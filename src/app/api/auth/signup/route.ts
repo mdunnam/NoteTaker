@@ -9,9 +9,10 @@ import bcrypt from "bcryptjs";
 export async function POST(request: NextRequest) {
   try {
     const { email, password, name } = await request.json();
+    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
 
     // Validation
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return NextResponse.json(
         { error: "Email and password are required" },
         { status: 400 }
@@ -20,13 +21,13 @@ export async function POST(request: NextRequest) {
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
       return NextResponse.json(
         { error: "Email already in use" },
-        { status: 400 }
+        { status: 409 }
       );
     }
 
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest) {
     // Create user
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         name: name || null,
       },

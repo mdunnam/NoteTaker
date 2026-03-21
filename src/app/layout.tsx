@@ -6,6 +6,9 @@ import { auth } from "@/auth";
 export const metadata: Metadata = {
   title: "QNote - AI-Assisted Note Inbox",
   description: "Capture thoughts fast, let AI organize, resurface what matters",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default async function RootLayout({
