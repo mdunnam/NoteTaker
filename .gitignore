@@ -26,12 +26,20 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.env.development
+.env.test
+.env.production
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Local history / cache artifacts
+.history/
+*.tsbuildinfo
+.vercel/
 
 # Prisma
 prisma/*.db
