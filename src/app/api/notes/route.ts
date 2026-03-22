@@ -36,8 +36,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Trigger AI organization in the background
-    // For now, we'll do it synchronously, but this could be moved to a queue
+    // Trigger AI organization synchronously for now.
     try {
       const organized = await organizeNote(rawContent);
 
@@ -59,15 +58,81 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // TODO: Create/link entities
-      // TODO: Generate embedding for semantic search
+      const extractedEntities = organized.extractedEntities || [];
+
+      if (extractedEntities.length > 0) {
+        for (const extractedEntity of extractedEntities) {
+          const normalizedName = extractedEntity.name.trim();
+
+          if (!normalizedName) {
+            continue;
+          }
+
+          const entity = await prisma.entity.upsert({
+            where: {
+              userId_type_name: {
+                userId: session.user.id,
+                type: extractedEntity.type,
+                name: normalizedName,
+              },
+            },
+            update: {},
+            create: {
+              userId: session.user.id,
+              type: extractedEntity.type,
+              name: normalizedName,
+              permalink: normalizedName.toLowerCase().replace(/\s+/g, "-"),
+            },
+          });
+
+          await prisma.noteEntity.upsert({
+            where: {
+              noteId_entityId: {
+                noteId: note.id,
+                entityId: entity.id,
+              },
+            },
+            update: {
+              mentionCount: {
+                increment: 1,
+              },
+            },
+            create: {
+              noteId: note.id,
+              entityId: entity.id,
+              mentionCount: 1,
+            },
+          });
+        }
+      }
     } catch (aiError) {
       console.error("Error organizing note:", aiError);
-      // Note stays in PROCESSED state even if AI fails
-      // User can manually organize if needed
+
+      // Mark as processed so the note still appears as handled when AI enrichment fails.
+      await prisma.note.update({
+        where: { id: note.id },
+        data: {
+          status: "PROCESSED",
+          title: note.rawContent.split("\n")[0]?.slice(0, 80) || note.title,
+          summary: note.rawContent.slice(0, 200),
+          confidenceScore: 0.2,
+        },
+      });
     }
 
-    return NextResponse.json(note, { status: 201 });
+    const freshNote = await prisma.note.findUnique({
+      where: { id: note.id },
+      include: {
+        collection: true,
+        entities: {
+          include: {
+            entity: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(freshNote, { status: 201 });
   } catch (error) {
     console.error("Error creating note:", error);
     return NextResponse.json(
