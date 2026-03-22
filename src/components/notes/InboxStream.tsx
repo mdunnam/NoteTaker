@@ -4,7 +4,7 @@
 
 "use client";
 
-import { Note, NoteStatus } from "@prisma/client";
+import { Note } from "@prisma/client";
 import NoteCard from "./NoteCard";
 
 interface InboxStreamProps {

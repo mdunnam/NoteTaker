@@ -64,7 +64,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
       {query && (
         <p className="mb-4 text-sm text-gray-600">
-          {notes.length} result{notes.length === 1 ? "" : "s"} for "{query}".
+          {notes.length} result{notes.length === 1 ? "" : "s"} for &quot;{query}&quot;.
         </p>
       )}
 

@@ -80,14 +80,6 @@ export default function CaptureBar() {
     setTags(tags.filter((t) => t !== tag));
   };
 
-  /**
-   * Handle paste event
-   */
-  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    // Let default paste behavior work
-    // We could add special handling here later
-  };
-
   return (
     <div className="border-b border-gray-200 bg-white px-6 py-4">
       <form onSubmit={handleCapture} className="space-y-3">
@@ -96,13 +88,13 @@ export default function CaptureBar() {
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            onPaste={handlePaste}
             placeholder="Type, paste, or say something... (Shift+Enter for new line)"
             className="flex-1 resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 focus:ring-offset-white min-h-14"
             rows={2}
             onKeyDown={(e) => {
               if (e.key === "Enter" && e.ctrlKey) {
-                handleCapture(e as any);
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
               }
             }}
           />
