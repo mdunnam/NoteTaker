@@ -14,6 +14,7 @@ export default function CaptureBar() {
   const [isLoading, setIsLoading] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [lastResultMessage, setLastResultMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -28,6 +29,7 @@ export default function CaptureBar() {
     }
 
     setIsLoading(true);
+    setLastResultMessage("");
 
     try {
       const response = await fetch("/api/notes", {
@@ -41,6 +43,14 @@ export default function CaptureBar() {
 
       if (!response.ok) {
         throw new Error("Failed to create note");
+      }
+
+      const data = await response.json();
+
+      if (data?.split && typeof data?.count === "number") {
+        setLastResultMessage(`Split dump into ${data.count} notes.`);
+      } else {
+        setLastResultMessage("Saved 1 note.");
       }
 
       // Clear form
@@ -154,6 +164,12 @@ export default function CaptureBar() {
             <Paperclip className="w-4 h-4" />
             Add tags (optional)
           </button>
+        )}
+
+        {lastResultMessage && (
+          <p className="text-xs text-green-700" role="status">
+            {lastResultMessage}
+          </p>
         )}
       </form>
     </div>
