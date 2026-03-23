@@ -11,7 +11,7 @@ export default async function RightPanel() {
     return null;
   }
 
-  const [totalNotes, uncategorizedCount, processingCount, recentNotes] = await Promise.all([
+  const [totalNotes, uncategorizedCount, processingCount, recentNotes, topRelations] = await Promise.all([
     prisma.note.count({
       where: {
         userId: session.user.id,
@@ -44,6 +44,29 @@ export default async function RightPanel() {
         id: true,
         title: true,
         extractedTasks: true,
+      },
+    }),
+    prisma.noteRelation.findMany({
+      where: {
+        sourceNote: {
+          userId: session.user.id,
+        },
+      },
+      orderBy: {
+        score: "desc",
+      },
+      take: 6,
+      include: {
+        sourceNote: {
+          select: {
+            title: true,
+          },
+        },
+        targetNote: {
+          select: {
+            title: true,
+          },
+        },
       },
     }),
   ]);
@@ -118,6 +141,31 @@ export default async function RightPanel() {
                   {task.dueDate && (
                     <div className="mt-1 text-[11px] text-blue-700">Due: {task.dueDate}</div>
                   )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="pt-6 border-t border-gray-200">
+          <h3 className="font-semibold text-sm mb-3">Top Related Notes</h3>
+          {topRelations.length === 0 ? (
+            <p className="text-xs text-gray-600">No related-note links yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {topRelations.map((relation) => (
+                <li
+                  key={relation.id}
+                  className="rounded border border-gray-200 bg-white p-3 text-[11px] text-gray-700"
+                >
+                  <div className="font-medium text-gray-900">
+                    {relation.sourceNote.title || "Untitled note"}
+                  </div>
+                  <div className="mt-1">related to</div>
+                  <div className="font-medium text-gray-900">
+                    {relation.targetNote.title || "Untitled note"}
+                  </div>
+                  <div className="mt-1 text-blue-700">Score: {relation.score.toFixed(2)}</div>
                 </li>
               ))}
             </ul>

@@ -5,7 +5,7 @@
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { organizeNote } from "@/lib/ai";
+import { cosineSimilarity, embedNote, organizeNote } from "@/lib/ai";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -104,6 +104,77 @@ export async function POST(request: NextRequest) {
             },
           });
         }
+      }
+
+      // Create lightweight related-note links using embedding similarity.
+      try {
+        const sourceText = `${organized.title || ""}\n${organized.summary || rawContent}`.trim();
+        const sourceEmbedding = await embedNote(sourceText);
+
+        if (sourceEmbedding.length > 0) {
+          const candidates = await prisma.note.findMany({
+            where: {
+              userId: session.user.id,
+              id: { not: note.id },
+              isArchived: false,
+              status: "PROCESSED",
+            },
+            select: {
+              id: true,
+              title: true,
+              summary: true,
+              rawContent: true,
+            },
+            orderBy: {
+              createdAt: "desc",
+            },
+            take: 25,
+          });
+
+          const scored: Array<{ id: string; score: number }> = [];
+
+          for (const candidate of candidates) {
+            const candidateText = `${candidate.title || ""}\n${candidate.summary || candidate.rawContent}`.trim();
+            const candidateEmbedding = await embedNote(candidateText);
+
+            if (candidateEmbedding.length === 0) {
+              continue;
+            }
+
+            const score = cosineSimilarity(sourceEmbedding, candidateEmbedding);
+
+            if (score >= 0.78) {
+              scored.push({ id: candidate.id, score });
+            }
+          }
+
+          const topMatches = scored.sort((a, b) => b.score - a.score).slice(0, 5);
+
+          for (const match of topMatches) {
+            const [sourceNoteId, targetNoteId] = [note.id, match.id].sort();
+
+            await prisma.noteRelation.upsert({
+              where: {
+                sourceNoteId_targetNoteId: {
+                  sourceNoteId,
+                  targetNoteId,
+                },
+              },
+              update: {
+                score: match.score,
+                reason: "Embedding similarity",
+              },
+              create: {
+                sourceNoteId,
+                targetNoteId,
+                score: match.score,
+                reason: "Embedding similarity",
+              },
+            });
+          }
+        }
+      } catch (relationError) {
+        console.error("Error creating related-note links:", relationError);
       }
     } catch (aiError) {
       console.error("Error organizing note:", aiError);
