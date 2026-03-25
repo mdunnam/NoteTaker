@@ -5,7 +5,7 @@
 "use client";
 
 import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface NoteData {
@@ -26,13 +26,35 @@ interface NoteCardProps {
   note: NoteData;
 }
 
+interface CollectionOption {
+  id: string;
+  name: string;
+}
+
 export default function NoteCard({ note }: NoteCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(note.title || "");
   const [editContent, setEditContent] = useState(note.rawContent);
+  const [editCollectionId, setEditCollectionId] = useState(note.collection?.id || "");
   const [isSaving, setIsSaving] = useState(false);
+  const [collections, setCollections] = useState<CollectionOption[]>([]);
+
+  useEffect(() => {
+    const loadCollections = async () => {
+      try {
+        const response = await fetch("/api/collections");
+        if (!response.ok) return;
+        const data = (await response.json()) as Array<{ id: string; name: string }>;
+        setCollections(data.map((c) => ({ id: c.id, name: c.name })));
+      } catch (error) {
+        console.error("Error loading collections:", error);
+      }
+    };
+
+    loadCollections();
+  }, []);
 
   /**
    * Save inline edits back to the server.
@@ -46,6 +68,7 @@ export default function NoteCard({ note }: NoteCardProps) {
         body: JSON.stringify({
           title: editTitle.trim() || null,
           rawContent: editContent.trim(),
+          collectionId: editCollectionId || null,
         }),
       });
       if (!response.ok) throw new Error("Save failed");
@@ -64,6 +87,7 @@ export default function NoteCard({ note }: NoteCardProps) {
   const handleCancelEdit = () => {
     setEditTitle(note.title || "");
     setEditContent(note.rawContent);
+    setEditCollectionId(note.collection?.id || "");
     setIsEditing(false);
   };
 
@@ -224,6 +248,21 @@ export default function NoteCard({ note }: NoteCardProps) {
         </p>
       )}
 
+      {isEditing && (
+        <select
+          value={editCollectionId}
+          onChange={(e) => setEditCollectionId(e.target.value)}
+          className="mb-3 w-full rounded border border-blue-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">No collection</option>
+          {collections.map((collection) => (
+            <option key={collection.id} value={collection.id}>
+              {collection.name}
+            </option>
+          ))}
+        </select>
+      )}
+
       {/* Metadata */}
       <div className="flex flex-wrap gap-2 items-center text-xs">
         {note.collection && (
@@ -256,6 +295,15 @@ export default function NoteCard({ note }: NoteCardProps) {
             AI organizing...
           </span>
         )}
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-gray-100">
+        <a
+          href={`/notes/${note.id}`}
+          className="text-xs text-blue-600 hover:underline"
+        >
+          View full note →
+        </a>
       </div>
     </div>
   );

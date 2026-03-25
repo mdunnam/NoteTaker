@@ -17,6 +17,7 @@ import {
   Heart,
   LogOut,
   Library,
+  Settings,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -33,6 +34,7 @@ const navigationItems = [
 const secondaryItems = [
   { label: "Favorites", href: "/favorites", icon: Heart },
   { label: "Archive", href: "/archive", icon: Archive },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 export default function Sidebar() {
