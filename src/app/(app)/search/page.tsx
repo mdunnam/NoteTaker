@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import AskPanel from "@/components/search/AskPanel";
 
 interface SearchPageProps {
   searchParams?: {
@@ -43,6 +44,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-4 text-gray-900">Search & Ask</h1>
+
+      <AskPanel />
 
       <form method="GET" className="mb-6">
         <div className="flex gap-2">
