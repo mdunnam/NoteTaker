@@ -1,5 +1,6 @@
 /**
- * PATCH /api/notes/[id] - Update a note
+ * GET    /api/notes/[id] - Retrieve a single note
+ * PATCH  /api/notes/[id] - Update a note
  * DELETE /api/notes/[id] - Delete a note
  */
 
@@ -11,6 +12,53 @@ interface Params {
   params: {
     id: string;
   };
+}
+
+export async function GET(request: NextRequest, { params }: Params) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const note = await prisma.note.findFirst({
+      where: { id: params.id, userId: session.user.id },
+      include: {
+        collection: true,
+        entities: {
+          include: { entity: true },
+        },
+        relatedNotesFrom: {
+          include: {
+            targetNote: {
+              select: { id: true, title: true, summary: true, createdAt: true },
+            },
+          },
+          orderBy: { score: "desc" },
+          take: 5,
+        },
+        relatedNotesTo: {
+          include: {
+            sourceNote: {
+              select: { id: true, title: true, summary: true, createdAt: true },
+            },
+          },
+          orderBy: { score: "desc" },
+          take: 5,
+        },
+      },
+    });
+
+    if (!note) {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(note);
+  } catch (error) {
+    console.error("Error fetching note:", error);
+    return NextResponse.json({ error: "Failed to fetch note" }, { status: 500 });
+  }
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
@@ -41,6 +89,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       where: { id },
       data: {
         ...(body.title !== undefined && { title: body.title }),
+        ...(body.rawContent !== undefined && { rawContent: body.rawContent }),
         ...(body.summary !== undefined && { summary: body.summary }),
         ...(body.category !== undefined && { category: body.category }),
         ...(body.type !== undefined && { type: body.type }),

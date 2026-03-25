@@ -16,12 +16,14 @@ import {
   Archive,
   Heart,
   LogOut,
+  Library,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 const navigationItems = [
   { label: "Inbox", href: "/inbox", icon: Inbox },
   { label: "Cards", href: "/cards", icon: Grid3x3 },
+  { label: "Collections", href: "/collections", icon: Library },
   { label: "Projects", href: "/projects", icon: Folder },
   { label: "Topics", href: "/topics", icon: Tag },
   { label: "Timeline", href: "/timeline", icon: Calendar },
