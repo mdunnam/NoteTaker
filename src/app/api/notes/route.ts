@@ -7,6 +7,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { cosineSimilarity, embedNote, organizeNote, splitNote } from "@/lib/ai";
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 interface CreateNoteOptions {
   userId: string;
@@ -197,6 +198,15 @@ export async function POST(request: NextRequest) {
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limit check
+    const rateLimitResult = checkRateLimit(session.user.id, "/api/notes");
+    if (!rateLimitResult.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again in a moment." },
+        { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter) } }
+      );
     }
 
     const { rawContent, tags, collectionId, autoSplit = true } = await request.json();

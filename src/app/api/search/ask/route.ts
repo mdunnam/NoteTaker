@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import OpenAI from "openai";
 import { NextRequest, NextResponse } from "next/server";
+import { embedNote, cosineSimilarity } from "@/lib/ai";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -35,6 +37,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Rate limit check
+    const rateLimitResult = checkRateLimit(session.user.id, "/api/search/ask");
+    if (!rateLimitResult.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again in a moment." },
+        { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter) } }
+      );
+    }
+
     const body = (await request.json()) as AskRequestBody;
     const question = (body.question || "").trim();
 
@@ -46,11 +57,8 @@ export async function POST(request: NextRequest) {
       where: {
         userId: session.user.id,
         isArchived: false,
+        status: "PROCESSED",
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: 25,
       select: {
         id: true,
         title: true,
@@ -58,21 +66,67 @@ export async function POST(request: NextRequest) {
         rawContent: true,
         createdAt: true,
       },
+      orderBy: { createdAt: "desc" },
+      take: 30,
     });
 
-    if (notes.length === 0) {
+    // Try to find semantically relevant notes
+    let contextNotes = notes;
+    try {
+      const queryEmbedding = await embedNote(question);
+      if (queryEmbedding.length > 0) {
+        const scored: Array<{
+          id: string;
+          title: string | null;
+          summary: string | null;
+          rawContent: string;
+          createdAt: Date;
+          score: number;
+        }> = [];
+
+        for (const note of notes) {
+          const noteText = `${note.title || ""}\n${note.summary || note.rawContent}`.trim();
+          const noteEmbedding = await embedNote(noteText);
+
+          if (noteEmbedding.length === 0) {
+            continue;
+          }
+
+          const score = cosineSimilarity(queryEmbedding, noteEmbedding);
+          if (score > 0.5) {
+            scored.push({ ...note, score });
+          }
+        }
+
+        scored.sort((a, b) => b.score - a.score);
+
+        if (scored.length > 0) {
+          contextNotes = scored.slice(0, 15).map((item) => ({
+            id: item.id,
+            title: item.title,
+            summary: item.summary,
+            rawContent: item.rawContent,
+            createdAt: item.createdAt,
+          }));
+        }
+      }
+    } catch (embedError) {
+      console.warn("Semantic grounding failed, using recent notes:", embedError);
+    }
+
+    if (contextNotes.length === 0) {
       return NextResponse.json({
-        answer: "No notes yet. Capture a few notes first, then ask again.",
+        answer: "No notes available. Capture a few notes first, then ask again.",
         sources: [],
       });
     }
 
-    const context = buildContext(notes);
+    const context = buildContext(contextNotes);
 
     if (!openaiClient) {
       return NextResponse.json({
         answer: "OpenAI is not configured, so I can only show source notes. Add OPENAI_API_KEY to enable full answers.",
-        sources: notes.slice(0, 5).map((note) => ({
+        sources: contextNotes.slice(0, 5).map((note) => ({
           id: note.id,
           title: note.title || "Untitled note",
           createdAt: note.createdAt.toISOString(),
@@ -100,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       answer,
-      sources: notes.slice(0, 5).map((note) => ({
+      sources: contextNotes.slice(0, 5).map((note) => ({
         id: note.id,
         title: note.title || "Untitled note",
         createdAt: note.createdAt.toISOString(),
