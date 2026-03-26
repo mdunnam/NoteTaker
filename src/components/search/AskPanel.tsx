@@ -6,7 +6,7 @@ interface AskResponse {
   answer: string;
   sources: Array<{
     id: string;
-    title: string;
+    title: string | null;
     createdAt: string;
   }>;
 }
@@ -88,8 +88,16 @@ export default function AskPanel() {
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">Sources</h3>
               <ul className="space-y-1">
                 {result.sources.map((source) => (
-                  <li key={source.id} className="text-xs text-gray-700">
-                    {source.title} ({new Date(source.createdAt).toLocaleDateString("en-US")})
+                  <li key={source.id}>
+                    <a
+                      href={`/notes/${source.id}`}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      {source.title || "Untitled note"} &rarr;
+                    </a>
+                    <span className="ml-1 text-xs text-gray-500">
+                      {new Date(source.createdAt).toLocaleDateString("en-US")}
+                    </span>
                   </li>
                 ))}
               </ul>

@@ -39,8 +39,12 @@ export default async function CardsPage() {
       </div>
 
       {notes.length === 0 ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
-          <p className="text-gray-600">No notes yet. Add your first capture from the top bar.</p>
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 p-16 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+            <span className="text-3xl">🗂️</span>
+          </div>
+          <p className="text-lg font-medium text-gray-700 mb-1">No notes yet</p>
+          <p className="text-sm text-gray-500">Capture your first thought using the box at the top of the page.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
