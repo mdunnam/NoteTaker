@@ -26,7 +26,7 @@ async function createBaseNote(options: CreateNoteOptions) {
       rawContent: options.rawContent.trim(),
       tags: options.tags || [],
       collectionId: options.collectionId || null,
-      status: "UNPROCESSED",
+      status: "PROCESSING",
     },
   });
 }
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
 
             createdNoteIds.push(created.id);
 
-            await enrichNote({
+            void enrichNote({
               noteId: created.id,
               userId: session.user.id,
               rawContent: splitItem.content,
@@ -283,7 +283,7 @@ export async function POST(request: NextRequest) {
       collectionId,
     });
 
-    await enrichNote({
+    void enrichNote({
       noteId: note.id,
       userId: session.user.id,
       rawContent,
