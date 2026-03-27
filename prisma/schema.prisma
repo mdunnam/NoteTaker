@@ -74,6 +74,7 @@ model Note {
   relatedNotesTo    NoteRelation[] @relation("target")
   
   entities          NoteEntity[]
+  jobs              NoteJob[]
   
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -89,6 +90,35 @@ enum NoteStatus {
   UNPROCESSED
   PROCESSING
   PROCESSED
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+// Durable enrichment job queue — survives serverless cold-starts and retries on failure
+model NoteJob {
+  id          String    @id @default(cuid())
+  noteId      String
+  note        Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId      String
+
+  status      JobStatus @default(PENDING)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3)
+  lastError   String?   @db.Text
+
+  scheduledAt DateTime  @default(now())
+  processedAt DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, scheduledAt])
+  @@index([noteId])
 }
 
 // Related notes (many-to-many with score)
