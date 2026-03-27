@@ -22,6 +22,26 @@ vi.mock("@/lib/rateLimit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
+vi.mock("openai", () => {
+  return {
+    default: class OpenAI {
+      chat = {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [
+              {
+                message: {
+                  content: "Mocked assistant answer from notes context.",
+                },
+              },
+            ],
+          }),
+        },
+      };
+    },
+  };
+});
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { embedNote, cosineSimilarity } from "@/lib/ai";
@@ -66,7 +86,7 @@ describe("/api/search/ask POST", () => {
     expect(response.headers.get("Retry-After")).toBe("6");
   });
 
-  it("returns fallback answer with sources when OpenAI is not configured", async () => {
+  it("returns mocked answer with sources", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" } } as never);
     mockedFindMany.mockResolvedValue([
       {
@@ -87,7 +107,7 @@ describe("/api/search/ask POST", () => {
     const payload = (await response.json()) as { answer: string; sources: Array<{ id: string }> };
 
     expect(response.status).toBe(200);
-    expect(payload.answer).toContain("OpenAI is not configured");
+    expect(payload.answer).toContain("Mocked assistant answer");
     expect(payload.sources[0]?.id).toBe("n1");
   });
 
