@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { embedNote, cosineSimilarity } from "@/lib/ai";
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { rankKeywordCandidates, selectTopSemanticCandidates } from "@/lib/searchRanking";
 
 interface SemanticSearchRequest {
   query: string;
@@ -97,10 +98,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    scored.sort((a, b) => b.score - a.score);
+    const semanticResults = selectTopSemanticCandidates(scored, limit, 0.5);
 
     return NextResponse.json({
-      results: scored.slice(0, limit).map((note) => ({
+      results: semanticResults.map((note) => ({
         id: note.id,
         title: note.title,
         summary: note.summary,
@@ -124,18 +125,7 @@ function performKeywordSearch(
   query: string,
   limit: number
 ) {
-  const queryLower = query.toLowerCase();
-  const scored = notes
-    .map((note) => {
-      let score = 0;
-      if (note.title?.toLowerCase().includes(queryLower)) score += 3;
-      if (note.summary?.toLowerCase().includes(queryLower)) score += 2;
-      if (note.rawContent.toLowerCase().includes(queryLower)) score += 1;
-      return { ...note, score };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+  const scored = rankKeywordCandidates(notes, query, limit);
 
   return NextResponse.json({
     results: scored.map((note) => ({
