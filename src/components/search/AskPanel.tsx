@@ -4,6 +4,10 @@ import { FormEvent, useState } from "react";
 
 interface AskResponse {
   answer: string;
+  inferredContext: string;
+  confidence: number;
+  needsClarification: boolean;
+  followUpQuestions: string[];
   sources: Array<{
     id: string;
     title: string | null;
@@ -16,6 +20,8 @@ interface AskResponse {
  */
 export default function AskPanel() {
   const [question, setQuestion] = useState("");
+  const [contextHint, setContextHint] = useState("");
+  const [remember, setRemember] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<AskResponse | null>(null);
@@ -38,7 +44,11 @@ export default function AskPanel() {
       const response = await fetch("/api/search/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: trimmedQuestion }),
+        body: JSON.stringify({
+          question: trimmedQuestion,
+          contextHint: contextHint.trim() || undefined,
+          remember,
+        }),
       });
 
       const data = (await response.json()) as AskResponse | { error: string };
@@ -68,6 +78,24 @@ export default function AskPanel() {
           className="min-h-24 w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
         />
 
+        <input
+          type="text"
+          value={contextHint}
+          onChange={(event) => setContextHint(event.target.value)}
+          placeholder="Optional context hint (e.g., 'this is about product launch planning')"
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+        />
+
+        <label className="flex items-center gap-2 text-xs text-gray-600">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(event) => setRemember(event.target.checked)}
+            className="h-4 w-4"
+          />
+          Remember inferred context patterns to get smarter over time
+        </label>
+
         <button
           type="submit"
           disabled={isLoading || !question.trim()}
@@ -82,6 +110,36 @@ export default function AskPanel() {
       {result && (
         <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
           <p className="whitespace-pre-wrap text-sm text-gray-900">{result.answer}</p>
+
+          <div className="mt-3 space-y-1 text-xs text-gray-700">
+            <p>
+              <strong>Inferred context:</strong> {result.inferredContext}
+            </p>
+            <p>
+              <strong>Confidence:</strong> {(result.confidence * 100).toFixed(0)}%
+            </p>
+          </div>
+
+          {result.followUpQuestions.length > 0 && (
+            <div className="mt-4">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                Follow-up Questions
+              </h3>
+              <ul className="space-y-1">
+                {result.followUpQuestions.map((followUp) => (
+                  <li key={followUp}>
+                    <button
+                      type="button"
+                      onClick={() => setQuestion(followUp)}
+                      className="text-left text-xs text-blue-700 hover:underline"
+                    >
+                      {followUp}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {result.sources.length > 0 && (
             <div className="mt-4">

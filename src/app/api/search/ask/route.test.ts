@@ -10,6 +10,10 @@ vi.mock("@/lib/db", () => ({
     note: {
       findMany: vi.fn(),
     },
+    userPreferences: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+    },
   },
 }));
 
@@ -50,6 +54,8 @@ import { POST } from "./route";
 
 const mockedAuth = vi.mocked(auth);
 const mockedFindMany = vi.mocked(prisma.note.findMany);
+const mockedPreferencesFindUnique = vi.mocked(prisma.userPreferences.findUnique);
+const mockedPreferencesUpsert = vi.mocked(prisma.userPreferences.upsert);
 const mockedEmbedNote = vi.mocked(embedNote);
 const mockedCosineSimilarity = vi.mocked(cosineSimilarity);
 const mockedCheckRateLimit = vi.mocked(checkRateLimit);
@@ -66,6 +72,8 @@ describe("/api/search/ask POST", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedCheckRateLimit.mockReturnValue({ ok: true });
+    mockedPreferencesFindUnique.mockResolvedValue(null as never);
+    mockedPreferencesUpsert.mockResolvedValue({} as never);
   });
 
   it("returns 400 when question is empty", async () => {
