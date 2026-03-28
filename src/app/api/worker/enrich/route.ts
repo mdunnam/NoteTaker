@@ -35,7 +35,10 @@ function isAuthorised(request: NextRequest): boolean {
   return false;
 }
 
-export async function POST(request: NextRequest) {
+/**
+ * Process one queued enrichment job.
+ */
+async function handleWorker(request: NextRequest) {
   if (!isAuthorised(request)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -103,4 +106,13 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function POST(request: NextRequest) {
+  return handleWorker(request);
+}
+
+// Vercel Cron invokes GET requests, so support GET as well.
+export async function GET(request: NextRequest) {
+  return handleWorker(request);
 }
