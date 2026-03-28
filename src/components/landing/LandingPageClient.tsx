@@ -15,6 +15,7 @@ interface LandingPageClientProps {
 export default function LandingPageClient({ isSignedIn, userEmail }: LandingPageClientProps) {
   const [isLoadingCheckout, setIsLoadingCheckout] = useState(false);
   const [error, setError] = useState("");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
 
   const features = useMemo(
     () => [
@@ -33,11 +34,13 @@ export default function LandingPageClient({ isSignedIn, userEmail }: LandingPage
     setIsLoadingCheckout(true);
     setError("");
 
+    const selectedPlan = billingCycle === "annual" ? "pro-annual" : "pro-monthly";
+
     try {
       const response = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "pro-monthly" }),
+        body: JSON.stringify({ plan: selectedPlan }),
       });
 
       const data = (await response.json()) as { url?: string; error?: string };
@@ -127,10 +130,40 @@ export default function LandingPageClient({ isSignedIn, userEmail }: LandingPage
 
           <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-xl shadow-gray-200/60">
             <p className="mb-2 text-sm uppercase tracking-[0.16em] text-gray-500">Pro Plan</p>
-            <div className="mb-6 flex items-end gap-2">
-              <span className="text-5xl font-bold tracking-tight">$12</span>
-              <span className="pb-2 text-gray-500">/ month</span>
+
+            <div className="mb-4 inline-flex rounded-lg border border-gray-300 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => setBillingCycle("monthly")}
+                className={`rounded-md px-3 py-1.5 font-medium transition ${
+                  billingCycle === "monthly" ? "bg-black text-white" : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingCycle("annual")}
+                className={`rounded-md px-3 py-1.5 font-medium transition ${
+                  billingCycle === "annual" ? "bg-black text-white" : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                Annual
+              </button>
             </div>
+
+            <div className="mb-6 flex items-end gap-2">
+              <span className="text-5xl font-bold tracking-tight">
+                {billingCycle === "annual" ? "$120" : "$12"}
+              </span>
+              <span className="pb-2 text-gray-500">
+                {billingCycle === "annual" ? "/ year" : "/ month"}
+              </span>
+            </div>
+
+            {billingCycle === "annual" && (
+              <p className="mb-5 text-xs font-medium text-emerald-700">Save 17% with annual billing</p>
+            )}
 
             <ul className="mb-8 space-y-3">
               {features.map((feature) => (
@@ -146,7 +179,9 @@ export default function LandingPageClient({ isSignedIn, userEmail }: LandingPage
               disabled={isLoadingCheckout}
               className="w-full rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isLoadingCheckout ? "Opening checkout..." : "Start Pro with Stripe"}
+              {isLoadingCheckout
+                ? "Opening checkout..."
+                : `Start ${billingCycle === "annual" ? "Annual" : "Monthly"} Pro with Stripe`}
             </button>
 
             {error && <p className="mt-3 text-sm text-red-700">{error}</p>}

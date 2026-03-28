@@ -4,8 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const CheckoutBodySchema = z.object({
-  plan: z.literal("pro-monthly"),
+  plan: z.enum(["pro-monthly", "pro-annual"]),
 });
+
+const PLAN_TO_PRICE_ENV: Record<"pro-monthly" | "pro-annual", string> = {
+  "pro-monthly": "STRIPE_PRICE_PRO_MONTHLY",
+  "pro-annual": "STRIPE_PRICE_PRO_ANNUAL",
+};
 
 /**
  * POST /api/billing/checkout
@@ -21,10 +26,11 @@ export async function POST(request: NextRequest) {
     const session = await auth();
     const stripe = getStripeClient();
 
-    const priceId = process.env.STRIPE_PRICE_PRO_MONTHLY;
+    const priceEnvName = PLAN_TO_PRICE_ENV[parsedBody.data.plan];
+    const priceId = process.env[priceEnvName];
     if (!priceId) {
       return NextResponse.json(
-        { error: "Missing STRIPE_PRICE_PRO_MONTHLY" },
+        { error: `Missing ${priceEnvName}` },
         { status: 500 }
       );
     }
