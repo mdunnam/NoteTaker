@@ -19,9 +19,20 @@ const STALE_JOB_MINUTES = 10;
  */
 function isAuthorised(request: NextRequest): boolean {
   const workerSecret = process.env.WORKER_SECRET;
-  if (!workerSecret) return false;
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!workerSecret && !cronSecret) return false;
+
   const auth = request.headers.get("Authorization") ?? "";
-  return auth === `Bearer ${workerSecret}`;
+  if (workerSecret && auth === `Bearer ${workerSecret}`) {
+    return true;
+  }
+
+  if (cronSecret && auth === `Bearer ${cronSecret}`) {
+    return true;
+  }
+
+  return false;
 }
 
 export async function POST(request: NextRequest) {
