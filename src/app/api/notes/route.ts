@@ -13,22 +13,29 @@ import { checkRateLimit } from "@/lib/rateLimit";
  * Enqueue an enrichment job and trigger the worker endpoint asynchronously.
  * The job persists in the DB so it survives serverless cold-starts and retries on failure.
  */
-async function enqueueEnrichment(noteId: string, userId: string): Promise<void> {
+async function enqueueEnrichment(noteId: string, userId: string, requestOrigin: string): Promise<void> {
   await prisma.noteJob.create({
     data: { noteId, userId },
   });
 
-  // Trigger the worker without awaiting — the job is safe in the DB regardless
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  // Trigger the worker without awaiting — the job is safe in the DB regardless.
+  // Use request origin first to avoid cross-origin redirects stripping auth headers.
+  const baseUrl = requestOrigin || process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
   const workerSecret = process.env.WORKER_SECRET;
   if (workerSecret) {
     void fetch(`${baseUrl}/api/worker/enrich`, {
       method: "POST",
       headers: { Authorization: `Bearer ${workerSecret}` },
-    }).catch((err: unknown) => {
+    })
+      .then((response) => {
+        if (!response.ok) {
+          console.warn("Worker trigger returned non-OK response:", response.status);
+        }
+      })
+      .catch((err: unknown) => {
       // Non-fatal: worker will be picked up on next trigger or cron run
       console.warn("Worker trigger failed (job is queued):", err);
-    });
+      });
   }
 }
 
@@ -101,7 +108,7 @@ export async function POST(request: NextRequest) {
 
             createdNoteIds.push(created.id);
 
-            await enqueueEnrichment(created.id, session.user.id);
+            await enqueueEnrichment(created.id, session.user.id, request.nextUrl.origin);
           }
 
           const createdNotes = await prisma.note.findMany({
@@ -142,7 +149,7 @@ export async function POST(request: NextRequest) {
       collectionId,
     });
 
-    await enqueueEnrichment(note.id, session.user.id);
+    await enqueueEnrichment(note.id, session.user.id, request.nextUrl.origin);
 
     const freshNote = await prisma.note.findUnique({
       where: { id: note.id },
