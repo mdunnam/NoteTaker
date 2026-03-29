@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/worker/enrich",
-      "schedule": "* * * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }

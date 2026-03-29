@@ -1,5 +1,17 @@
-import { redirect } from "next/navigation";
+"use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+/**
+ * Route-group root redirect for authenticated app routes.
+ */
 export default function AppPage() {
-  redirect("/inbox");
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/inbox");
+  }, [router]);
+
+  return null;
 }
