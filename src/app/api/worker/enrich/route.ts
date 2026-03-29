@@ -13,6 +13,7 @@ import { enrichNote } from "@/lib/enrichNote";
 import { NextRequest, NextResponse } from "next/server";
 
 const STALE_JOB_MINUTES = 10;
+const STALE_PROCESSING_NOTE_MINUTES = 5;
 
 /**
  * Verify the request carries a valid worker secret.
@@ -64,6 +65,35 @@ async function handleWorker(request: NextRequest) {
   const job = stalledJob ?? (pendingJob && pendingJob.attempts < pendingJob.maxAttempts ? pendingJob : null);
 
   if (!job) {
+    // Recovery path: find notes stuck in PROCESSING with no jobs and re-enqueue them.
+    const staleProcessingCutoff = new Date(Date.now() - STALE_PROCESSING_NOTE_MINUTES * 60 * 1000);
+    const orphanNote = await prisma.note.findFirst({
+      where: {
+        status: "PROCESSING",
+        updatedAt: { lt: staleProcessingCutoff },
+        jobs: { none: {} },
+      },
+      select: {
+        id: true,
+        userId: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (orphanNote) {
+      const queued = await prisma.noteJob.create({
+        data: {
+          noteId: orphanNote.id,
+          userId: orphanNote.userId,
+        },
+      });
+
+      return NextResponse.json(
+        { message: "Recovered orphan processing note", noteId: orphanNote.id, jobId: queued.id },
+        { status: 202 }
+      );
+    }
+
     return NextResponse.json({ message: "No jobs pending" }, { status: 200 });
   }
 
