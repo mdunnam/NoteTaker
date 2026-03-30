@@ -47,10 +47,6 @@ const OrganizedNoteSchema = z.object({
   confidenceScore: z.number().min(0).max(1).describe("Confidence in the organization (0-1)"),
 });
 
-const SummaryRewriteSchema = z.object({
-  summary: z.string().min(1).max(500),
-});
-
 const STOPWORDS = new Set([
   "a",
   "an",
@@ -228,7 +224,16 @@ Return strict JSON:
   "confidenceScore": 0.0
 }`;
 
+interface OrganizeNoteOptions {
+  userContext?: string;
+  explicitProject?: string;
+  explicitContext?: string;
+}
 
+/**
+ * Build supplemental hints to guide AI organization with user context.
+ */
+function buildOrganizationHints(options?: OrganizeNoteOptions): string {
   if (!options) {
     return "";
   }
@@ -265,6 +270,9 @@ export async function organizeNote(rawContent: string, options?: OrganizeNoteOpt
       const fallback = {
         title: rawContent.split("\n")[0]?.slice(0, 80) || "Untitled note",
         summary: "",
+        intent: "Unable to determine intent without AI.",
+        nextAction: null,
+        priority: "medium" as const,
         category: "General",
         type: "NOTE" as const,
         tags: [],
@@ -272,6 +280,7 @@ export async function organizeNote(rawContent: string, options?: OrganizeNoteOpt
         extractedTasks: [],
         extractedDates: [],
         extractedEntities: [],
+        clarificationQuestions: [],
         confidenceScore: 0.3,
       };
 
