@@ -13,6 +13,11 @@ vi.mock("@/lib/rateLimit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
+vi.mock("@/lib/userMemory", () => ({
+  getThinkingMemory: vi.fn(),
+  buildThinkingMemoryPrompt: vi.fn(),
+}));
+
 vi.mock("@/lib/db", () => ({
   prisma: {
     note: {
@@ -26,6 +31,7 @@ import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { buildThinkingMemoryPrompt, getThinkingMemory } from "@/lib/userMemory";
 import { POST } from "./route";
 
 const mockedAuth = vi.mocked(auth);
@@ -33,6 +39,8 @@ const mockedOrganizeNote = vi.mocked(organizeNote);
 const mockedFindFirst = vi.mocked(prisma.note.findFirst);
 const mockedUpdate = vi.mocked(prisma.note.update);
 const mockedCheckRateLimit = vi.mocked(checkRateLimit);
+const mockedGetThinkingMemory = vi.mocked(getThinkingMemory);
+const mockedBuildThinkingMemoryPrompt = vi.mocked(buildThinkingMemoryPrompt);
 
 function makeRequest() {
   return new NextRequest("http://localhost/api/notes/n1/summary", {
@@ -44,6 +52,13 @@ describe("/api/notes/[id]/summary POST", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedCheckRateLimit.mockReturnValue({ ok: true });
+    mockedGetThinkingMemory.mockResolvedValue({
+      knownProjects: [],
+      knownContexts: [],
+      knownPeople: [],
+      knownTopics: [],
+    });
+    mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -66,7 +81,12 @@ describe("/api/notes/[id]/summary POST", () => {
 
   it("regenerates and persists summary", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" } } as never);
-    mockedFindFirst.mockResolvedValue({ id: "n1", rawContent: "Call Jim about invoices" } as never);
+    mockedFindFirst.mockResolvedValue({
+      id: "n1",
+      rawContent: "Call Jim about invoices",
+      suggestedProject: null,
+      category: null,
+    } as never);
     mockedOrganizeNote.mockResolvedValue({
       title: "Call Jim",
       summary: "A follow-up note focused on invoice reconciliation and next outreach.",
@@ -91,7 +111,10 @@ describe("/api/notes/[id]/summary POST", () => {
 
     expect(response.status).toBe(200);
     expect(payload.id).toBe("n1");
-    expect(mockedOrganizeNote).toHaveBeenCalledWith("Call Jim about invoices");
+    expect(mockedOrganizeNote).toHaveBeenCalledWith(
+      "Call Jim about invoices",
+      expect.objectContaining({ userContext: "Known projects: (none)" })
+    );
     expect(mockedUpdate).toHaveBeenCalled();
   });
 });

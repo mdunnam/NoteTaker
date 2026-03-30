@@ -18,11 +18,33 @@ interface NoteData {
   isPinned: boolean;
   isArchived: boolean;
   category: string | null;
+  type: string | null;
   tags: string[];
   status: string;
   confidenceScore: number | null;
+  priority: string | null;
+  aiMeta: unknown;
   collection: { id: string; name: string; color?: string | null } | null;
   entities: Array<{ entity: { id: string; name: string; type: string } }>;
+}
+
+interface AiMeta {
+  intent?: string | null;
+  nextAction?: string | null;
+  clarificationQuestions?: string[];
+}
+
+/** Safely parse the aiMeta JSON blob. */
+function parseAiMeta(raw: unknown): AiMeta {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const obj = raw as Record<string, unknown>;
+  return {
+    intent: typeof obj.intent === "string" ? obj.intent : null,
+    nextAction: typeof obj.nextAction === "string" ? obj.nextAction : null,
+    clarificationQuestions: Array.isArray(obj.clarificationQuestions)
+      ? (obj.clarificationQuestions as string[]).filter((q) => typeof q === "string")
+      : [],
+  };
 }
 
 interface NoteCardProps {
@@ -48,6 +70,8 @@ export default function NoteCard({ note }: NoteCardProps) {
   const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
   const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
   const confidenceBadge = getConfidenceBadgeConfig(note.confidenceScore);
+  const aiMeta = parseAiMeta(note.aiMeta);
+  const hasClarifications = (aiMeta.clarificationQuestions?.length ?? 0) > 0 && (note.confidenceScore ?? 1) < 0.65;
 
   useEffect(() => {
     const loadCollections = async () => {
@@ -208,11 +232,23 @@ export default function NoteCard({ note }: NoteCardProps) {
 
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          {note.title && (
-            <h3 className="font-semibold text-lg mb-1">{note.title}</h3>
-          )}
-          <p className="text-sm text-gray-500">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            {note.priority === "high" && (
+              <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                High
+              </span>
+            )}
+            {note.priority === "medium" && (
+              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                Medium
+              </span>
+            )}
+            {note.title && (
+              <h3 className="font-semibold text-base text-gray-900 truncate">{note.title}</h3>
+            )}
+          </div>
+          <p className="text-xs text-gray-400">
             {new Date(note.createdAt).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
@@ -314,9 +350,28 @@ export default function NoteCard({ note }: NoteCardProps) {
           className="mb-3 w-full resize-y rounded border border-blue-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       ) : (
-        <p className="text-sm text-gray-900 mb-3 whitespace-pre-wrap line-clamp-4">
+        <p className="text-sm text-gray-900 mb-2 whitespace-pre-wrap line-clamp-4">
           {note.rawContent}
         </p>
+      )}
+
+      {/* AI Intent callout */}
+      {!isEditing && aiMeta.intent && (
+        <p className="mb-3 text-xs text-indigo-700 bg-indigo-50 rounded-md px-2.5 py-1.5 border border-indigo-100">
+          <span className="font-semibold">Intent:</span> {aiMeta.intent}
+        </p>
+      )}
+
+      {/* Clarification questions for low-confidence notes */}
+      {!isEditing && hasClarifications && (
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2">
+          <p className="mb-1 text-[11px] font-semibold text-amber-800">AI needs clarification:</p>
+          <ul className="space-y-0.5">
+            {aiMeta.clarificationQuestions!.map((q, i) => (
+              <li key={i} className="text-xs text-amber-900">• {q}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {isEditing && (

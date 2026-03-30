@@ -25,6 +25,8 @@ interface NoteDetailData {
   isPinned: boolean;
   isArchived: boolean;
   confidenceScore: number | null;
+  priority: string | null;
+  aiMeta: unknown;
   suggestedProject: string | null;
   extractedTasks: unknown;
   createdAt: Date;
@@ -33,6 +35,25 @@ interface NoteDetailData {
   entities: Array<{ entity: { id: string; name: string; type: string } }>;
   relatedNotesFrom: Array<{ score: number; targetNote: RelatedNote }>;
   relatedNotesTo: Array<{ score: number; sourceNote: RelatedNote }>;
+}
+
+interface AiMeta {
+  intent?: string | null;
+  nextAction?: string | null;
+  clarificationQuestions?: string[];
+}
+
+/** Safely parse aiMeta JSON. */
+function parseAiMeta(raw: unknown): AiMeta {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const obj = raw as Record<string, unknown>;
+  return {
+    intent: typeof obj.intent === "string" ? obj.intent : null,
+    nextAction: typeof obj.nextAction === "string" ? obj.nextAction : null,
+    clarificationQuestions: Array.isArray(obj.clarificationQuestions)
+      ? (obj.clarificationQuestions as string[]).filter((q) => typeof q === "string")
+      : [],
+  };
 }
 
 interface NoteDetailClientProps {
@@ -56,9 +77,11 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
   const [displayedConfidence, setDisplayedConfidence] = useState(note.confidenceScore);
 
   const confidenceBadge = getConfidenceBadgeConfig(displayedConfidence);
+  const aiMeta = parseAiMeta(note.aiMeta);
+  const hasClarifications = (aiMeta.clarificationQuestions?.length ?? 0) > 0 && (note.confidenceScore ?? 1) < 0.65;
 
   const extractedTasks = Array.isArray(note.extractedTasks)
-    ? (note.extractedTasks as Array<{ text: string; dueDate?: string }>)
+    ? (note.extractedTasks as Array<{ text: string; dueDate?: string; priority?: string }>)
     : [];
 
   const allRelated: Array<{ id: string; title: string | null; summary: string | null; score: number }> = [
@@ -182,9 +205,21 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
                   className="w-full rounded border border-blue-300 px-2 py-1 text-xl font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               ) : (
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {note.title || "Untitled note"}
-                </h1>
+                <div className="flex items-start gap-2 flex-wrap">
+                  {note.priority === "high" && (
+                    <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 shrink-0">
+                      High priority
+                    </span>
+                  )}
+                  {note.priority === "medium" && (
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 shrink-0">
+                      Medium priority
+                    </span>
+                  )}
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    {note.title || "Untitled note"}
+                  </h1>
+                </div>
               )}
               <p className="mt-1 text-sm text-gray-500">
                 {new Date(note.createdAt).toLocaleString()}
@@ -282,6 +317,37 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
           )}
         </div>
 
+        {/* Intent + Next Action */}
+        {(aiMeta.intent || aiMeta.nextAction) && (
+          <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-4 space-y-2">
+            {aiMeta.intent && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500 mb-0.5">Intent</p>
+                <p className="text-sm text-indigo-900">{aiMeta.intent}</p>
+              </div>
+            )}
+            {aiMeta.nextAction && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500 mb-0.5">Next Action</p>
+                <p className="text-sm font-medium text-indigo-900">➜ {aiMeta.nextAction}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Clarification questions */}
+        {hasClarifications && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="mb-2 text-xs font-semibold text-amber-800">AI has questions about this note:</p>
+            <ul className="space-y-1">
+              {aiMeta.clarificationQuestions!.map((q, i) => (
+                <li key={i} className="text-sm text-amber-900">• {q}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-amber-700">Add project/context hints to the capture bar and regenerate, or edit the note to clarify.</p>
+          </div>
+        )}
+
         {/* Extracted tasks */}
         {extractedTasks.length > 0 && (
           <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -290,10 +356,16 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
               {extractedTasks.map((task, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-gray-800">
                   <span className="mt-0.5 h-4 w-4 shrink-0 rounded border border-gray-400" />
-                  <span>
+                  <span className="flex-1">
                     {task.text}
                     {task.dueDate && <span className="ml-2 text-xs text-blue-600">Due: {task.dueDate}</span>}
                   </span>
+                  {task.priority === "high" && (
+                    <span className="shrink-0 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700">High</span>
+                  )}
+                  {task.priority === "medium" && (
+                    <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">Med</span>
+                  )}
                 </li>
               ))}
             </ul>

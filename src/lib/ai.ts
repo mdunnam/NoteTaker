@@ -11,20 +11,24 @@ type OrganizedNote = z.infer<typeof OrganizedNoteSchema>;
  * Schema for organized note output from AI
  */
 const OrganizedNoteSchema = z.object({
-  title: z.string().describe("Auto-generated title based on content"),
-  summary: z.string().describe("Brief summary of the note"),
+  title: z.string().describe("Specific, actionable title (max 80 chars)"),
+  summary: z.string().describe("Interpretive 1-2 sentence summary — why it matters and what to do"),
+  intent: z.string().describe("The user's underlying goal in one sentence"),
+  nextAction: z.string().nullable().optional().describe("Single most important immediate action, or null"),
+  priority: z.enum(["high", "medium", "low"]).default("medium").describe("Note urgency"),
   category: z.string().describe("Suggested category (e.g., Work, Personal, Project)"),
   type: z.enum(["TASK", "IDEA", "NOTE", "REFERENCE", "DECISION"]).describe("Type of note"),
   tags: z.array(z.string()).describe("Suggested tags"),
-  suggestedProject: z.string().optional().describe("Project this might belong to"),
+  suggestedProject: z.string().optional().nullable().describe("Project this belongs to — match known projects first"),
   extractedTasks: z
     .array(
       z.object({
         text: z.string(),
-        dueDate: z.string().optional(),
+        dueDate: z.string().nullable().optional(),
+        priority: z.enum(["high", "medium", "low"]).default("medium"),
       })
     )
-    .describe("Tasks extracted from the note"),
+    .describe("Atomic, immediately-executable tasks extracted from the note"),
   extractedDates: z
     .array(z.string())
     .describe("Dates or time references mentioned"),
@@ -36,6 +40,10 @@ const OrganizedNoteSchema = z.object({
       })
     )
     .describe("People, projects, topics, etc. mentioned"),
+  clarificationQuestions: z
+    .array(z.string())
+    .default([])
+    .describe("Questions to ask user when confidence < 0.65"),
   confidenceScore: z.number().min(0).max(1).describe("Confidence in the organization (0-1)"),
 });
 
@@ -153,61 +161,105 @@ function synthesizeStructuredSummary(rawContent: string, organized: OrganizedNot
 
 /**
  * Rewrite weak summaries so they explain intent rather than echoing the raw note.
+ * With gpt-4o this only triggers as a last-resort local fallback — no extra API call.
  */
 async function improveSummaryIfNeeded(rawContent: string, organized: OrganizedNote): Promise<string> {
   if (!isWeakExtractiveSummary(rawContent, organized.summary)) {
     return organized.summary.trim();
   }
+  // Fallback: synthesize locally without an extra API round-trip
+  return synthesizeStructuredSummary(rawContent, organized);
+}
 
-  if (!openaiClient) {
-    return synthesizeStructuredSummary(rawContent, organized);
+/** System prompt for organizeNote — behaviorally explicit, multi-section. */
+const ORGANIZE_SYSTEM_PROMPT = `You are the personal intelligence layer for a fast-capture note system. Your job is to decode what a person truly means — not just transcribe what they wrote.
+
+IDENTITY
+Act as a brilliant personal assistant who has read every note this person ever wrote. You know their projects, their collaborators, their patterns. Apply that knowledge to make every new note immediately useful.
+
+CORE RULES
+1. Infer intent, don’t just parse text. "call jim invoices" means the user needs to follow up with Jim about an invoice issue — say that.
+2. Titles must be specific and actionable (max 80 chars). "Schedule Jim invoice follow-up" not "Jim/Invoices" and never "Note".
+3. Summaries explain value: write as if surfacing this note to the user in 3 weeks. Why does it matter? What should they do? Never copy the note wording back.
+4. Intent: one sentence capturing the underlying goal or concern behind the note.
+5. nextAction: the single most important next step. Null only if there is genuinely nothing to act on.
+6. Tasks must be atomic and immediately executable. "Reply to Sarah’s message about contract renewal" not "emails". One clear action per item.
+7. Use known projects: if a known project from the user’s memory profile fits, use its exact name as suggestedProject. Do not invent project names.
+8. Be honest about confidence. Do not inflate it. If you are guessing, lower the score and add clarificationQuestions.
+
+PRIORITY
+Assign note-level priority:
+- "high": explicit deadline, blocking work, urgent/ASAP language, named person waiting on them
+- "medium": clear action needed but no time pressure
+- "low": ideas, reference material, future thoughts, nothing actionable now
+
+CLARIFICATION QUESTIONS
+Only include when confidenceScore < 0.65. Write each so the user can answer in a word or phrase. Max 3. Examples: "Which project is this for?", "Is this a task or an idea?", "Who is this assigned to?"
+
+ENTITY RULES
+- PERSON: real people’s first name or full name only
+- PROJECT: match known projects first; create new only if clearly named in the note
+- APP: specific software tools or platforms
+- COMPANY: named organisations, clients, employers
+- PLACE: physical locations
+- TOPIC: recurring conceptual threads worth tracking (e.g., "pricing strategy", "onboarding", "tech debt")
+Do not extract generic nouns. Quality over quantity.
+
+CONFIDENCE THRESHOLDS
+- 0.85–1.0: intent unambiguous, project known, all fields high quality
+- 0.65–0.84: reasonable inference; user should review
+- 0.0–0.64: ambiguous; must include clarificationQuestions
+
+Return strict JSON:
+{
+  "title": "string",
+  "summary": "string",
+  "intent": "string",
+  "nextAction": "string | null",
+  "priority": "high | medium | low",
+  "category": "string",
+  "type": "TASK | IDEA | NOTE | REFERENCE | DECISION",
+  "tags": ["string"],
+  "suggestedProject": "string | null",
+  "extractedTasks": [{"text": "string", "dueDate": "string | null", "priority": "high | medium | low"}],
+  "extractedDates": ["string"],
+  "extractedEntities": [{"type": "PERSON | PROJECT | APP | COMPANY | PLACE | TOPIC", "name": "string"}],
+  "clarificationQuestions": ["string"],
+  "confidenceScore": 0.0
+}`;
+
+
+  if (!options) {
+    return "";
   }
 
-  try {
-    const completion = await openaiClient.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You rewrite weak note summaries. Produce one concise, interpretive summary sentence. Explain intent, context, and likely next action. Do not copy the source wording. Return JSON: { summary }.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            rawContent,
-            weakSummary: organized.summary,
-            category: organized.category,
-            type: organized.type,
-            extractedTasks: organized.extractedTasks,
-            extractedEntities: organized.extractedEntities,
-          }),
-        },
-      ],
-    });
+  const hints: string[] = [];
 
-    const raw = completion.choices[0]?.message?.content || "{}";
-    const parsed = SummaryRewriteSchema.parse(JSON.parse(raw));
-    const rewritten = parsed.summary.trim();
-
-    if (!rewritten || isWeakExtractiveSummary(rawContent, rewritten)) {
-      return synthesizeStructuredSummary(rawContent, organized);
-    }
-
-    return rewritten;
-  } catch (error) {
-    console.error("Error rewriting weak summary:", error);
-    return synthesizeStructuredSummary(rawContent, organized);
+  if (options.explicitProject?.trim()) {
+    hints.push(`Explicit project hint: ${options.explicitProject.trim()}`);
   }
+
+  if (options.explicitContext?.trim()) {
+    hints.push(`Explicit context hint: ${options.explicitContext.trim()}`);
+  }
+
+  if (options.userContext?.trim()) {
+    hints.push("User memory profile:");
+    hints.push(options.userContext.trim());
+  }
+
+  if (hints.length === 0) {
+    return "";
+  }
+
+  return `\n\nUse these hints while organizing:\n${hints.join("\n")}`;
 }
 
 /**
  * Organize a raw note using AI
  * Generates title, summary, category, tags, extracted tasks, entities, etc.
  */
-export async function organizeNote(rawContent: string) {
+export async function organizeNote(rawContent: string, options?: OrganizeNoteOptions) {
   try {
     if (!openaiClient) {
       const fallback = {
@@ -230,18 +282,17 @@ export async function organizeNote(rawContent: string) {
     }
 
     const completion = await openaiClient.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
+      model: "gpt-4o",
+      temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
-          content:
-            "You are an expert note organizer for messy real-world notes. Return JSON matching this shape: { title, summary, category, type, tags, suggestedProject, extractedTasks, extractedDates, extractedEntities, confidenceScore }. Summary rules: be interpretive (not extractive), infer user intent/context, and include likely next action in 1-2 concise sentences. Task extraction rules: output explicit action-oriented tasks using imperative phrasing, normalize vague fragments into clear actions when reasonable, keep each task atomic, and only include dueDate when clearly implied or stated. Confidence rules: lower confidence when input is ambiguous or multi-topic.",
+          content: ORGANIZE_SYSTEM_PROMPT,
         },
         {
           role: "user",
-          content: `Organize this raw note. If it is messy, decipher it into intent + actions:\n\n${rawContent}`,
+          content: `Organize this note:\n\n${rawContent}${buildOrganizationHints(options)}`,
         },
       ],
     });
@@ -280,14 +331,14 @@ export async function splitNote(rawContent: string) {
     }
 
     const completion = await openaiClient.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.2,
+      model: "gpt-4o",
+      temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
           content:
-            "Return JSON matching this shape: { notes: [{ content, category, type, title }], needsSplit }. Split only if there are truly separate ideas/tasks.",
+            "You analyze a raw note to determine if it contains multiple distinct, self-contained items that should be separate cards. Split only when topics or tasks are genuinely unrelated — not just multiple sub-tasks of the same effort. For each split note assign a specific actionable title. Return JSON: { needsSplit: boolean, notes: [{ title, content, category, type }] }",
         },
         {
           role: "user",
@@ -315,7 +366,8 @@ export async function embedNote(text: string): Promise<number[]> {
     }
 
     const response = await openaiClient.embeddings.create({
-      model: "text-embedding-3-small",
+      model: "text-embedding-3-large",
+      dimensions: 1536,
       input: text,
     });
 
@@ -336,7 +388,8 @@ export async function embedNotes(texts: string[]): Promise<number[][]> {
     }
 
     const response = await openaiClient.embeddings.create({
-      model: "text-embedding-3-small",
+      model: "text-embedding-3-large",
+      dimensions: 1536,
       input: texts,
     });
 
@@ -364,7 +417,8 @@ export function cosineSimilarity(a: number[], b: number[]): number {
  */
 export interface ExtractedTask {
   text: string;
-  dueDate?: string;
+  dueDate?: string | null;
+  priority?: "high" | "medium" | "low";
   completed?: boolean;
 }
 

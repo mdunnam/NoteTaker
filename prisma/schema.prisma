@@ -61,8 +61,10 @@ model Note {
   
   status            NoteStatus @default(UNPROCESSED) // UNPROCESSED, PROCESSING, PROCESSED
   confidenceScore   Float?    @default(0.5)
+  priority          String?   // "high" | "medium" | "low" — AI-assigned urgency
+  aiMeta            Json?     // { intent, nextAction, clarificationQuestions }
   
-  embedding         Unsupported("vector(1536)")?  // OpenAI text-embedding-3-small is 1536 dims
+  embedding         Unsupported("vector(1536)")?  // OpenAI text-embedding-3-large w/ dimensions:1536
   
   isArchived        Boolean   @default(false)
   isPinned          Boolean   @default(false)

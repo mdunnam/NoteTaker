@@ -14,6 +14,8 @@ export default function CaptureBar() {
   const [isLoading, setIsLoading] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [projectHint, setProjectHint] = useState("");
+  const [contextHint, setContextHint] = useState("");
   const [lastResultMessage, setLastResultMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
@@ -38,6 +40,8 @@ export default function CaptureBar() {
         body: JSON.stringify({
           rawContent: content,
           tags: tags.length > 0 ? tags : undefined,
+          projectHint: projectHint.trim() || undefined,
+          contextHint: contextHint.trim() || undefined,
         }),
       });
 
@@ -57,6 +61,8 @@ export default function CaptureBar() {
       setContent("");
       setTags([]);
       setTagInput("");
+      setProjectHint("");
+      setContextHint("");
 
       // Focus back to textarea
       if (textareaRef.current) {
@@ -116,6 +122,24 @@ export default function CaptureBar() {
             <Send className="w-4 h-4" />
             Save
           </button>
+        </div>
+
+        {/* Tags section */}
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <input
+            type="text"
+            value={projectHint}
+            onChange={(e) => setProjectHint(e.target.value)}
+            placeholder="Project hint (optional): e.g. QNote, Client A"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
+          <input
+            type="text"
+            value={contextHint}
+            onChange={(e) => setContextHint(e.target.value)}
+            placeholder="Context hint (optional): e.g. Sprint planning, Home admin"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+          />
         </div>
 
         {/* Tags section */}

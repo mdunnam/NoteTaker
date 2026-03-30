@@ -44,6 +44,8 @@ interface CreateNoteOptions {
   rawContent: string;
   tags?: string[];
   collectionId?: string | null;
+  projectHint?: string;
+  contextHint?: string;
 }
 
 /**
@@ -55,6 +57,8 @@ async function createBaseNote(options: CreateNoteOptions) {
       userId: options.userId,
       rawContent: options.rawContent.trim(),
       tags: options.tags || [],
+      suggestedProject: options.projectHint?.trim() || null,
+      category: options.contextHint?.trim() || null,
       collectionId: options.collectionId || null,
       status: "PROCESSING",
     },
@@ -80,7 +84,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { rawContent, tags, collectionId, autoSplit = true } = await request.json();
+    const { rawContent, tags, collectionId, projectHint, contextHint, autoSplit = true } = await request.json();
 
     if (!rawContent || !rawContent.trim()) {
       return NextResponse.json(
@@ -104,6 +108,8 @@ export async function POST(request: NextRequest) {
               rawContent: splitItem.content,
               tags,
               collectionId,
+              projectHint,
+              contextHint,
             });
 
             createdNoteIds.push(created.id);
@@ -147,6 +153,8 @@ export async function POST(request: NextRequest) {
       rawContent,
       tags,
       collectionId,
+      projectHint,
+      contextHint,
     });
 
     await enqueueEnrichment(note.id, session.user.id, request.nextUrl.origin);

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { buildThinkingMemoryPrompt, getThinkingMemory } from "@/lib/userMemory";
 import { NextRequest, NextResponse } from "next/server";
 
 interface Params {
@@ -38,6 +39,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       select: {
         id: true,
         rawContent: true,
+        suggestedProject: true,
+        category: true,
       },
     });
 
@@ -45,7 +48,12 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 });
     }
 
-    const organized = await organizeNote(note.rawContent);
+    const memory = await getThinkingMemory(session.user.id);
+    const organized = await organizeNote(note.rawContent, {
+      explicitProject: note.suggestedProject || undefined,
+      explicitContext: note.category || undefined,
+      userContext: buildThinkingMemoryPrompt(memory),
+    });
 
     const updated = await prisma.note.update({
       where: { id: note.id },

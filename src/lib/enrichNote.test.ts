@@ -5,6 +5,7 @@ vi.mock("@/lib/db", () => ({
     note: {
       update: vi.fn(),
       findMany: vi.fn(),
+      findUnique: vi.fn(),
     },
     entity: {
       upsert: vi.fn(),
@@ -19,6 +20,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/lib/userMemory", () => ({
+  getThinkingMemory: vi.fn(),
+  buildThinkingMemoryPrompt: vi.fn(),
+  updateThinkingMemory: vi.fn(),
+}));
+
 vi.mock("@/lib/ai", () => ({
   organizeNote: vi.fn(),
   embedNote: vi.fn(),
@@ -27,6 +34,7 @@ vi.mock("@/lib/ai", () => ({
 
 import { embedNote, organizeNote, cosineSimilarity } from "@/lib/ai";
 import { prisma } from "@/lib/db";
+import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory } from "@/lib/userMemory";
 import { enrichNote } from "./enrichNote";
 
 const mockedOrganizeNote = vi.mocked(organizeNote);
@@ -34,10 +42,14 @@ const mockedEmbedNote = vi.mocked(embedNote);
 const mockedCosineSimilarity = vi.mocked(cosineSimilarity);
 const mockedUpdate = vi.mocked(prisma.note.update);
 const mockedFindMany = vi.mocked(prisma.note.findMany);
+const mockedFindUnique = vi.mocked(prisma.note.findUnique);
 const mockedEntityUpsert = vi.mocked(prisma.entity.upsert);
 const mockedNoteEntityUpsert = vi.mocked(prisma.noteEntity.upsert);
 const mockedNoteRelationUpsert = vi.mocked(prisma.noteRelation.upsert);
 const mockedExecuteRaw = vi.mocked(prisma.$executeRaw);
+const mockedGetThinkingMemory = vi.mocked(getThinkingMemory);
+const mockedBuildThinkingMemoryPrompt = vi.mocked(buildThinkingMemoryPrompt);
+const mockedUpdateThinkingMemory = vi.mocked(updateThinkingMemory);
 
 describe("enrichNote", () => {
   beforeEach(() => {
@@ -63,6 +75,15 @@ describe("enrichNote", () => {
     mockedFindMany.mockResolvedValue([] as never);
     mockedExecuteRaw.mockResolvedValue(1 as never);
     mockedCosineSimilarity.mockReturnValue(0.9);
+    mockedFindUnique.mockResolvedValue({ suggestedProject: null, category: null } as never);
+    mockedGetThinkingMemory.mockResolvedValue({
+      knownProjects: [],
+      knownContexts: [],
+      knownPeople: [],
+      knownTopics: [],
+    });
+    mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
+    mockedUpdateThinkingMemory.mockResolvedValue(undefined);
   });
 
   it("persists the computed embedding when enrichment succeeds", async () => {

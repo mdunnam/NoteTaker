@@ -7,6 +7,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cosineSimilarity, embedNote, organizeNote } from "@/lib/ai";
 import { toPgVectorLiteral } from "@/lib/pgvector";
+import {
+  buildThinkingMemoryPrompt,
+  getThinkingMemory,
+  updateThinkingMemory,
+} from "@/lib/userMemory";
 
 export interface EnrichNoteOptions {
   noteId: string;
@@ -38,7 +43,19 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
   const { noteId, userId, rawContent, fallbackTags } = options;
 
   try {
-    const organized = await organizeNote(rawContent);
+    const [currentNoteHints, thinkingMemory] = await Promise.all([
+      prisma.note.findUnique({
+        where: { id: noteId },
+        select: { suggestedProject: true, category: true },
+      }),
+      getThinkingMemory(userId),
+    ]);
+
+    const organized = await organizeNote(rawContent, {
+      explicitProject: currentNoteHints?.suggestedProject || undefined,
+      explicitContext: currentNoteHints?.category || undefined,
+      userContext: buildThinkingMemoryPrompt(thinkingMemory),
+    });
 
     await prisma.note.update({
       where: { id: noteId },
@@ -53,6 +70,12 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
         extractedDates: organized.extractedDates || null,
         extractedEntities: organized.extractedEntities || null,
         confidenceScore: organized.confidenceScore,
+        priority: organized.priority || "medium",
+        aiMeta: {
+          intent: organized.intent || null,
+          nextAction: organized.nextAction || null,
+          clarificationQuestions: organized.clarificationQuestions || [],
+        },
         status: "PROCESSED",
       },
     });
@@ -81,6 +104,16 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
         update: { mentionCount: { increment: 1 } },
         create: { noteId, entityId: entity.id, mentionCount: 1 },
       });
+    }
+
+    try {
+      await updateThinkingMemory(userId, {
+        explicitProject: currentNoteHints?.suggestedProject || undefined,
+        explicitContext: currentNoteHints?.category || undefined,
+        organized,
+      });
+    } catch (memoryError) {
+      console.error("Error updating user thinking memory:", memoryError);
     }
 
     // Build similarity relations using on-the-fly embeddings
