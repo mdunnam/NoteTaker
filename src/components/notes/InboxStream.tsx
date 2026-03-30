@@ -15,9 +15,13 @@ interface InboxStreamProps {
     collection: { id: string; name: string; color?: string | null } | null;
     entities: Array<{ entity: { id: string; name: string; type: string } }>;
   })[];
+  quickHints?: {
+    projects: string[];
+    contexts: string[];
+  };
 }
 
-export default function InboxStream({ notes }: InboxStreamProps) {
+export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
@@ -148,7 +152,7 @@ export default function InboxStream({ notes }: InboxStreamProps) {
               className="mt-5 h-4 w-4 shrink-0 rounded border-gray-300 text-blue-600"
             />
             <div className="flex-1 min-w-0">
-              <NoteCard note={note} />
+              <NoteCard note={note} quickHints={quickHints} />
             </div>
           </div>
         ))}

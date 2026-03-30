@@ -48,6 +48,14 @@ function makeRequest() {
   });
 }
 
+function makeRequestWithHints(body: unknown) {
+  return new NextRequest("http://localhost/api/notes/n1/summary", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 describe("/api/notes/[id]/summary POST", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -116,5 +124,47 @@ describe("/api/notes/[id]/summary POST", () => {
       expect.objectContaining({ userContext: "Known projects: (none)" })
     );
     expect(mockedUpdate).toHaveBeenCalled();
+  });
+
+  it("uses project/context hints when provided", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "u1" } } as never);
+    mockedFindFirst.mockResolvedValue({
+      id: "n1",
+      rawContent: "Discuss Q2 launch blockers",
+      suggestedProject: null,
+      category: null,
+    } as never);
+    mockedOrganizeNote.mockResolvedValue({
+      title: "Q2 blockers",
+      summary: "Focused note about launch blockers and immediate owner follow-up.",
+      category: "Sprint planning",
+      type: "TASK",
+      tags: ["q2"],
+      suggestedProject: "Project A",
+      extractedTasks: [{ text: "Identify blocker owners" }],
+      extractedDates: [],
+      extractedEntities: [],
+      confidenceScore: 0.9,
+    } as never);
+    mockedUpdate.mockResolvedValue({
+      id: "n1",
+      summary: "Focused note about launch blockers and immediate owner follow-up.",
+      confidenceScore: 0.9,
+      updatedAt: new Date("2026-03-30T00:00:00.000Z"),
+    } as never);
+
+    const response = await POST(
+      makeRequestWithHints({ projectHint: "Project A", contextHint: "Sprint planning" }),
+      { params: { id: "n1" } }
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedOrganizeNote).toHaveBeenCalledWith(
+      "Discuss Q2 launch blockers",
+      expect.objectContaining({
+        explicitProject: "Project A",
+        explicitContext: "Sprint planning",
+      })
+    );
   });
 });

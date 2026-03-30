@@ -49,6 +49,10 @@ function parseAiMeta(raw: unknown): AiMeta {
 
 interface NoteCardProps {
   note: NoteData;
+  quickHints?: {
+    projects: string[];
+    contexts: string[];
+  };
 }
 
 interface CollectionOption {
@@ -56,7 +60,7 @@ interface CollectionOption {
   name: string;
 }
 
-export default function NoteCard({ note }: NoteCardProps) {
+export default function NoteCard({ note, quickHints }: NoteCardProps) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -69,6 +73,7 @@ export default function NoteCard({ note }: NoteCardProps) {
   const [splitMessage, setSplitMessage] = useState<string | null>(null);
   const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
   const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
+  const [isApplyingHint, setIsApplyingHint] = useState(false);
   const confidenceBadge = getConfidenceBadgeConfig(note.confidenceScore);
   const aiMeta = parseAiMeta(note.aiMeta);
   const hasClarifications = (aiMeta.clarificationQuestions?.length ?? 0) > 0 && (note.confidenceScore ?? 1) < 0.65;
@@ -211,6 +216,51 @@ export default function NoteCard({ note }: NoteCardProps) {
       setSummaryMessage("Could not regenerate summary.");
     } finally {
       setIsRegeneratingSummary(false);
+    }
+  };
+
+  /**
+   * Apply a project/context clarification and regenerate summary immediately.
+   */
+  const handleApplyHint = async (kind: "project" | "context", value: string) => {
+    setIsApplyingHint(true);
+    setSummaryMessage(null);
+
+    try {
+      const patchBody = kind === "project"
+        ? { suggestedProject: value }
+        : { category: value };
+
+      const patchResponse = await fetch(`/api/notes/${note.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patchBody),
+      });
+
+      if (!patchResponse.ok) {
+        throw new Error("Failed to apply clarification");
+      }
+
+      const summaryResponse = await fetch(`/api/notes/${note.id}/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectHint: kind === "project" ? value : undefined,
+          contextHint: kind === "context" ? value : undefined,
+        }),
+      });
+
+      if (!summaryResponse.ok) {
+        throw new Error("Failed to regenerate summary");
+      }
+
+      setSummaryMessage(`Applied ${kind} hint: ${value}`);
+      router.refresh();
+    } catch (error) {
+      console.error("Error applying clarification hint:", error);
+      setSummaryMessage("Could not apply clarification hint.");
+    } finally {
+      setIsApplyingHint(false);
     }
   };
 
@@ -371,6 +421,44 @@ export default function NoteCard({ note }: NoteCardProps) {
               <li key={i} className="text-xs text-amber-900">• {q}</li>
             ))}
           </ul>
+
+          {quickHints?.projects && quickHints.projects.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[11px] font-medium text-amber-800 mb-1">Quick project hints:</p>
+              <div className="flex flex-wrap gap-1">
+                {quickHints.projects.map((project) => (
+                  <button
+                    key={`project-${project}`}
+                    type="button"
+                    onClick={() => handleApplyHint("project", project)}
+                    disabled={isApplyingHint}
+                    className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                  >
+                    {project}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {quickHints?.contexts && quickHints.contexts.length > 0 && (
+            <div className="mt-2">
+              <p className="text-[11px] font-medium text-amber-800 mb-1">Quick context hints:</p>
+              <div className="flex flex-wrap gap-1">
+                {quickHints.contexts.map((context) => (
+                  <button
+                    key={`context-${context}`}
+                    type="button"
+                    onClick={() => handleApplyHint("context", context)}
+                    disabled={isApplyingHint}
+                    className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                  >
+                    {context}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

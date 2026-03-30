@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import InboxStream from "@/components/notes/InboxStream";
 import InboxFilterBar from "@/components/notes/InboxFilterBar";
+import { getThinkingMemory, getThinkingMemoryHints } from "@/lib/userMemory";
 
 interface InboxPageProps {
   searchParams?: { category?: string; tag?: string };
@@ -52,6 +53,8 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
 
   const categories = [...new Set(allNotes.map((n) => n.category).filter(Boolean))] as string[];
   const tags = [...new Set(allNotes.flatMap((n) => n.tags))].filter(Boolean).slice(0, 20);
+  const thinkingMemory = await getThinkingMemory(session.user.id);
+  const quickHints = getThinkingMemoryHints(thinkingMemory);
 
   return (
     <div className="p-6">
@@ -70,7 +73,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         </Suspense>
       )}
 
-      <InboxStream notes={notes} />
+      <InboxStream notes={notes} quickHints={quickHints} />
     </div>
   );
 }

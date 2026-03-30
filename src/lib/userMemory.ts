@@ -14,6 +14,11 @@ interface ThinkingMemory {
   knownTopics: MemoryItem[];
 }
 
+export interface ThinkingMemoryHints {
+  projects: string[];
+  contexts: string[];
+}
+
 interface OrganizedLike {
   suggestedProject?: string | null;
   extractedEntities?: Array<{ type: string; name: string }>;
@@ -152,6 +157,16 @@ export function buildThinkingMemoryPrompt(memory: ThinkingMemory): string {
     formatBucket("Frequent people", memory.knownPeople),
     formatBucket("Frequent topics", memory.knownTopics),
   ].join("\n");
+}
+
+/**
+ * Build compact hint lists for UI clarification chips.
+ */
+export function getThinkingMemoryHints(memory: ThinkingMemory): ThinkingMemoryHints {
+  return {
+    projects: memory.knownProjects.slice(0, 4).map((item) => item.name),
+    contexts: memory.knownContexts.slice(0, 4).map((item) => item.name),
+  };
 }
 
 /**
