@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
+import SplitNoteModal from "@/components/notes/SplitNoteModal";
+import { getConfidenceBadgeConfig } from "@/lib/confidence";
 
 interface RelatedNote {
   id: string;
@@ -46,6 +48,14 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
   const [editTitle, setEditTitle] = useState(note.title || "");
   const [editContent, setEditContent] = useState(note.rawContent);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+  const [splitMessage, setSplitMessage] = useState<string | null>(null);
+  const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
+  const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
+  const [displayedSummary, setDisplayedSummary] = useState(note.summary);
+  const [displayedConfidence, setDisplayedConfidence] = useState(note.confidenceScore);
+
+  const confidenceBadge = getConfidenceBadgeConfig(displayedConfidence);
 
   const extractedTasks = Array.isArray(note.extractedTasks)
     ? (note.extractedTasks as Array<{ text: string; dueDate?: string }>)
@@ -104,11 +114,62 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
     router.push("/inbox");
   };
 
+  /** Handle split completion and refresh the page state. */
+  const handleSplitCreated = (count: number) => {
+    setSplitMessage(`Created ${count} split card${count === 1 ? "" : "s"}.`);
+    router.refresh();
+  };
+
+  /**
+   * Regenerate summary for the current note and update local display state.
+   */
+  const handleRegenerateSummary = async () => {
+    setIsRegeneratingSummary(true);
+    setSummaryMessage(null);
+
+    try {
+      const response = await fetch(`/api/notes/${note.id}/summary`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to regenerate summary");
+      }
+
+      const payload = (await response.json()) as {
+        summary: string | null;
+        confidenceScore: number | null;
+      };
+
+      setDisplayedSummary(payload.summary);
+      setDisplayedConfidence(payload.confidenceScore);
+      setSummaryMessage("AI summary regenerated.");
+      router.refresh();
+    } catch (error) {
+      console.error("Error regenerating summary:", error);
+      setSummaryMessage("Could not regenerate summary. Please try again.");
+    } finally {
+      setIsRegeneratingSummary(false);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       {/* Main content */}
       <div className="lg:col-span-2 space-y-4">
         <div className="rounded-lg border border-gray-200 bg-white p-6">
+          {splitMessage && (
+            <div className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+              {splitMessage}
+            </div>
+          )}
+
+          {summaryMessage && (
+            <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              {summaryMessage}
+            </div>
+          )}
+
           {/* Header bar */}
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -154,6 +215,9 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
               ) : (
                 <>
                   <button onClick={() => setIsEditing(true)} className="rounded-lg p-2 hover:bg-gray-100" title="Edit"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => setIsSplitModalOpen(true)} className="rounded-lg p-2 hover:bg-gray-100" title="Split note">
+                    <span className="text-xs font-semibold text-gray-700">Split</span>
+                  </button>
                   <button onClick={handlePin} className="rounded-lg p-2 hover:bg-gray-100" title={note.isPinned ? "Unpin" : "Pin"}><Pin className={`h-4 w-4 ${note.isPinned ? "fill-current text-blue-600" : ""}`} /></button>
                   <button onClick={handleArchive} className="rounded-lg p-2 hover:bg-gray-100" title={note.isArchived ? "Restore" : "Archive"}><Archive className="h-4 w-4" /></button>
                   <button onClick={handleDelete} className="rounded-lg p-2 hover:bg-red-100 hover:text-red-700" title="Delete"><Trash2 className="h-4 w-4" /></button>
@@ -192,15 +256,31 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
         </div>
 
         {/* AI Summary */}
-        {note.summary && (
-          <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
-            <h2 className="mb-2 text-sm font-semibold text-blue-900">AI Summary</h2>
-            <p className="text-sm text-blue-800">{note.summary}</p>
-            {note.suggestedProject && (
-              <p className="mt-2 text-xs text-blue-700">Suggested project: <strong>{note.suggestedProject}</strong></p>
-            )}
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-blue-900">AI Summary</h2>
+            <div className="flex items-center gap-2">
+              <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${confidenceBadge.className}`}>
+                {confidenceBadge.label}
+              </span>
+              <button
+                onClick={handleRegenerateSummary}
+                disabled={isRegeneratingSummary}
+                className="rounded-md border border-blue-200 bg-white px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+              >
+                {isRegeneratingSummary ? "Regenerating..." : "Regenerate"}
+              </button>
+            </div>
           </div>
-        )}
+
+          <p className="text-sm text-blue-800">
+            {displayedSummary || "No summary yet. Use Regenerate to create one."}
+          </p>
+
+          {note.suggestedProject && (
+            <p className="mt-2 text-xs text-blue-700">Suggested project: <strong>{note.suggestedProject}</strong></p>
+          )}
+        </div>
 
         {/* Extracted tasks */}
         {extractedTasks.length > 0 && (
@@ -260,13 +340,20 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-xs space-y-2 text-gray-700">
           <h2 className="font-semibold text-sm text-gray-900 mb-2">Details</h2>
           <div className="flex justify-between"><span>Status</span><span className="font-medium">{note.status}</span></div>
-          {note.confidenceScore !== null && (
-            <div className="flex justify-between"><span>AI Confidence</span><span className="font-medium">{((note.confidenceScore ?? 0) * 100).toFixed(0)}%</span></div>
+          {displayedConfidence !== null && (
+            <div className="flex justify-between"><span>AI Confidence</span><span className="font-medium">{((displayedConfidence ?? 0) * 100).toFixed(0)}%</span></div>
           )}
           <div className="flex justify-between"><span>Pinned</span><span className="font-medium">{note.isPinned ? "Yes" : "No"}</span></div>
           <div className="flex justify-between"><span>Archived</span><span className="font-medium">{note.isArchived ? "Yes" : "No"}</span></div>
         </div>
       </div>
+
+      <SplitNoteModal
+        noteId={note.id}
+        open={isSplitModalOpen}
+        onClose={() => setIsSplitModalOpen(false)}
+        onCreated={handleSplitCreated}
+      />
     </div>
   );
 }

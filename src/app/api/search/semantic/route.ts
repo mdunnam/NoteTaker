@@ -2,11 +2,13 @@
  * POST /api/search/semantic - semantic similarity search over note embeddings
  */
 
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { embedNote, cosineSimilarity } from "@/lib/ai";
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { parsePgVectorLiteral } from "@/lib/pgvector";
 import { rankKeywordCandidates, selectTopSemanticCandidates } from "@/lib/searchRanking";
 
 interface SemanticSearchRequest {
@@ -61,6 +63,22 @@ export async function POST(request: NextRequest) {
       take: 100, // Search pool
     });
 
+    const storedEmbeddings = await prisma.$queryRaw<Array<{ id: string; embeddingText: string | null }>>(
+      Prisma.sql`
+        SELECT "id", "embedding"::text AS "embeddingText"
+        FROM "Note"
+        WHERE "userId" = ${session.user.id}
+          AND "isArchived" = false
+          AND "status" = 'PROCESSED'
+        ORDER BY "createdAt" DESC
+        LIMIT 100
+      `
+    );
+
+    const embeddingById = new Map(
+      storedEmbeddings.map((row) => [row.id, parsePgVectorLiteral(row.embeddingText)])
+    );
+
     // Embed the search query
     let queryEmbedding: number[] = [];
     try {
@@ -86,7 +104,10 @@ export async function POST(request: NextRequest) {
 
     for (const note of notes) {
       const candidateText = `${note.title || ""}\n${note.summary || note.rawContent}`.trim();
-      const candidateEmbedding = await embedNote(candidateText);
+      const storedEmbedding = embeddingById.get(note.id) || [];
+      const candidateEmbedding = storedEmbedding.length > 0
+        ? storedEmbedding
+        : await embedNote(candidateText);
 
       if (candidateEmbedding.length === 0) {
         continue;

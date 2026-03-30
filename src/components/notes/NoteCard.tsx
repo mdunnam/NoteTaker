@@ -7,6 +7,8 @@
 import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import SplitNoteModal from "@/components/notes/SplitNoteModal";
+import { getConfidenceBadgeConfig } from "@/lib/confidence";
 
 interface NoteData {
   id: string;
@@ -18,6 +20,7 @@ interface NoteData {
   category: string | null;
   tags: string[];
   status: string;
+  confidenceScore: number | null;
   collection: { id: string; name: string; color?: string | null } | null;
   entities: Array<{ entity: { id: string; name: string; type: string } }>;
 }
@@ -40,6 +43,11 @@ export default function NoteCard({ note }: NoteCardProps) {
   const [editCollectionId, setEditCollectionId] = useState(note.collection?.id || "");
   const [isSaving, setIsSaving] = useState(false);
   const [collections, setCollections] = useState<CollectionOption[]>([]);
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+  const [splitMessage, setSplitMessage] = useState<string | null>(null);
+  const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
+  const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
+  const confidenceBadge = getConfidenceBadgeConfig(note.confidenceScore);
 
   useEffect(() => {
     const loadCollections = async () => {
@@ -148,10 +156,56 @@ export default function NoteCard({ note }: NoteCardProps) {
     }
   };
 
+  /**
+   * Handle split completion and refresh card list.
+   */
+  const handleSplitCreated = (count: number) => {
+    setSplitMessage(`Created ${count} split card${count === 1 ? "" : "s"}.`);
+    router.refresh();
+  };
+
+  /**
+   * Regenerate AI summary for this note directly from inbox triage.
+   */
+  const handleRegenerateSummary = async () => {
+    setIsRegeneratingSummary(true);
+    setSummaryMessage(null);
+
+    try {
+      const response = await fetch(`/api/notes/${note.id}/summary`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to regenerate summary");
+      }
+
+      setSummaryMessage("Summary regenerated.");
+      router.refresh();
+    } catch (error) {
+      console.error("Error regenerating summary:", error);
+      setSummaryMessage("Could not regenerate summary.");
+    } finally {
+      setIsRegeneratingSummary(false);
+    }
+  };
+
   return (
     <div className={`border rounded-lg p-4 transition-all ${
       note.isPinned ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"
     }`}>
+      {splitMessage && (
+        <div className="mb-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">
+          {splitMessage}
+        </div>
+      )}
+
+      {summaryMessage && (
+        <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          {summaryMessage}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
@@ -202,6 +256,23 @@ export default function NoteCard({ note }: NoteCardProps) {
                 title={note.isPinned ? "Unpin" : "Pin"}
               >
                 <Pin className={`w-4 h-4 ${note.isPinned ? "fill-current" : ""}`} />
+              </button>
+              <button
+                onClick={() => setIsSplitModalOpen(true)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Split"
+              >
+                <span className="text-[11px] font-semibold text-gray-700">Split</span>
+              </button>
+              <button
+                onClick={handleRegenerateSummary}
+                disabled={isRegeneratingSummary}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                title="Regenerate summary"
+              >
+                <span className="text-[11px] font-semibold text-gray-700">
+                  {isRegeneratingSummary ? "..." : "Regen"}
+                </span>
               </button>
               <button
                 onClick={handleArchive}
@@ -295,6 +366,12 @@ export default function NoteCard({ note }: NoteCardProps) {
             AI organizing...
           </span>
         )}
+
+        {note.status === "PROCESSED" && (
+          <span className={`px-2 py-1 rounded-full ${confidenceBadge.className}`}>
+            {confidenceBadge.label}
+          </span>
+        )}
       </div>
 
       <div className="mt-3 pt-3 border-t border-gray-100">
@@ -305,6 +382,13 @@ export default function NoteCard({ note }: NoteCardProps) {
           View full note →
         </a>
       </div>
+
+      <SplitNoteModal
+        noteId={note.id}
+        open={isSplitModalOpen}
+        onClose={() => setIsSplitModalOpen(false)}
+        onCreated={handleSplitCreated}
+      />
     </div>
   );
 }

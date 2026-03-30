@@ -1,0 +1,69 @@
+import { auth } from "@/auth";
+import { organizeNote } from "@/lib/ai";
+import { prisma } from "@/lib/db";
+import { checkRateLimit } from "@/lib/rateLimit";
+import { NextRequest, NextResponse } from "next/server";
+
+interface Params {
+  params: {
+    id: string;
+  };
+}
+
+/**
+ * POST /api/notes/[id]/summary
+ * Regenerate AI summary (and confidence score) for an existing note.
+ */
+export async function POST(request: NextRequest, { params }: Params) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const rateLimitResult = checkRateLimit(session.user.id, "/api/notes/summary");
+    if (!rateLimitResult.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again in a moment." },
+        { status: 429, headers: { "Retry-After": String(rateLimitResult.retryAfter) } }
+      );
+    }
+
+    const note = await prisma.note.findFirst({
+      where: {
+        id: params.id,
+        userId: session.user.id,
+      },
+      select: {
+        id: true,
+        rawContent: true,
+      },
+    });
+
+    if (!note) {
+      return NextResponse.json({ error: "Note not found" }, { status: 404 });
+    }
+
+    const organized = await organizeNote(note.rawContent);
+
+    const updated = await prisma.note.update({
+      where: { id: note.id },
+      data: {
+        summary: organized.summary,
+        confidenceScore: organized.confidenceScore,
+      },
+      select: {
+        id: true,
+        summary: true,
+        confidenceScore: true,
+        updatedAt: true,
+      },
+    });
+
+    return NextResponse.json(updated, { status: 200 });
+  } catch (error) {
+    console.error("Error regenerating note summary:", error);
+    return NextResponse.json({ error: "Failed to regenerate summary" }, { status: 500 });
+  }
+}

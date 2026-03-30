@@ -5,6 +5,8 @@ const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+type OrganizedNote = z.infer<typeof OrganizedNoteSchema>;
+
 /**
  * Schema for organized note output from AI
  */
@@ -37,6 +39,35 @@ const OrganizedNoteSchema = z.object({
   confidenceScore: z.number().min(0).max(1).describe("Confidence in the organization (0-1)"),
 });
 
+const SummaryRewriteSchema = z.object({
+  summary: z.string().min(1).max(500),
+});
+
+const STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "but",
+  "by",
+  "for",
+  "from",
+  "in",
+  "is",
+  "it",
+  "of",
+  "on",
+  "or",
+  "that",
+  "the",
+  "this",
+  "to",
+  "with",
+]);
+
 /**
  * Schema for split notes output
  */
@@ -55,15 +86,133 @@ const SplitNotesSchema = z.object({
 });
 
 /**
+ * Tokenize text for overlap scoring to detect extractive summaries.
+ */
+function tokenizeForSimilarity(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length > 2 && !STOPWORDS.has(token));
+}
+
+/**
+ * Detect whether a summary is mostly copied from the raw note.
+ */
+function isWeakExtractiveSummary(rawContent: string, summary: string): boolean {
+  const normalizedSummary = summary.trim();
+  if (!normalizedSummary) {
+    return true;
+  }
+
+  if (normalizedSummary.length < 24) {
+    return true;
+  }
+
+  const normalizedRaw = rawContent.trim().toLowerCase();
+  if (!normalizedRaw) {
+    return false;
+  }
+
+  if (normalizedRaw.includes(normalizedSummary.toLowerCase())) {
+    return true;
+  }
+
+  const summaryTokens = tokenizeForSimilarity(normalizedSummary);
+  const rawTokens = new Set(tokenizeForSimilarity(normalizedRaw));
+
+  if (summaryTokens.length < 4) {
+    return false;
+  }
+
+  const overlap = summaryTokens.filter((token) => rawTokens.has(token)).length;
+  const overlapRatio = overlap / summaryTokens.length;
+
+  // If most meaningful words are copied, force a rewrite.
+  return overlapRatio >= 0.85;
+}
+
+/**
+ * Build a concise fallback summary from extracted structure when the AI summary is weak.
+ */
+function synthesizeStructuredSummary(rawContent: string, organized: OrganizedNote): string {
+  const taskLead = organized.extractedTasks?.slice(0, 2).map((task) => task.text).filter(Boolean) || [];
+  const entityLead = organized.extractedEntities?.slice(0, 2).map((entity) => entity.name).filter(Boolean) || [];
+
+  if (taskLead.length > 0) {
+    return `Mixed ${organized.category || "general".toLowerCase()} note with actionable items. Key actions: ${taskLead.join("; ")}.`;
+  }
+
+  if (entityLead.length > 0) {
+    return `Note focused on ${entityLead.join(" and ")} in a ${organized.category || "general".toLowerCase()} context.`;
+  }
+
+  const firstLine = rawContent.split("\n").map((line) => line.trim()).find(Boolean) || "captured note";
+  return `Captured ${organized.type?.toLowerCase() || "note"} in ${organized.category || "General"}: ${firstLine.slice(0, 120)}.`;
+}
+
+/**
+ * Rewrite weak summaries so they explain intent rather than echoing the raw note.
+ */
+async function improveSummaryIfNeeded(rawContent: string, organized: OrganizedNote): Promise<string> {
+  if (!isWeakExtractiveSummary(rawContent, organized.summary)) {
+    return organized.summary.trim();
+  }
+
+  if (!openaiClient) {
+    return synthesizeStructuredSummary(rawContent, organized);
+  }
+
+  try {
+    const completion = await openaiClient.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You rewrite weak note summaries. Produce one concise, interpretive summary sentence. Explain intent, context, and likely next action. Do not copy the source wording. Return JSON: { summary }.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            rawContent,
+            weakSummary: organized.summary,
+            category: organized.category,
+            type: organized.type,
+            extractedTasks: organized.extractedTasks,
+            extractedEntities: organized.extractedEntities,
+          }),
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content || "{}";
+    const parsed = SummaryRewriteSchema.parse(JSON.parse(raw));
+    const rewritten = parsed.summary.trim();
+
+    if (!rewritten || isWeakExtractiveSummary(rawContent, rewritten)) {
+      return synthesizeStructuredSummary(rawContent, organized);
+    }
+
+    return rewritten;
+  } catch (error) {
+    console.error("Error rewriting weak summary:", error);
+    return synthesizeStructuredSummary(rawContent, organized);
+  }
+}
+
+/**
  * Organize a raw note using AI
  * Generates title, summary, category, tags, extracted tasks, entities, etc.
  */
 export async function organizeNote(rawContent: string) {
   try {
     if (!openaiClient) {
-      return {
+      const fallback = {
         title: rawContent.split("\n")[0]?.slice(0, 80) || "Untitled note",
-        summary: rawContent.slice(0, 200),
+        summary: "",
         category: "General",
         type: "NOTE" as const,
         tags: [],
@@ -72,6 +221,11 @@ export async function organizeNote(rawContent: string) {
         extractedDates: [],
         extractedEntities: [],
         confidenceScore: 0.3,
+      };
+
+      return {
+        ...fallback,
+        summary: synthesizeStructuredSummary(rawContent, fallback),
       };
     }
 
@@ -83,18 +237,23 @@ export async function organizeNote(rawContent: string) {
         {
           role: "system",
           content:
-            "You are an expert note organizer. Return JSON matching this shape: { title, summary, category, type, tags, suggestedProject, extractedTasks, extractedDates, extractedEntities, confidenceScore }.",
+            "You are an expert note organizer for messy real-world notes. Return JSON matching this shape: { title, summary, category, type, tags, suggestedProject, extractedTasks, extractedDates, extractedEntities, confidenceScore }. Summary rules: be interpretive (not extractive), infer user intent/context, and include likely next action in 1-2 concise sentences. Task extraction rules: output explicit action-oriented tasks using imperative phrasing, normalize vague fragments into clear actions when reasonable, keep each task atomic, and only include dueDate when clearly implied or stated. Confidence rules: lower confidence when input is ambiguous or multi-topic.",
         },
         {
           role: "user",
-          content: `Organize this raw note:\n\n${rawContent}`,
+          content: `Organize this raw note. If it is messy, decipher it into intent + actions:\n\n${rawContent}`,
         },
       ],
     });
 
     const raw = completion.choices[0]?.message?.content || "{}";
     const parsed = OrganizedNoteSchema.parse(JSON.parse(raw));
-    return parsed;
+    const improvedSummary = await improveSummaryIfNeeded(rawContent, parsed);
+
+    return {
+      ...parsed,
+      summary: improvedSummary,
+    };
   } catch (error) {
     console.error("Error organizing note:", error);
     throw new Error("Failed to organize note");

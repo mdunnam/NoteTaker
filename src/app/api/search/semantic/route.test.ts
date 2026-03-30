@@ -10,6 +10,7 @@ vi.mock("@/lib/db", () => ({
     note: {
       findMany: vi.fn(),
     },
+    $queryRaw: vi.fn(),
   },
 }));
 
@@ -30,6 +31,7 @@ import { POST } from "./route";
 
 const mockedAuth = vi.mocked(auth);
 const mockedFindMany = vi.mocked(prisma.note.findMany);
+const mockedQueryRaw = vi.mocked(prisma.$queryRaw);
 const mockedEmbedNote = vi.mocked(embedNote);
 const mockedCosineSimilarity = vi.mocked(cosineSimilarity);
 const mockedCheckRateLimit = vi.mocked(checkRateLimit);
@@ -46,6 +48,7 @@ describe("/api/search/semantic POST", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockedCheckRateLimit.mockReturnValue({ ok: true });
+    mockedQueryRaw.mockResolvedValue([] as never);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -85,10 +88,12 @@ describe("/api/search/semantic POST", () => {
       },
     ] as never);
 
-    mockedEmbedNote
-      .mockResolvedValueOnce([1, 0])
-      .mockResolvedValueOnce([1, 0])
-      .mockResolvedValueOnce([0, 1]);
+    mockedQueryRaw.mockResolvedValue([
+      { id: "n1", embeddingText: "[1,0]" },
+      { id: "n2", embeddingText: "[0,1]" },
+    ] as never);
+
+    mockedEmbedNote.mockResolvedValueOnce([1, 0]);
 
     mockedCosineSimilarity
       .mockReturnValueOnce(0.92)

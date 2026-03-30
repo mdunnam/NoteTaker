@@ -3,14 +3,31 @@
  * Shared between the legacy fire-and-forget path and the durable job queue.
  */
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { cosineSimilarity, embedNote, organizeNote } from "@/lib/ai";
+import { toPgVectorLiteral } from "@/lib/pgvector";
 
 export interface EnrichNoteOptions {
   noteId: string;
   userId: string;
   rawContent: string;
   fallbackTags?: string[];
+}
+
+/**
+ * Persist an embedding into the pgvector-backed Note.embedding column.
+ */
+async function persistNoteEmbedding(noteId: string, embedding: number[]): Promise<void> {
+  if (embedding.length === 0) {
+    return;
+  }
+
+  const literal = toPgVectorLiteral(embedding);
+
+  await prisma.$executeRaw(
+    Prisma.sql`UPDATE "Note" SET "embedding" = ${literal}::vector WHERE "id" = ${noteId}`
+  );
 }
 
 /**
@@ -72,6 +89,8 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
       const sourceEmbedding = await embedNote(sourceText);
 
       if (sourceEmbedding.length > 0) {
+        await persistNoteEmbedding(noteId, sourceEmbedding);
+
         const candidates = await prisma.note.findMany({
           where: {
             userId,

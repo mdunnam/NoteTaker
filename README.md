@@ -2,6 +2,11 @@
 
 A capture-first, auto-organizing note inbox app that helps you store thoughts fast and resurface them intelligently.
 
+## Planning Docs
+
+- [Implementation Summary](docs/IMPLEMENTATION.md)
+- [Phase 3 Implementation Plan](docs/PHASE3_IMPLEMENTATION_PLAN.md)
+
 ## Features
 
 ### Phase 1 ✅ (Complete)
@@ -16,11 +21,14 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Inbox view**: Stream of new/recent notes
 - **Basic actions**: Archive, pin, delete notes
 
-### Phase 3 ⏳ (Partial - API ready, UI integration pending)
+### Phase 3 🚧 (In progress)
 - **AI organization**: Auto-generate titles, summaries, categories, tags
 - **Task extraction**: Pull actionable items from notes
 - **Entity detection**: Identify people, projects, topics
-- **Confidence scoring**: Know how confident the AI is
+- **Confidence scoring**: Confidence badges in note views
+- **Split workflow**: Split messy notes into multiple cards with review modal
+- **Summary refresh**: Regenerate weak summaries from detail and inbox cards
+- **Semantic search**: Uses stored pgvector embeddings with on-the-fly fallback
 
 ### Phase 4 ⏳ (Placeholder pages created)
 - Card, Project, Topic, Timeline, Search views
@@ -94,7 +102,8 @@ src/
     api/
       notes/route.ts        # CRUD endpoints for notes
       notes/[id]/route.ts   # Single note operations
-      ai/organize/route.ts  # AI organization (upcoming)
+      notes/[id]/split/route.ts    # Split single note into multiple cards
+      notes/[id]/summary/route.ts  # Regenerate AI summary for a note
       auth/signup/route.ts  # User signup
     login/page.tsx          # Login page
     signup/page.tsx         # Signup page
@@ -155,12 +164,14 @@ src/
 - [x] NoteCard with actions
 - [x] PATCH/DELETE note endpoints
 
-### Phase 3: AI Organization ⏳
+### Phase 3: AI Organization 🚧
 - [x] AI service functions (organizeNote, splitNote, embedNote)
 - [x] Background organization trigger
-- [ ] UI for confirming/editing AI suggestions
-- [ ] Embedding storage & pgvector config
-- [ ] Entity linking
+- [x] Split-note API + review modal flow
+- [x] Embedding persistence into pgvector column
+- [x] Summary regeneration endpoint + UI actions
+- [x] Confidence state badges in note UI
+- [ ] Right panel contextual insights
 
 ### Phase 4: Views & Search ⏳
 - [x] Placeholder pages for all views
