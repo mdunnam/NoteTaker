@@ -8,6 +8,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Send } from "lucide-react";
+import DumpModal from "@/components/notes/DumpModal";
 
 export default function CaptureBar() {
   const [content, setContent] = useState("");
@@ -17,6 +18,7 @@ export default function CaptureBar() {
   const [projectHint, setProjectHint] = useState("");
   const [contextHint, setContextHint] = useState("");
   const [lastResultMessage, setLastResultMessage] = useState("");
+  const [isDumpModalOpen, setIsDumpModalOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -99,6 +101,17 @@ export default function CaptureBar() {
   return (
     <div className="border-b border-gray-200 bg-white px-6 py-4">
       <form onSubmit={handleCapture} className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">Capture quickly, or run a full dump analysis flow.</p>
+          <button
+            type="button"
+            onClick={() => setIsDumpModalOpen(true)}
+            className="rounded-md border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+          >
+            Organize This Dump
+          </button>
+        </div>
+
         <div className="flex gap-3">
           <textarea
             ref={textareaRef}
@@ -196,6 +209,15 @@ export default function CaptureBar() {
           </p>
         )}
       </form>
+
+      <DumpModal
+        open={isDumpModalOpen}
+        onClose={() => setIsDumpModalOpen(false)}
+        onCreated={(count) => {
+          setLastResultMessage(`Created ${count} note${count === 1 ? "" : "s"} from dump.`);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
