@@ -1,4 +1,4 @@
-import type { UserStats } from "@/lib/userStats";
+import type { MetricSeriesPoint, UserStats } from "@/lib/userStats";
 
 interface AIPerformancePanelProps {
   stats: UserStats;
@@ -12,6 +12,32 @@ function formatPercent(value: number): string {
 /** Format milliseconds to concise seconds label. */
 function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
+}
+
+/** Render a tiny SVG sparkline for 30-day metric history. */
+function Sparkline({ points }: { points: MetricSeriesPoint[] }) {
+  if (points.length < 2) {
+    return <div className="mt-2 h-10 rounded bg-gray-50" />;
+  }
+
+  const values = points.map((point) => point.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+
+  const path = points
+    .map((point, index) => {
+      const x = (index / (points.length - 1)) * 100;
+      const y = 32 - ((point.value - min) / range) * 28;
+      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg viewBox="0 0 100 32" className="mt-2 h-10 w-full overflow-visible">
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-500" />
+    </svg>
+  );
 }
 
 /** Render a compact delta chip from a trend object. */
@@ -54,6 +80,7 @@ export default function AIPerformancePanel({ stats }: AIPerformancePanelProps) {
           betterWhen={stats.trends.confidence.betterWhen}
           asPercent
         />
+        <Sparkline points={stats.history.confidence} />
         <p className="mt-1 text-xs text-gray-500">Average confidence across processed notes.</p>
       </div>
 
@@ -65,6 +92,7 @@ export default function AIPerformancePanel({ stats }: AIPerformancePanelProps) {
           betterWhen={stats.trends.clarificationRate.betterWhen}
           asPercent
         />
+        <Sparkline points={stats.history.clarificationRate} />
         <p className="mt-1 text-xs text-gray-500">
           {stats.lowConfidenceCount} low-confidence note{stats.lowConfidenceCount === 1 ? "" : "s"} still needing clarity.
         </p>
@@ -91,6 +119,7 @@ export default function AIPerformancePanel({ stats }: AIPerformancePanelProps) {
           delta={stats.trends.resolutionTimeMs.delta}
           betterWhen={stats.trends.resolutionTimeMs.betterWhen}
         />
+        <Sparkline points={stats.history.resolutionTimeMs} />
         <p className="mt-1 text-xs text-gray-500">From note creation to completed enrichment.</p>
       </div>
 

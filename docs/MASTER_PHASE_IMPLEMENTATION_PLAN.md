@@ -639,6 +639,11 @@ Cards showing:
 - Confidence lift from hints (your top-performing hints)
 - Avg enrichment time (seconds)
 
+Persisted history:
+- Store one daily `UserMetricSnapshot` row per user
+- Use last 30 daily snapshots to render inline sparklines on performance cards
+- Keep trend arrows based on 7-day vs 30-day comparison while the sparkline shows the actual month shape
+
 Existing hint effectiveness table stays below this section.
 
 #### Testing

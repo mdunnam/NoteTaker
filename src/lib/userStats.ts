@@ -9,11 +9,36 @@ export interface MetricTrend {
   betterWhen: "higher" | "lower";
 }
 
+export interface MetricSeriesPoint {
+  date: string;
+  value: number;
+}
+
 interface UserStatsTrends {
   confidence: MetricTrend;
   clarificationRate: MetricTrend;
   resolutionTimeMs: MetricTrend;
 }
+
+interface UserStatsHistory {
+  confidence: MetricSeriesPoint[];
+  clarificationRate: MetricSeriesPoint[];
+  resolutionTimeMs: MetricSeriesPoint[];
+}
+
+interface SnapshotRow {
+  snapshotDate: Date;
+  avgConfidence: number;
+  clarificationRate: number;
+  avgTimeToResolutionMs: number;
+}
+
+const snapshotClient = prisma as typeof prisma & {
+  userMetricSnapshot: {
+    upsert: (args: unknown) => Promise<unknown>;
+    findMany: (args: unknown) => Promise<SnapshotRow[]>;
+  };
+};
 
 export interface UserStats {
   totalNotes: number;
@@ -28,6 +53,7 @@ export interface UserStats {
   avgTimeToResolutionMs: number;
   failedJobs: number;
   trends: UserStatsTrends;
+  history: UserStatsHistory;
 }
 
 function average(values: number[]): number {
@@ -47,13 +73,17 @@ function buildTrend(last7: number, last30: number, betterWhen: "higher" | "lower
   };
 }
 
+function startOfDay(value: Date): Date {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
 /**
  * Build user-level instrumentation stats for AI quality and workflow health.
  */
 export async function getUserStats(userId: string): Promise<UserStats> {
-  const now = Date.now();
-  const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-  const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const [
     totalNotes,
@@ -216,6 +246,46 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     "lower"
   );
 
+  const snapshotDate = startOfDay(now);
+
+  await snapshotClient.userMetricSnapshot.upsert({
+    where: {
+      userId_snapshotDate: {
+        userId,
+        snapshotDate,
+      },
+    },
+    create: {
+      userId,
+      snapshotDate,
+      avgConfidence,
+      clarificationRate,
+      avgTimeToResolutionMs,
+    },
+    update: {
+      avgConfidence,
+      clarificationRate,
+      avgTimeToResolutionMs,
+    },
+  });
+
+  const snapshots = await snapshotClient.userMetricSnapshot.findMany({
+    where: {
+      userId,
+      snapshotDate: { gte: startOfDay(thirtyDaysAgo) },
+    },
+    orderBy: {
+      snapshotDate: "asc",
+    },
+    take: 30,
+    select: {
+      snapshotDate: true,
+      avgConfidence: true,
+      clarificationRate: true,
+      avgTimeToResolutionMs: true,
+    },
+  });
+
   return {
     totalNotes,
     processedNotes,
@@ -232,6 +302,20 @@ export async function getUserStats(userId: string): Promise<UserStats> {
       confidence: confidenceTrend,
       clarificationRate: clarificationTrend,
       resolutionTimeMs: resolutionTrend,
+    },
+    history: {
+      confidence: snapshots.map((snapshot: SnapshotRow) => ({
+        date: snapshot.snapshotDate.toISOString(),
+        value: snapshot.avgConfidence,
+      })),
+      clarificationRate: snapshots.map((snapshot: SnapshotRow) => ({
+        date: snapshot.snapshotDate.toISOString(),
+        value: snapshot.clarificationRate,
+      })),
+      resolutionTimeMs: snapshots.map((snapshot: SnapshotRow) => ({
+        date: snapshot.snapshotDate.toISOString(),
+        value: snapshot.avgTimeToResolutionMs,
+      })),
     },
   };
 }

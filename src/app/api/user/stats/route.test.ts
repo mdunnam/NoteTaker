@@ -47,6 +47,20 @@ describe("/api/user/stats GET", () => {
         clarificationRate: { last7: 0.2, last30: 0.3, delta: -0.1, direction: "down", betterWhen: "lower" },
         resolutionTimeMs: { last7: 1500, last30: 1800, delta: -300, direction: "down", betterWhen: "lower" },
       },
+      history: {
+        confidence: [
+          { date: "2026-03-01T00:00:00.000Z", value: 0.62 },
+          { date: "2026-03-31T00:00:00.000Z", value: 0.72 },
+        ],
+        clarificationRate: [
+          { date: "2026-03-01T00:00:00.000Z", value: 0.4 },
+          { date: "2026-03-31T00:00:00.000Z", value: 0.25 },
+        ],
+        resolutionTimeMs: [
+          { date: "2026-03-01T00:00:00.000Z", value: 2100 },
+          { date: "2026-03-31T00:00:00.000Z", value: 1700 },
+        ],
+      },
     });
 
     const response = await GET();
