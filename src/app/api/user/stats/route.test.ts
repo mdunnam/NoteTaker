@@ -1,0 +1,54 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
+}));
+
+vi.mock("@/lib/userStats", () => ({
+  getUserStats: vi.fn(),
+}));
+
+import { auth } from "@/auth";
+import { getUserStats } from "@/lib/userStats";
+import { GET } from "./route";
+
+const mockedAuth = vi.mocked(auth);
+const mockedGetUserStats = vi.mocked(getUserStats);
+
+describe("/api/user/stats GET", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    mockedAuth.mockResolvedValue(null as never);
+
+    const response = await GET();
+
+    expect(response.status).toBe(401);
+  });
+
+  it("returns stats payload", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "u1" } } as never);
+    mockedGetUserStats.mockResolvedValue({
+      totalNotes: 10,
+      processedNotes: 8,
+      stillProcessing: 1,
+      lowConfidenceCount: 2,
+      clarificationRate: 0.25,
+      clarificationConversionRate: 0.5,
+      avgConfidence: 0.72,
+      avgHintLift: 0.11,
+      hintUses: 6,
+      avgTimeToResolutionMs: 1700,
+      failedJobs: 0,
+    });
+
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.totalNotes).toBe(10);
+    expect(payload.avgConfidence).toBe(0.72);
+  });
+});
