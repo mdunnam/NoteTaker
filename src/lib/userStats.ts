@@ -77,6 +77,168 @@ function startOfDay(value: Date): Date {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate());
 }
 
+function endOfDay(value: Date): Date {
+  const day = startOfDay(value);
+  return new Date(day.getTime() + 24 * 60 * 60 * 1000 - 1);
+}
+
+async function buildSnapshotValuesForDate(userId: string, snapshotDate: Date): Promise<SnapshotRow> {
+  const dayStart = startOfDay(snapshotDate);
+  const dayEnd = endOfDay(snapshotDate);
+  const windowStart = startOfDay(new Date(dayStart.getTime() - 29 * 24 * 60 * 60 * 1000));
+
+  const [notes, jobs] = await Promise.all([
+    prisma.note.findMany({
+      where: {
+        userId,
+        isArchived: false,
+        status: "PROCESSED",
+        updatedAt: {
+          gte: windowStart,
+          lte: dayEnd,
+        },
+        confidenceScore: { not: null },
+      },
+      select: {
+        confidenceScore: true,
+      },
+      take: 3000,
+      orderBy: {
+        updatedAt: "desc",
+      },
+    }),
+    prisma.noteJob.findMany({
+      where: {
+        userId,
+        status: "DONE",
+        processedAt: {
+          gte: windowStart,
+          lte: dayEnd,
+        },
+      },
+      select: {
+        processedAt: true,
+        note: {
+          select: {
+            createdAt: true,
+          },
+        },
+      },
+      take: 3000,
+      orderBy: {
+        processedAt: "desc",
+      },
+    }),
+  ]);
+
+  const avgConfidence = average(notes.map((note) => note.confidenceScore || 0));
+  const lowConfidenceCount = notes.filter((note) => (note.confidenceScore || 0) < 0.65).length;
+  const clarificationRate = notes.length > 0 ? lowConfidenceCount / notes.length : 0;
+  const avgTimeToResolutionMs = average(
+    jobs
+      .filter((job) => !!job.processedAt)
+      .map((job) => {
+        const processedAt = job.processedAt as Date;
+        return processedAt.getTime() - job.note.createdAt.getTime();
+      })
+      .filter((ms) => ms >= 0)
+  );
+
+  return {
+    snapshotDate: dayStart,
+    avgConfidence,
+    clarificationRate,
+    avgTimeToResolutionMs,
+  };
+}
+
+/** Upsert a single daily metric snapshot for a user. */
+export async function upsertUserMetricSnapshotForDate(userId: string, snapshotDate: Date): Promise<void> {
+  const values = await buildSnapshotValuesForDate(userId, snapshotDate);
+
+  await snapshotClient.userMetricSnapshot.upsert({
+    where: {
+      userId_snapshotDate: {
+        userId,
+        snapshotDate: values.snapshotDate,
+      },
+    },
+    create: {
+      userId,
+      snapshotDate: values.snapshotDate,
+      avgConfidence: values.avgConfidence,
+      clarificationRate: values.clarificationRate,
+      avgTimeToResolutionMs: values.avgTimeToResolutionMs,
+    },
+    update: {
+      avgConfidence: values.avgConfidence,
+      clarificationRate: values.clarificationRate,
+      avgTimeToResolutionMs: values.avgTimeToResolutionMs,
+    },
+  });
+}
+
+/** Backfill missing daily snapshots for the last N days for a single user. */
+export async function ensureRecentUserMetricSnapshots(userId: string, days = 30): Promise<number> {
+  const today = startOfDay(new Date());
+  const oldest = startOfDay(new Date(today.getTime() - (days - 1) * 24 * 60 * 60 * 1000));
+
+  const existing = await snapshotClient.userMetricSnapshot.findMany({
+    where: {
+      userId,
+      snapshotDate: { gte: oldest },
+    },
+    select: {
+      snapshotDate: true,
+      avgConfidence: true,
+      clarificationRate: true,
+      avgTimeToResolutionMs: true,
+    },
+    orderBy: {
+      snapshotDate: "asc",
+    },
+    take: days,
+  });
+
+  const existingKeys = new Set(existing.map((snapshot) => snapshot.snapshotDate.toISOString()));
+  const datesToCreate: Date[] = [];
+
+  for (let index = 0; index < days; index += 1) {
+    const current = startOfDay(new Date(oldest.getTime() + index * 24 * 60 * 60 * 1000));
+    const key = current.toISOString();
+    if (!existingKeys.has(key)) {
+      datesToCreate.push(current);
+    }
+  }
+
+  for (const date of datesToCreate) {
+    await upsertUserMetricSnapshotForDate(userId, date);
+  }
+
+  return datesToCreate.length;
+}
+
+/** Backfill recent metric snapshots for all users, suitable for cron/worker use. */
+export async function backfillRecentMetricSnapshotsForAllUsers(days = 30): Promise<{
+  usersProcessed: number;
+  snapshotsCreated: number;
+}> {
+  const users = await prisma.user.findMany({
+    select: { id: true },
+  });
+
+  let snapshotsCreated = 0;
+
+  for (const user of users) {
+    snapshotsCreated += await ensureRecentUserMetricSnapshots(user.id, days);
+  }
+
+  return {
+    usersProcessed: users.length,
+    snapshotsCreated,
+  };
+}
+
 /**
  * Build user-level instrumentation stats for AI quality and workflow health.
  */
@@ -246,28 +408,8 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     "lower"
   );
 
-  const snapshotDate = startOfDay(now);
-
-  await snapshotClient.userMetricSnapshot.upsert({
-    where: {
-      userId_snapshotDate: {
-        userId,
-        snapshotDate,
-      },
-    },
-    create: {
-      userId,
-      snapshotDate,
-      avgConfidence,
-      clarificationRate,
-      avgTimeToResolutionMs,
-    },
-    update: {
-      avgConfidence,
-      clarificationRate,
-      avgTimeToResolutionMs,
-    },
-  });
+  await ensureRecentUserMetricSnapshots(userId, 30);
+  await upsertUserMetricSnapshotForDate(userId, now);
 
   const snapshots = await snapshotClient.userMetricSnapshot.findMany({
     where: {
