@@ -16,6 +16,7 @@ vi.mock("@/lib/rateLimit", () => ({
 vi.mock("@/lib/userMemory", () => ({
   getThinkingMemory: vi.fn(),
   buildThinkingMemoryPrompt: vi.fn(),
+  updateThinkingMemory: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -31,7 +32,7 @@ import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { buildThinkingMemoryPrompt, getThinkingMemory } from "@/lib/userMemory";
+import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory } from "@/lib/userMemory";
 import { POST } from "./route";
 
 const mockedAuth = vi.mocked(auth);
@@ -41,6 +42,7 @@ const mockedUpdate = vi.mocked(prisma.note.update);
 const mockedCheckRateLimit = vi.mocked(checkRateLimit);
 const mockedGetThinkingMemory = vi.mocked(getThinkingMemory);
 const mockedBuildThinkingMemoryPrompt = vi.mocked(buildThinkingMemoryPrompt);
+const mockedUpdateThinkingMemory = vi.mocked(updateThinkingMemory);
 
 function makeRequest() {
   return new NextRequest("http://localhost/api/notes/n1/summary", {
@@ -67,6 +69,7 @@ describe("/api/notes/[id]/summary POST", () => {
       knownTopics: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
+    mockedUpdateThinkingMemory.mockResolvedValue(undefined);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -98,13 +101,17 @@ describe("/api/notes/[id]/summary POST", () => {
     mockedOrganizeNote.mockResolvedValue({
       title: "Call Jim",
       summary: "A follow-up note focused on invoice reconciliation and next outreach.",
+      intent: "Resolve invoice mismatch with Jim.",
+      nextAction: "Call Jim to confirm invoice details",
+      priority: "high",
       category: "Work",
       type: "TASK",
       tags: ["finance"],
       suggestedProject: undefined,
-      extractedTasks: [{ text: "Call Jim about invoice discrepancies" }],
+      extractedTasks: [{ text: "Call Jim about invoice discrepancies", priority: "high" }],
       extractedDates: [],
       extractedEntities: [{ type: "PERSON", name: "Jim" }],
+      clarificationQuestions: [],
       confidenceScore: 0.82,
     } as never);
     mockedUpdate.mockResolvedValue({

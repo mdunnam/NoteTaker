@@ -25,6 +25,8 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [bulkProjectHint, setBulkProjectHint] = useState("");
+  const [bulkContextHint, setBulkContextHint] = useState("");
 
   /** Toggle a single note in the selection set. */
   const toggleSelect = useCallback((id: string) => {
@@ -91,6 +93,36 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
     }
   };
 
+  /**
+   * Apply a shared project/context hint to selected notes and regenerate AI organization.
+   */
+  const bulkClarify = async () => {
+    if (selected.size === 0) return;
+    if (!bulkProjectHint && !bulkContextHint) return;
+
+    setIsBulkProcessing(true);
+    try {
+      await Promise.all(
+        [...selected].map((id) =>
+          fetch(`/api/notes/${id}/summary`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              projectHint: bulkProjectHint || undefined,
+              contextHint: bulkContextHint || undefined,
+            }),
+          })
+        )
+      );
+      setSelected(new Set());
+      router.refresh();
+    } catch (error) {
+      console.error("Bulk clarify failed:", error);
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
   if (notes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -120,10 +152,43 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
         {someSelected ? (
           <>
             <span className="text-gray-600">{selected.size} selected</span>
+            {(quickHints?.projects?.length || quickHints?.contexts?.length) && (
+              <div className="ml-auto flex items-center gap-2">
+                <select
+                  value={bulkProjectHint}
+                  onChange={(e) => setBulkProjectHint(e.target.value)}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs"
+                >
+                  <option value="">Project hint...</option>
+                  {(quickHints?.projects || []).map((project) => (
+                    <option key={`bulk-project-${project}`} value={project}>{project}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={bulkContextHint}
+                  onChange={(e) => setBulkContextHint(e.target.value)}
+                  className="rounded border border-gray-300 px-2 py-1 text-xs"
+                >
+                  <option value="">Context hint...</option>
+                  {(quickHints?.contexts || []).map((context) => (
+                    <option key={`bulk-context-${context}`} value={context}>{context}</option>
+                  ))}
+                </select>
+
+                <button
+                  onClick={bulkClarify}
+                  disabled={isBulkProcessing || (!bulkProjectHint && !bulkContextHint)}
+                  className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                >
+                  Clarify + Regenerate
+                </button>
+              </div>
+            )}
             <button
               onClick={() => bulkPatch({ isArchived: true })}
               disabled={isBulkProcessing}
-              className="ml-auto flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
               <Archive className="h-3.5 w-3.5" />
               Archive

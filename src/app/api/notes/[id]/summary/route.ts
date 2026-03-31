@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { buildThinkingMemoryPrompt, getThinkingMemory } from "@/lib/userMemory";
+import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory } from "@/lib/userMemory";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -75,17 +75,44 @@ export async function POST(request: NextRequest, { params }: Params) {
     const updated = await prisma.note.update({
       where: { id: note.id },
       data: {
+        title: organized.title,
         summary: organized.summary,
+        category: organized.category,
+        type: organized.type,
+        tags: organized.tags,
+        suggestedProject: organized.suggestedProject || parsedHints.projectHint || null,
+        extractedTasks: organized.extractedTasks || null,
+        extractedDates: organized.extractedDates || null,
+        extractedEntities: organized.extractedEntities || null,
+        priority: organized.priority,
+        aiMeta: {
+          intent: organized.intent || null,
+          nextAction: organized.nextAction || null,
+          clarificationQuestions: organized.clarificationQuestions || [],
+        },
         confidenceScore: organized.confidenceScore,
-        ...(parsedHints.projectHint && { suggestedProject: parsedHints.projectHint }),
         ...(parsedHints.contextHint && { category: parsedHints.contextHint }),
       },
       select: {
         id: true,
+        title: true,
         summary: true,
+        category: true,
+        type: true,
+        tags: true,
+        suggestedProject: true,
+        extractedTasks: true,
+        priority: true,
+        aiMeta: true,
         confidenceScore: true,
         updatedAt: true,
       },
+    });
+
+    await updateThinkingMemory(session.user.id, {
+      explicitProject: parsedHints.projectHint,
+      explicitContext: parsedHints.contextHint,
+      organized,
     });
 
     return NextResponse.json(updated, { status: 200 });

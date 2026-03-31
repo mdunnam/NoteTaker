@@ -58,12 +58,16 @@ function parseAiMeta(raw: unknown): AiMeta {
 
 interface NoteDetailClientProps {
   note: NoteDetailData;
+  quickHints?: {
+    projects: string[];
+    contexts: string[];
+  };
 }
 
 /**
  * Interactive note detail view — edit, pin, archive, see entities and related notes.
  */
-export default function NoteDetailClient({ note }: NoteDetailClientProps) {
+export default function NoteDetailClient({ note, quickHints }: NoteDetailClientProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(note.title || "");
@@ -73,6 +77,7 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
   const [splitMessage, setSplitMessage] = useState<string | null>(null);
   const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
   const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
+  const [isApplyingHint, setIsApplyingHint] = useState(false);
   const [displayedSummary, setDisplayedSummary] = useState(note.summary);
   const [displayedConfidence, setDisplayedConfidence] = useState(note.confidenceScore);
 
@@ -173,6 +178,44 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
       setSummaryMessage("Could not regenerate summary. Please try again.");
     } finally {
       setIsRegeneratingSummary(false);
+    }
+  };
+
+  /**
+   * Apply a clarification hint and regenerate note insights.
+   */
+  const handleApplyHint = async (kind: "project" | "context", value: string) => {
+    setIsApplyingHint(true);
+    setSummaryMessage(null);
+
+    try {
+      const response = await fetch(`/api/notes/${note.id}/summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectHint: kind === "project" ? value : undefined,
+          contextHint: kind === "context" ? value : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to apply hint");
+      }
+
+      const payload = (await response.json()) as {
+        summary: string | null;
+        confidenceScore: number | null;
+      };
+
+      setDisplayedSummary(payload.summary);
+      setDisplayedConfidence(payload.confidenceScore);
+      setSummaryMessage(`Applied ${kind} hint: ${value}`);
+      router.refresh();
+    } catch (error) {
+      console.error("Error applying hint:", error);
+      setSummaryMessage("Could not apply clarification hint.");
+    } finally {
+      setIsApplyingHint(false);
     }
   };
 
@@ -344,6 +387,43 @@ export default function NoteDetailClient({ note }: NoteDetailClientProps) {
                 <li key={i} className="text-sm text-amber-900">• {q}</li>
               ))}
             </ul>
+            {quickHints?.projects && quickHints.projects.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[11px] font-semibold text-amber-800 mb-1">Quick project hints</p>
+                <div className="flex flex-wrap gap-1">
+                  {quickHints.projects.map((project) => (
+                    <button
+                      key={`detail-project-${project}`}
+                      type="button"
+                      disabled={isApplyingHint}
+                      onClick={() => handleApplyHint("project", project)}
+                      className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                    >
+                      {project}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {quickHints?.contexts && quickHints.contexts.length > 0 && (
+              <div className="mt-2">
+                <p className="text-[11px] font-semibold text-amber-800 mb-1">Quick context hints</p>
+                <div className="flex flex-wrap gap-1">
+                  {quickHints.contexts.map((context) => (
+                    <button
+                      key={`detail-context-${context}`}
+                      type="button"
+                      disabled={isApplyingHint}
+                      onClick={() => handleApplyHint("context", context)}
+                      className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                    >
+                      {context}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <p className="mt-2 text-[11px] text-amber-700">Add project/context hints to the capture bar and regenerate, or edit the note to clarify.</p>
           </div>
         )}

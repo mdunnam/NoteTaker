@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import NoteDetailClient from "@/components/notes/NoteDetailClient";
+import { getThinkingMemory, getThinkingMemoryHints } from "@/lib/userMemory";
 
 interface NoteDetailPageProps {
   params: { id: string };
@@ -50,6 +51,9 @@ export default async function NoteDetailPage({ params }: NoteDetailPageProps) {
     notFound();
   }
 
+  const memory = await getThinkingMemory(session.user.id);
+  const quickHints = getThinkingMemoryHints(memory);
+
   return (
     <div className="mx-auto max-w-4xl p-6">
       <div className="mb-4">
@@ -58,7 +62,7 @@ export default async function NoteDetailPage({ params }: NoteDetailPageProps) {
         </Link>
       </div>
 
-      <NoteDetailClient note={note} />
+      <NoteDetailClient note={note} quickHints={quickHints} />
     </div>
   );
 }

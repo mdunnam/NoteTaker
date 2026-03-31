@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import RightPanelContextual from "@/components/layout/RightPanelContextual";
 
 /**
  * Right panel showing live note health and recent extracted tasks.
@@ -11,7 +12,15 @@ export default async function RightPanel() {
     return null;
   }
 
-  const [totalNotes, uncategorizedCount, processingCount, recentNotes, topRelations] = await Promise.all([
+  const [
+    totalNotes,
+    uncategorizedCount,
+    processingCount,
+    recentNotes,
+    topRelations,
+    lowConfidenceNotes,
+    highPriorityNotes,
+  ] = await Promise.all([
     prisma.note.count({
       where: {
         userId: session.user.id,
@@ -69,6 +78,36 @@ export default async function RightPanel() {
         },
       },
     }),
+    prisma.note.findMany({
+      where: {
+        userId: session.user.id,
+        isArchived: false,
+        status: "PROCESSED",
+        confidenceScore: { lt: 0.65 },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        aiMeta: true,
+      },
+    }),
+    prisma.note.findMany({
+      where: {
+        userId: session.user.id,
+        isArchived: false,
+        status: "PROCESSED",
+        priority: "high",
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        aiMeta: true,
+      },
+    }),
   ]);
 
   const extractedTasks: Array<{
@@ -110,6 +149,8 @@ export default async function RightPanel() {
   return (
     <aside className="w-80 border-l border-gray-200 bg-gray-50 p-6 overflow-y-auto">
       <div className="space-y-6">
+        <RightPanelContextual />
+
         <div>
           <h3 className="font-semibold text-sm mb-3">Note Health</h3>
           <ul className="space-y-2 text-xs text-gray-700">
@@ -168,6 +209,53 @@ export default async function RightPanel() {
                   <div className="mt-1 text-blue-700">Score: {relation.score.toFixed(2)}</div>
                 </li>
               ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="pt-6 border-t border-gray-200">
+          <h3 className="font-semibold text-sm mb-3">Needs Clarification</h3>
+          {lowConfidenceNotes.length === 0 ? (
+            <p className="text-xs text-gray-600">No low-confidence notes right now.</p>
+          ) : (
+            <ul className="space-y-2">
+              {lowConfidenceNotes.map((note) => {
+                const meta = (note.aiMeta || {}) as { clarificationQuestions?: string[] };
+                const question = Array.isArray(meta.clarificationQuestions) && meta.clarificationQuestions.length > 0
+                  ? meta.clarificationQuestions[0]
+                  : null;
+
+                return (
+                  <li key={note.id} className="rounded border border-amber-200 bg-amber-50 p-3">
+                    <a href={`/notes/${note.id}`} className="text-xs font-medium text-amber-900 hover:underline">
+                      {note.title || "Untitled note"}
+                    </a>
+                    {question && <p className="mt-1 text-[11px] text-amber-800">{question}</p>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="pt-6 border-t border-gray-200">
+          <h3 className="font-semibold text-sm mb-3">Priority Queue</h3>
+          {highPriorityNotes.length === 0 ? (
+            <p className="text-xs text-gray-600">No high-priority notes pending.</p>
+          ) : (
+            <ul className="space-y-2">
+              {highPriorityNotes.map((note) => {
+                const meta = (note.aiMeta || {}) as { nextAction?: string };
+
+                return (
+                  <li key={note.id} className="rounded border border-red-200 bg-red-50 p-3">
+                    <a href={`/notes/${note.id}`} className="text-xs font-medium text-red-900 hover:underline">
+                      {note.title || "Untitled note"}
+                    </a>
+                    {meta.nextAction && <p className="mt-1 text-[11px] text-red-800">Next: {meta.nextAction}</p>}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
