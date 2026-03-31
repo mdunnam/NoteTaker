@@ -14,6 +14,32 @@ function formatSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** Render a compact delta chip from a trend object. */
+function TrendDelta({
+  delta,
+  betterWhen,
+  asPercent,
+}: {
+  delta: number;
+  betterWhen: "higher" | "lower";
+  asPercent?: boolean;
+}) {
+  const abs = Math.abs(delta);
+  const isUp = delta > 0;
+  const isFlat = abs < 0.0001;
+  const isGood = isFlat || (betterWhen === "higher" ? isUp : !isUp);
+  const arrow = isFlat ? "→" : isUp ? "↑" : "↓";
+  const value = asPercent ? `${(abs * 100).toFixed(0)}pp` : `${(abs / 1000).toFixed(1)}s`;
+
+  return (
+    <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+      isGood ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+    }`}>
+      {arrow} {value} vs 30d
+    </span>
+  );
+}
+
 /**
  * Dashboard cards for AI instrumentation metrics in Settings.
  */
@@ -23,12 +49,22 @@ export default function AIPerformancePanel({ stats }: AIPerformancePanelProps) {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-gray-500">First-Pass Confidence</p>
         <p className="mt-1 text-2xl font-bold text-gray-900">{formatPercent(stats.avgConfidence)}</p>
+        <TrendDelta
+          delta={stats.trends.confidence.delta}
+          betterWhen={stats.trends.confidence.betterWhen}
+          asPercent
+        />
         <p className="mt-1 text-xs text-gray-500">Average confidence across processed notes.</p>
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-gray-500">Clarification Rate</p>
         <p className="mt-1 text-2xl font-bold text-gray-900">{formatPercent(stats.clarificationRate)}</p>
+        <TrendDelta
+          delta={stats.trends.clarificationRate.delta}
+          betterWhen={stats.trends.clarificationRate.betterWhen}
+          asPercent
+        />
         <p className="mt-1 text-xs text-gray-500">
           {stats.lowConfidenceCount} low-confidence note{stats.lowConfidenceCount === 1 ? "" : "s"} still needing clarity.
         </p>
@@ -51,6 +87,10 @@ export default function AIPerformancePanel({ stats }: AIPerformancePanelProps) {
       <div className="rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-gray-500">Avg Time To Resolution</p>
         <p className="mt-1 text-2xl font-bold text-gray-900">{formatSeconds(stats.avgTimeToResolutionMs)}</p>
+        <TrendDelta
+          delta={stats.trends.resolutionTimeMs.delta}
+          betterWhen={stats.trends.resolutionTimeMs.betterWhen}
+        />
         <p className="mt-1 text-xs text-gray-500">From note creation to completed enrichment.</p>
       </div>
 

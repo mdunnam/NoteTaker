@@ -42,6 +42,11 @@ describe("/api/user/stats GET", () => {
       hintUses: 6,
       avgTimeToResolutionMs: 1700,
       failedJobs: 0,
+      trends: {
+        confidence: { last7: 0.75, last30: 0.7, delta: 0.05, direction: "up", betterWhen: "higher" },
+        clarificationRate: { last7: 0.2, last30: 0.3, delta: -0.1, direction: "down", betterWhen: "lower" },
+        resolutionTimeMs: { last7: 1500, last30: 1800, delta: -300, direction: "down", betterWhen: "lower" },
+      },
     });
 
     const response = await GET();
