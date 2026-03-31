@@ -1,5 +1,8 @@
 # Phase 3 Implementation Plan: Thinking Modes Foundation
 
+> Superseded as canonical plan by `docs/MASTER_PHASE_IMPLEMENTATION_PLAN.md`.
+> Keep this file as a phase-specific historical checkpoint.
+
 Related docs:
 - [Implementation Summary](IMPLEMENTATION.md)
 - [AI Training Opt-In Plan](AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)

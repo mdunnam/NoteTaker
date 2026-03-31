@@ -4,8 +4,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 
 ## Planning Docs
 
-- [Implementation Summary](docs/IMPLEMENTATION.md)
-- [Phase 3 Implementation Plan](docs/PHASE3_IMPLEMENTATION_PLAN.md)
+- [Master Phase Implementation Plan](docs/MASTER_PHASE_IMPLEMENTATION_PLAN.md)
 - [AI Training Opt-In Plan](docs/AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)
 - [Intended User Workflow](docs/USE_CASE_WORKFLOW.md)
 

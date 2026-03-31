@@ -1,5 +1,8 @@
 # QNote Implementation Summary — Current State + Full Plan
 
+> Superseded as canonical plan by `docs/MASTER_PHASE_IMPLEMENTATION_PLAN.md`.
+> Keep this document for historical context and incremental notes.
+
 ## Current Delivery Status (2026-03-30)
 
 - ✅ Upgraded core organization and split reasoning model to `gpt-5.4`
