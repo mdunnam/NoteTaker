@@ -1,4 +1,4 @@
-# QNote Implementation Summary — Phase 1 ✅ Complete
+# QNote Implementation Summary — Current State + Full Plan
 
 ## Current Delivery Status (2026-03-30)
 
@@ -9,6 +9,79 @@
 - ✅ Added contextual RightPanel section on note detail routes
 - ✅ Added hint-effectiveness analytics in settings (usage + average confidence lift)
 - ✅ Added planning docs for optional opt-in training strategy and privacy-safe rollout
+
+## Strategic Gap Analysis (What Is Still Missing)
+
+The core loop is live: capture -> organize -> clarify -> regenerate -> learn from hint interactions.
+
+The key missing pieces are now grouped into implementation buckets.
+
+### Immediate Product Gaps (Explicit Phase 3 Remainders)
+- Organize This Dump dedicated flow (analyze + confirm create)
+- Dump Mode capture variant with keyboard-first triage
+- Instrumentation dashboard (clarification conversion, time-to-resolution, confidence trends)
+
+### Experience Completeness Gaps
+- Several navigation surfaces still need full depth: Cards, Projects, Topics, Timeline, Favorites, Archive
+- Search is partially implemented but still needs stronger product UX and tuning loops
+- RightPanel is improved but still needs richer synthesis-level guidance
+
+### Thinking-System Gaps (Memory Payoff)
+- Project/topic clustering from note activity
+- Smart resurfacing of forgotten and repeated thinking
+- Multi-note synthesis with explicit next steps
+- Auto-project creation from synthesis clusters
+
+### Capture Surface Gaps
+- Clipboard and contextual app/web capture
+- Global hotkey and desktop wrapper integrations
+- Browser extension, email-to-note, mobile share-sheet capture
+- Offline-first sync and future voice/OCR capture
+
+### Platform and Trust Gaps
+- OAuth providers and multi-user/team capabilities
+- Optional training-consent implementation (consent ledger, deletion flows, de-identification, governance gates)
+
+## Ruthless Priority Tiers (Fastest Path to "Undeniable")
+
+### Must Have (Now)
+1. Organize This Dump
+2. True semantic search UX
+3. Project/topic clustering
+4. Resurfacing engine
+5. Multi-note synthesis
+
+### Should Have (Next)
+1. Dump Mode + keyboard-first triage
+2. RightPanel depth upgrades
+3. Instrumentation dashboards
+4. Training-consent foundation
+5. OAuth login options
+
+### Nice to Have (After Core Payoff)
+1. Capture-from-anywhere stack
+2. Desktop and global hotkey polish
+3. Mobile/offline stack
+4. Voice and OCR
+5. Team collaboration features
+
+## Recommended Execution Sequence
+
+1. Organize This Dump
+2. Search UX + relevance tuning
+3. Clustering (project/topic detection)
+4. Resurfacing
+5. Synthesis
+6. Instrumentation + training opt-in foundation
+7. Capture surfaces
+
+## Success Metrics (Non-Negotiable)
+
+1. Percentage of notes resolved without manual edit
+2. Clarification-rate trend over time
+3. Confidence lift after hint interactions
+4. Resurfaced-note reopen rate
+5. Synthesis-to-action conversion rate
 
 ## What's Built
 
@@ -96,8 +169,8 @@
 - ✅ Note detail summary panel with confidence badge + regenerate action
 
 ### Database
-- ✅ Prisma schema with 8 models:
-  - User, Note, Collection, Entity, NoteEntity, NoteRelation, UserPreferences, ApiKey
+- ✅ Prisma schema with 9 models:
+  - User, UserPreferences, Note, NoteJob, Collection, Entity, NoteEntity, NoteRelation, ApiKey
 - ✅ Prisma client generated and configured
 - ✅ Ready for migrations
 
@@ -532,14 +605,12 @@ The difference between a tool people *use* and a tool people *can't live without
 
 ---
 
-## Stats
+## Stats Snapshot
 
-- 📝 **Files created**: 37
-- 📦 **Dependencies**: 502
-- 🔧 **API routes**: 5
-- 🎨 **Components**: 7
-- 🗄️ **Database models**: 8
-- ⚡ **Setup time**: ~30 minutes
+- Status reflects active implementation (not just initial scaffold)
+- API surface now includes split, summary regenerate, insights, and worker enrichment routes
+- Database includes durable enrichment queue (`NoteJob`) and AI metadata fields
+- Product has moved from basic capture to an operational clarify-and-learn loop
 
 ---
 
