@@ -1,5 +1,15 @@
 # QNote Implementation Summary — Phase 1 ✅ Complete
 
+## Current Delivery Status (2026-03-30)
+
+- ✅ Upgraded core organization and split reasoning model to `gpt-5.4`
+- ✅ Added user-memory-aware organization with persistent project/context/person/topic signals
+- ✅ Added clarification loops in both inbox and note detail views
+- ✅ Added bulk clarify + regenerate workflow for triage batches
+- ✅ Added contextual RightPanel section on note detail routes
+- ✅ Added hint-effectiveness analytics in settings (usage + average confidence lift)
+- ✅ Added planning docs for optional opt-in training strategy and privacy-safe rollout
+
 ## What's Built
 
 ### Auth System
@@ -40,11 +50,14 @@
   - `organizeNote()` — AI generates:
     - Title from content
     - Summary
+    - Intent and next action
+    - Priority
     - Category (Work, Personal, Project, etc.)
     - Type (TASK, IDEA, NOTE, REFERENCE, DECISION)
     - Tags
     - Extracted tasks & deadlines
     - Extracted entities (people, projects, topics)
+    - Clarification questions when confidence is low
     - Confidence score (0-1)
   - `splitNote()` — AI detects bundles in messy notes
   - `embedNote()` — Generates semantic embeddings (ready for pgvector)
@@ -55,6 +68,14 @@
   - Triggered automatically when note is created
   - Runs in background (async in POST response)
   - Falls back gracefully if AI fails
+- ✅ **Clarification loop**
+  - Low-confidence notes show clarification questions
+  - One-click project/context hints in inbox and detail views
+  - Hint click triggers immediate re-organization
+  - Bulk clarify applies shared hints to selected notes
+- ✅ **Per-user learning telemetry**
+  - Hint usage and confidence lift captured in user memory
+  - Hint effectiveness table exposed in Settings
 - ✅ **Zod validation** for all AI responses
 
 ### App Shell & Navigation
@@ -63,7 +84,7 @@
   - Favorites, Archive
   - Sign out button
   - Active page highlighting
-- ✅ **RightPanel** placeholder (for Phase 4 AI insights)
+- ✅ **RightPanel** with health/task/relations plus contextual note intelligence on detail routes
 - ✅ **Layout** with responsive design
   - Sidebar + Main content + Right panel
   - Mobile-friendly (sidebar can collapse later)

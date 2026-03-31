@@ -6,6 +6,8 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 
 - [Implementation Summary](docs/IMPLEMENTATION.md)
 - [Phase 3 Implementation Plan](docs/PHASE3_IMPLEMENTATION_PLAN.md)
+- [AI Training Opt-In Plan](docs/AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)
+- [Intended User Workflow](docs/USE_CASE_WORKFLOW.md)
 
 ## Features
 
@@ -25,14 +27,18 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **AI organization**: Auto-generate titles, summaries, categories, tags
 - **Task extraction**: Pull actionable items from notes
 - **Entity detection**: Identify people, projects, topics
-- **Confidence scoring**: Confidence badges in note views
+- **Confidence scoring**: Confidence badges in note views + tracked confidence lift
 - **Split workflow**: Split messy notes into multiple cards with review modal
 - **Summary refresh**: Regenerate weak summaries from detail and inbox cards
 - **Semantic search**: Uses stored pgvector embeddings with on-the-fly fallback
+- **Clarification loop**: One-click project/context hints in inbox and note detail
+- **Bulk clarify**: Apply project/context hints to selected notes and regenerate
+- **Contextual RightPanel**: Intent, next action, contextual tasks, related notes on note detail routes
+- **Hint effectiveness analytics**: Settings view tracks per-hint usage and average confidence lift
 
 ### Phase 4 ⏳ (Placeholder pages created)
 - Card, Project, Topic, Timeline, Search views
-- Right panel with AI insights
+- Broader workflow intelligence and synthesis features
 
 ### Phase 5+ 📋
 - Resurface old notes
@@ -171,7 +177,12 @@ src/
 - [x] Embedding persistence into pgvector column
 - [x] Summary regeneration endpoint + UI actions
 - [x] Confidence state badges in note UI
-- [ ] Right panel contextual insights
+- [x] User-memory-aware organization hints
+- [x] Clarification chips in inbox and note detail
+- [x] Bulk clarify + regenerate actions
+- [x] Right panel contextual insights for note detail
+- [x] Hint effectiveness analytics in settings
+- [ ] Organize This Dump dedicated flow
 
 ### Phase 4: Views & Search ⏳
 - [x] Placeholder pages for all views

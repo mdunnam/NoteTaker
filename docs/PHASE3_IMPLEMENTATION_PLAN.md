@@ -1,5 +1,10 @@
 # Phase 3 Implementation Plan: Thinking Modes Foundation
 
+Related docs:
+- [Implementation Summary](IMPLEMENTATION.md)
+- [AI Training Opt-In Plan](AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)
+- [Intended User Workflow](USE_CASE_WORKFLOW.md)
+
 **Goal**: Transform QNote from note storage into a thinking partner.
 
 **Timeline**: 3–4 weeks (if working full-time)
@@ -15,6 +20,21 @@
 - [x] Added confidence-state badges (`Auto-applied`, `Suggested`, `Needs review`) in note UI
 - [x] Tuned organizer prompt to produce clearer action-oriented extracted tasks
 - [x] Switched semantic search to use stored vectors directly with on-the-fly fallback
+- [x] Added user-memory-aware organization context (projects/contexts/entities)
+- [x] Upgraded core reasoning model for organization and splitting
+- [x] Added clarification chips to inbox low-confidence notes
+- [x] Added clarification chips to note detail low-confidence notes
+- [x] Added bulk clarify + regenerate actions in inbox
+- [x] Added contextual RightPanel section for note detail routes
+- [x] Added hint-effectiveness analytics in settings
+
+---
+
+## Remaining Phase 3 Focus
+
+- [ ] Organize This Dump dedicated modal flow (analyze + confirm create)
+- [ ] Dump mode capture variant with keyboard-first triage shortcuts
+- [ ] End-to-end instrumentation dashboard for clarification conversion and time-to-resolution
 
 ---
 
