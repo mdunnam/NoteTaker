@@ -46,6 +46,7 @@ interface CreateNoteOptions {
   collectionId?: string | null;
   projectHint?: string;
   contextHint?: string;
+  dumpMode?: boolean;
 }
 
 /**
@@ -59,6 +60,11 @@ async function createBaseNote(options: CreateNoteOptions) {
       tags: options.tags || [],
       suggestedProject: options.projectHint?.trim() || null,
       category: options.contextHint?.trim() || null,
+      aiMeta: options.dumpMode
+        ? {
+            captureMode: "dump",
+          }
+        : undefined,
       collectionId: options.collectionId || null,
       status: "PROCESSING",
     },
@@ -84,7 +90,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { rawContent, tags, collectionId, projectHint, contextHint, autoSplit = true } = await request.json();
+    const {
+      rawContent,
+      tags,
+      collectionId,
+      projectHint,
+      contextHint,
+      autoSplit = true,
+      dumpMode = false,
+    } = await request.json();
 
     if (!rawContent || !rawContent.trim()) {
       return NextResponse.json(
@@ -95,7 +109,9 @@ export async function POST(request: NextRequest) {
 
     const createdNoteIds: string[] = [];
 
-    if (autoSplit) {
+    const shouldAutoSplit = dumpMode ? false : autoSplit;
+
+    if (shouldAutoSplit) {
       try {
         const split = await splitNote(rawContent);
 
@@ -110,6 +126,7 @@ export async function POST(request: NextRequest) {
               collectionId,
               projectHint,
               contextHint,
+              dumpMode,
             });
 
             createdNoteIds.push(created.id);
@@ -155,6 +172,7 @@ export async function POST(request: NextRequest) {
       collectionId,
       projectHint,
       contextHint,
+      dumpMode,
     });
 
     await enqueueEnrichment(note.id, session.user.id, request.nextUrl.origin);

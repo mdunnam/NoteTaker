@@ -5,7 +5,7 @@
 "use client";
 
 import { Note } from "@prisma/client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Trash2 } from "lucide-react";
 import NoteCard from "./NoteCard";
@@ -27,6 +27,11 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
   const [bulkProjectHint, setBulkProjectHint] = useState("");
   const [bulkContextHint, setBulkContextHint] = useState("");
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const [shortcutMessage, setShortcutMessage] = useState<string | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  const focusedNote = notes[focusedIndex] || null;
 
   /** Toggle a single note in the selection set. */
   const toggleSelect = useCallback((id: string) => {
@@ -123,6 +128,113 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
     }
   };
 
+  /** Set small transient message for keyboard triage feedback. */
+  const flashMessage = (text: string) => {
+    setShortcutMessage(text);
+    setTimeout(() => setShortcutMessage(null), 2000);
+  };
+
+  /** Apply a patch to one note by id. */
+  const patchOne = async (id: string, patch: Record<string, unknown>) => {
+    await fetch(`/api/notes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+  };
+
+  /** Perform keyboard-first triage actions for focused card. */
+  const handleShortcutAction = async (key: string) => {
+    if (!focusedNote) return;
+
+    if (key === "a") {
+      await fetch(`/api/notes/${focusedNote.id}/summary`, { method: "POST" });
+      flashMessage("Accepted AI suggestions (regenerated summary).");
+      router.refresh();
+      return;
+    }
+
+    if (key === "e") {
+      router.push(`/notes/${focusedNote.id}`);
+      return;
+    }
+
+    if (key === "s") {
+      const response = await fetch(`/api/notes/${focusedNote.id}/split`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "create", maxNotes: 8 }),
+      });
+
+      if (response.ok) {
+        const payload = (await response.json()) as { count?: number };
+        flashMessage(`Split created ${payload.count || 0} note${payload.count === 1 ? "" : "s"}.`);
+      } else {
+        flashMessage("Split failed.");
+      }
+      router.refresh();
+      return;
+    }
+
+    if (key === "p") {
+      await patchOne(focusedNote.id, { isPinned: !focusedNote.isPinned });
+      flashMessage(focusedNote.isPinned ? "Unpinned." : "Pinned.");
+      router.refresh();
+      return;
+    }
+
+    if (key === "d") {
+      if (!confirm("Delete focused note permanently?")) return;
+      await fetch(`/api/notes/${focusedNote.id}`, { method: "DELETE" });
+      flashMessage("Deleted note.");
+      router.refresh();
+    }
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const isInput =
+        tag === "input" ||
+        tag === "textarea" ||
+        tag === "select" ||
+        !!target?.isContentEditable;
+
+      if (isInput) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (key === "?") {
+        event.preventDefault();
+        setShowShortcuts((prev) => !prev);
+        return;
+      }
+
+      if (key === "arrowright" || key === "j") {
+        event.preventDefault();
+        setFocusedIndex((prev) => Math.min(prev + 1, notes.length - 1));
+        return;
+      }
+
+      if (key === "arrowleft" || key === "k") {
+        event.preventDefault();
+        setFocusedIndex((prev) => Math.max(prev - 1, 0));
+        return;
+      }
+
+      if (["a", "e", "s", "p", "d"].includes(key)) {
+        event.preventDefault();
+        void handleShortcutAction(key);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [notes.length, focusedNote]);
+
   if (notes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -140,6 +252,20 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
 
   return (
     <div className="max-w-3xl">
+      {showShortcuts && (
+        <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+          <p className="font-semibold mb-1">Triage shortcuts</p>
+          <p><strong>A</strong> accept AI, <strong>E</strong> edit note, <strong>S</strong> split, <strong>P</strong> pin, <strong>D</strong> delete</p>
+          <p><strong>→</strong>/<strong>J</strong> next, <strong>←</strong>/<strong>K</strong> previous, <strong>?</strong> toggle help</p>
+        </div>
+      )}
+
+      {shortcutMessage && (
+        <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-xs text-green-800">
+          {shortcutMessage}
+        </div>
+      )}
+
       {/* Bulk action toolbar */}
       <div className="mb-3 flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm">
         <input
@@ -208,8 +334,11 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
       </div>
 
       <div className="space-y-3">
-        {notes.map((note) => (
-          <div key={note.id} className="flex items-start gap-3">
+        {notes.map((note, index) => (
+          <div
+            key={note.id}
+            className={`flex items-start gap-3 rounded-lg px-1 py-1 ${index === focusedIndex ? "ring-2 ring-blue-300" : ""}`}
+          >
             <input
               type="checkbox"
               checked={selected.has(note.id)}

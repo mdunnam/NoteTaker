@@ -13,6 +13,7 @@ import DumpModal from "@/components/notes/DumpModal";
 export default function CaptureBar() {
   const [content, setContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [dumpMode, setDumpMode] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [projectHint, setProjectHint] = useState("");
@@ -41,9 +42,11 @@ export default function CaptureBar() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rawContent: content,
-          tags: tags.length > 0 ? tags : undefined,
-          projectHint: projectHint.trim() || undefined,
-          contextHint: contextHint.trim() || undefined,
+          tags: dumpMode ? undefined : (tags.length > 0 ? tags : undefined),
+          projectHint: dumpMode ? undefined : (projectHint.trim() || undefined),
+          contextHint: dumpMode ? undefined : (contextHint.trim() || undefined),
+          dumpMode,
+          autoSplit: !dumpMode,
         }),
       });
 
@@ -56,7 +59,7 @@ export default function CaptureBar() {
       if (data?.split && typeof data?.count === "number") {
         setLastResultMessage(`Split dump into ${data.count} notes.`);
       } else {
-        setLastResultMessage("Saved 1 note.");
+        setLastResultMessage(dumpMode ? "Dump saved and queued for organization." : "Saved 1 note.");
       }
 
       // Clear form
@@ -103,13 +106,25 @@ export default function CaptureBar() {
       <form onSubmit={handleCapture} className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-500">Capture quickly, or run a full dump analysis flow.</p>
-          <button
-            type="button"
-            onClick={() => setIsDumpModalOpen(true)}
-            className="rounded-md border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
-          >
-            Organize This Dump
-          </button>
+          <div className="flex items-center gap-2">
+            <label className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-2 py-1 text-[11px] text-gray-700">
+              <input
+                type="checkbox"
+                checked={dumpMode}
+                onChange={(e) => setDumpMode(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600"
+              />
+              Dump Mode
+            </label>
+
+            <button
+              type="button"
+              onClick={() => setIsDumpModalOpen(true)}
+              className="rounded-md border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+            >
+              Organize This Dump
+            </button>
+          </div>
         </div>
 
         <div className="flex gap-3">
@@ -117,9 +132,11 @@ export default function CaptureBar() {
             ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Type, paste, or say something... (Shift+Enter for new line)"
+            placeholder={dumpMode
+              ? "Brain dump here. We'll organize it in the background..."
+              : "Type, paste, or say something... (Shift+Enter for new line)"}
             className="flex-1 resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 focus:ring-offset-white min-h-14"
-            rows={2}
+            rows={dumpMode ? 4 : 2}
             onKeyDown={(e) => {
               if (e.key === "Enter" && e.ctrlKey) {
                 e.preventDefault();
@@ -133,30 +150,30 @@ export default function CaptureBar() {
             className="self-end px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
             <Send className="w-4 h-4" />
-            Save
+            {dumpMode ? "Dump It" : "Save"}
           </button>
         </div>
 
-        {/* Tags section */}
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-          <input
-            type="text"
-            value={projectHint}
-            onChange={(e) => setProjectHint(e.target.value)}
-            placeholder="Project hint (optional): e.g. QNote, Client A"
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-          />
-          <input
-            type="text"
-            value={contextHint}
-            onChange={(e) => setContextHint(e.target.value)}
-            placeholder="Context hint (optional): e.g. Sprint planning, Home admin"
-            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-          />
-        </div>
+        {!dumpMode && (
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <input
+              type="text"
+              value={projectHint}
+              onChange={(e) => setProjectHint(e.target.value)}
+              placeholder="Project hint (optional): e.g. QNote, Client A"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+            <input
+              type="text"
+              value={contextHint}
+              onChange={(e) => setContextHint(e.target.value)}
+              placeholder="Context hint (optional): e.g. Sprint planning, Home admin"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+            />
+          </div>
+        )}
 
-        {/* Tags section */}
-        {(tags.length > 0 || tagInput.length > 0) && (
+        {!dumpMode && (tags.length > 0 || tagInput.length > 0) && (
           <div className="flex flex-wrap gap-2 items-center">
             {tags.map((tag) => (
               <div
@@ -192,7 +209,7 @@ export default function CaptureBar() {
           </div>
         )}
 
-        {!tagInput && tags.length === 0 && (
+        {!dumpMode && !tagInput && tags.length === 0 && (
           <button
             type="button"
             onClick={() => setTagInput("")}
