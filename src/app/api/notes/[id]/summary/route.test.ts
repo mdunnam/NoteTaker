@@ -17,6 +17,7 @@ vi.mock("@/lib/userMemory", () => ({
   getThinkingMemory: vi.fn(),
   buildThinkingMemoryPrompt: vi.fn(),
   updateThinkingMemory: vi.fn(),
+  recordHintUsage: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -32,7 +33,7 @@ import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory } from "@/lib/userMemory";
+import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory, recordHintUsage } from "@/lib/userMemory";
 import { POST } from "./route";
 
 const mockedAuth = vi.mocked(auth);
@@ -43,6 +44,7 @@ const mockedCheckRateLimit = vi.mocked(checkRateLimit);
 const mockedGetThinkingMemory = vi.mocked(getThinkingMemory);
 const mockedBuildThinkingMemoryPrompt = vi.mocked(buildThinkingMemoryPrompt);
 const mockedUpdateThinkingMemory = vi.mocked(updateThinkingMemory);
+const mockedRecordHintUsage = vi.mocked(recordHintUsage);
 
 function makeRequest() {
   return new NextRequest("http://localhost/api/notes/n1/summary", {
@@ -70,6 +72,7 @@ describe("/api/notes/[id]/summary POST", () => {
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);
+    mockedRecordHintUsage.mockResolvedValue(undefined);
   });
 
   it("returns 401 when not authenticated", async () => {

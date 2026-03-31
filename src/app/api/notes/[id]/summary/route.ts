@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory } from "@/lib/userMemory";
+import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory, recordHintUsage } from "@/lib/userMemory";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -58,6 +58,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         rawContent: true,
         suggestedProject: true,
         category: true,
+        confidenceScore: true,
       },
     });
 
@@ -114,6 +115,16 @@ export async function POST(request: NextRequest, { params }: Params) {
       explicitContext: parsedHints.contextHint,
       organized,
     });
+
+    // Record confidence lift when the user clicked a specific hint chip.
+    const confidenceBefore = note.confidenceScore ?? 0;
+    const confidenceAfter = updated.confidenceScore ?? 0;
+    if (parsedHints.projectHint) {
+      await recordHintUsage(session.user.id, parsedHints.projectHint, "project", confidenceBefore, confidenceAfter);
+    }
+    if (parsedHints.contextHint) {
+      await recordHintUsage(session.user.id, parsedHints.contextHint, "context", confidenceBefore, confidenceAfter);
+    }
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {

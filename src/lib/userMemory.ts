@@ -7,12 +7,23 @@ interface MemoryItem {
   lastSeen: string;
 }
 
+interface HintStat {
+  hint: string;
+  kind: "project" | "context";
+  uses: number;
+  totalConfidenceLift: number;
+  lastUsed: string;
+}
+
 interface ThinkingMemory {
   knownProjects: MemoryItem[];
   knownContexts: MemoryItem[];
   knownPeople: MemoryItem[];
   knownTopics: MemoryItem[];
+  hintStats: HintStat[];
 }
+
+export type { HintStat };
 
 export interface ThinkingMemoryHints {
   projects: string[];
@@ -78,7 +89,22 @@ function emptyMemory(): ThinkingMemory {
     knownContexts: [],
     knownPeople: [],
     knownTopics: [],
+    hintStats: [],
   };
+}
+
+function parseHintStats(value: unknown): HintStat[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is HintStat => {
+    if (!isRecord(item)) return false;
+    return (
+      typeof item.hint === "string" &&
+      (item.kind === "project" || item.kind === "context") &&
+      typeof item.uses === "number" &&
+      typeof item.totalConfidenceLift === "number" &&
+      typeof item.lastUsed === "string"
+    );
+  });
 }
 
 /**
@@ -100,6 +126,7 @@ export async function getThinkingMemory(userId: string): Promise<ThinkingMemory>
     knownContexts: parseMemoryBucket(raw.knownContexts),
     knownPeople: parseMemoryBucket(raw.knownPeople),
     knownTopics: parseMemoryBucket(raw.knownTopics),
+    hintStats: parseHintStats(raw.hintStats),
   };
 }
 
@@ -210,6 +237,8 @@ export async function updateThinkingMemory(
     }
   }
 
+  const hintStats = [...current.hintStats];
+
   await prisma.userPreferences.upsert({
     where: { userId },
     create: {
@@ -219,6 +248,7 @@ export async function updateThinkingMemory(
         knownContexts,
         knownPeople,
         knownTopics,
+        hintStats,
       } as unknown as Prisma.InputJsonValue,
     },
     update: {
@@ -227,7 +257,71 @@ export async function updateThinkingMemory(
         knownContexts,
         knownPeople,
         knownTopics,
+        hintStats,
       } as unknown as Prisma.InputJsonValue,
     },
   });
+}
+
+/**
+ * Record the confidence lift produced by a clarification hint click.
+ */
+export async function recordHintUsage(
+  userId: string,
+  hint: string,
+  kind: "project" | "context",
+  confidenceBefore: number,
+  confidenceAfter: number
+): Promise<void> {
+  const current = await getThinkingMemory(userId);
+  const lift = confidenceAfter - confidenceBefore;
+  const now = new Date().toISOString();
+  const stats = [...current.hintStats];
+
+  const existingIndex = stats.findIndex(
+    (s) => s.hint.toLowerCase() === hint.toLowerCase() && s.kind === kind
+  );
+
+  if (existingIndex === -1) {
+    stats.push({ hint, kind, uses: 1, totalConfidenceLift: lift, lastUsed: now });
+  } else {
+    const existing = stats[existingIndex];
+    stats[existingIndex] = {
+      ...existing,
+      uses: existing.uses + 1,
+      totalConfidenceLift: existing.totalConfidenceLift + lift,
+      lastUsed: now,
+    };
+  }
+
+  // Keep top 50 most-used stats.
+  stats.sort((a, b) => b.uses - a.uses);
+  stats.splice(50);
+
+  await prisma.userPreferences.upsert({
+    where: { userId },
+    create: {
+      userId,
+      thinkingMemory: {
+        ...current,
+        hintStats: stats,
+      } as unknown as Prisma.InputJsonValue,
+    },
+    update: {
+      thinkingMemory: {
+        ...current,
+        hintStats: stats,
+      } as unknown as Prisma.InputJsonValue,
+    },
+  });
+}
+
+/**
+ * Return sorted hint stats for display in settings.
+ */
+export async function getHintStats(userId: string): Promise<HintStat[]> {
+  const memory = await getThinkingMemory(userId);
+  return memory.hintStats
+    .filter((s) => s.uses > 0)
+    .sort((a, b) => b.uses - a.uses);
 }
