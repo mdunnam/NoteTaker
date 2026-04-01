@@ -1,8 +1,7 @@
 # AI Training Opt-In Implementation Plan
 
 Related docs:
-- [Implementation Summary](IMPLEMENTATION.md)
-- [Phase 3 Plan](PHASE3_IMPLEMENTATION_PLAN.md)
+- [Master Phase Implementation Plan](MASTER_PHASE_IMPLEMENTATION_PLAN.md)
 - [Intended User Workflow](USE_CASE_WORKFLOW.md)
 
 Goal: enable optional, privacy-safe learning from user interactions to improve global AI quality while preserving account-level personalization boundaries.
@@ -131,6 +130,13 @@ Before enabling any training job:
 
 ## Implementation Notes for QNote
 
+- Best initial learned components:
   - project/context suggestion ranking
-n  - confidence calibration model
+  - confidence calibration model
   - split-vs-no-split classifier
+- Current product already captures useful non-training signals:
+  - hint effectiveness and confidence lift
+  - clarification conversion and time-to-resolution
+  - daily AI performance snapshots for dashboard history
+- These signals are useful for evaluation and future training design, but they are not yet gated by opt-in consent.
+- Training consent, event export, deletion flows, and de-identification remain unimplemented.

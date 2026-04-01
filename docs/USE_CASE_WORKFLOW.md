@@ -14,7 +14,7 @@ QNote is not intended to be a passive note archive. It is intended to be a captu
 
 ## Primary User Journey
 
-### Step 1: Fast Capture
+### Step 1: Fast Capture And Dump Entry Points
 
 User enters raw thought in Capture Bar.
 
@@ -23,6 +23,11 @@ Optional hints:
 - Project hint (if known)
 - Context hint (if known)
 - Tags (optional)
+
+Alternate capture paths:
+
+- Dump Mode for zero-friction background organization
+- Organize This Dump modal for large pasted brain dumps, meeting notes, or copied text that should be reviewed before creation
 
 Expected behavior:
 
@@ -94,6 +99,9 @@ Expected behavior:
 
 In Settings:
 
+- AI Performance cards show current confidence, clarification rate, time-to-resolution, and queue health,
+- 7d vs 30d trend arrows show whether behavior is improving,
+- 30-day sparkline history shows month-shape movement over time,
 - hint effectiveness table shows per-hint uses,
 - average confidence lift is tracked,
 - low-value hints can be identified and avoided.
@@ -108,6 +116,7 @@ Expected behavior:
 Morning:
 
 - user captures 10–20 mixed notes quickly,
+- user uses Organize This Dump for any large multi-topic paste,
 - AI organizes in background.
 
 Midday triage:
@@ -149,14 +158,20 @@ Reflection:
 In scope now:
 
 - capture,
+- dump capture,
+- dump analysis and review,
 - organize,
 - clarify,
 - regenerate,
+- keyboard-first inbox triage,
+- AI performance visibility,
 - learn from hint interactions.
 
 Planned next:
 
-- dedicated Organize This Dump workflow,
+- semantic search UX,
+- project/topic clustering,
+- resurfacing forgotten thinking,
 - deeper workflow synthesis across notes,
 - optional opt-in global training pipeline with strict privacy controls.
 
@@ -166,5 +181,6 @@ The current workflow is successful when:
 
 - low-confidence notes trend downward over time,
 - average confidence lift from hints stays positive,
+- time-to-resolution trends downward over time,
 - manual correction time decreases,
 - users can triage notes quickly without losing nuance.

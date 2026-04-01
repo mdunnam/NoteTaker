@@ -21,7 +21,7 @@ The product target:
 
 The product wins when users say: *"I forgot I even wrote that, and it brought it back because it connected to what I am working on right now."*
 
-## 2. Current Engineering State (2026-03-30)
+## 2. Current Engineering State (2026-04-01)
 
 ### 2.1 Delivery Status
 
@@ -29,12 +29,18 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Low-confidence clarification questions generated automatically
 - Split note generation for mixed multitopic input
 - Capture bar with optional project/context hints at save time
+- Organize This Dump analyze + confirm modal flow
+- Dump Mode capture path with keyboard-first inbox triage shortcuts
 - Inbox triage stream with split and regenerate card actions
 - Bulk clarify and regenerate for selected note batches
 - Per-user memory profile: projects, contexts, people, topics
 - Organization prompts conditioned on per-user memory
 - Chip-click confidence lift tracking
 - Hint effectiveness analytics in settings
+- AI performance dashboard in settings
+- 7d vs 30d trend deltas on confidence, clarification rate, and time-to-resolution
+- Daily `UserMetricSnapshot` persistence with 30-day sparkline history
+- Snapshot backfill worker route for warming missing daily history
 - Embedding persistence into pgvector-compatible column
 - Semantic ranking with on-the-fly keyword fallback
 - Related note relation links
@@ -44,12 +50,10 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 ### 2.2 Current Product Boundary
 
 Shipped:
-- capture, organize, clarify, regenerate, learn from hint interactions
+- capture, dump capture, dump analysis, organize, clarify, regenerate, keyboard-first triage, AI performance visibility, learn from hint interactions
 
 Not yet shipped:
-- Organize This Dump dedicated flow
-- Dump Mode UX
-- Instrumentation dashboard
+- Semantic search UX with filters, snippets, and typeahead
 - Full surface depth for Cards, Projects, Topics, Timeline, Favorites, Archive
 - Project/topic cluster detection
 - Smart resurfacing
@@ -62,11 +66,15 @@ Not yet shipped:
 
 ### 3.1 Primary Journey
 
-**Step 1 — Fast Capture**
+**Step 1 — Fast Capture And Dump Entry Points**
 
 User writes or pastes a raw thought into the Capture Bar.
 Optional at save time: project hint, context hint, tags.
 Note is created immediately. AI organization runs in background.
+
+Alternate paths:
+- Dump Mode for zero-friction background organization
+- Organize This Dump modal for large pasted input that should be analyzed and reviewed before note creation
 
 **Step 2 — First-Pass AI Organization**
 
@@ -105,6 +113,9 @@ On the note detail route:
 **Step 6 — Learning Feedback Visibility**
 
 In Settings:
+- AI Performance cards show current confidence, clarification rate, time-to-resolution, and queue health
+- 7d vs 30d trend arrows show whether metrics are improving
+- 30-day sparklines show month-shape history from persisted daily snapshots
 - hint effectiveness table shows per-hint uses and average confidence lift
 - user can see if the system is actually improving from their corrections
 
@@ -183,13 +194,17 @@ src/
       notes/[id]/route.ts            # PATCH, DELETE single note
       notes/[id]/split/route.ts      # POST preview/create split
       notes/[id]/summary/route.ts    # POST regenerate AI summary
+      notes/analyze-dump/route.ts    # POST analyze raw dump into note previews
+      notes/analyze-dump/confirm/route.ts # POST create selected reviewed dump notes
       notes/[id]/insights/route.ts   # GET contextual note insights
       search/semantic/route.ts       # POST semantic search
       search/ask/route.ts            # POST conversational ask
       auth/signup/route.ts           # POST create user
       user/route.ts                  # PATCH user profile
       user/hint-stats/route.ts       # GET hint effectiveness stats
+      user/stats/route.ts            # GET AI performance metrics and history
       worker/enrich/route.ts         # POST/GET enrichment worker
+      worker/metric-snapshots/route.ts # POST/GET metric snapshot backfill worker
     login/page.tsx
     signup/page.tsx
     layout.tsx                       # Root layout + NextAuth provider
@@ -205,12 +220,14 @@ src/
       InboxStream.tsx
       InboxFilterBar.tsx
       NoteDetailClient.tsx
+      DumpModal.tsx
     search/
       SearchClient.tsx
       AskPanel.tsx
     settings/
       SettingsClient.tsx
       HintEffectivenessPanel.tsx
+      AIPerformancePanel.tsx
     collections/
       CollectionsClient.tsx
     landing/
@@ -221,6 +238,7 @@ src/
     enrichNote.ts                    # full enrichment pipeline
     db.ts                            # Prisma client singleton
     userMemory.ts                    # memory CRUD + hint stats
+    userStats.ts                     # AI performance metrics + snapshot history
     searchRanking.ts                 # semantic + keyword blending
     rateLimit.ts                     # per-user API rate limiting
     stripe.ts                        # billing (placeholder)
@@ -258,6 +276,8 @@ DELETE /api/notes/[id]               Delete note
 ```
 POST   /api/notes/[id]/split         Preview or create split cards
 POST   /api/notes/[id]/summary       Regenerate AI organization and confidence
+POST   /api/notes/analyze-dump       Analyze raw dump into organized previews
+POST   /api/notes/analyze-dump/confirm Create selected dump notes
 GET    /api/notes/[id]/insights      Get related notes, tasks, entities for detail view
 ```
 
@@ -271,6 +291,7 @@ POST   /api/search/ask               Conversational question against note corpus
 ```
 PATCH  /api/user                     Update profile (name)
 GET    /api/user/hint-stats          Get per-hint usage and confidence lift stats
+GET    /api/user/stats               Get AI performance dashboard metrics, trends, and history
 ```
 
 ### Auth
@@ -283,6 +304,8 @@ POST   /api/auth/[...nextauth]       NextAuth session handler
 ```
 POST   /api/worker/enrich            Trigger enrichment batch
 GET    /api/worker/enrich            Check worker status
+POST   /api/worker/metric-snapshots  Backfill metric history for one user or all users
+GET    /api/worker/metric-snapshots  Cron-friendly metric snapshot backfill entrypoint
 ```
 
 ---
@@ -339,7 +362,15 @@ NoteRelation
 
 ApiKey
   id, userId, key (hashed), name, lastUsed, createdAt
+
+UserMetricSnapshot
+  id, userId, snapshotDate
+  avgConfidence, clarificationRate, avgTimeToResolutionMs
+  createdAt, updatedAt
 ```
+
+Implementation detail:
+- dump captures are currently tagged via `aiMeta.captureMode = "dump"` rather than a dedicated schema field
 
 ### User Memory Shape (`thinkingMemory` JSON field)
 
@@ -461,13 +492,13 @@ npm run test -- src/app/api/notes            # targeted
 
 ---
 
-## 10. Phase 3 — Remaining Work
+## 10. Phase 3 — Delivered Foundation
 
-Phase 3 is partially delivered. Shipped items are listed in section 2.1. Three items remain.
+Phase 3 is now delivered. The sections below remain as the reference spec for shipped behavior.
 
 ---
 
-### 10.1 Organize This Dump (Must Have — Priority 1)
+### 10.1 Organize This Dump (Shipped)
 
 **Goal**: User pastes a brain dump, meeting notes, email, or raw block — AI splits and organizes it — user reviews and confirms before anything is created.
 
@@ -538,7 +569,7 @@ Post-create:
 
 ---
 
-### 10.2 Dump Mode Capture Variant (Should Have — Priority 2)
+### 10.2 Dump Mode Capture Variant (Shipped)
 
 **Goal**: Stripped-down capture for zero-friction brain dumping. No categorization UI. AI handles everything after save.
 
@@ -576,19 +607,10 @@ When true:
 - tag note with `dumpMode: true` for analytics
 - enrichment runs async as normal
 
-#### Database
+#### Data handling
 
-```prisma
-model Note {
-  // add:
-  dumpMode  Boolean  @default(false)
-}
-```
-
-Migration:
-```sql
-ALTER TABLE "Note" ADD COLUMN "dumpMode" BOOLEAN NOT NULL DEFAULT false;
-```
+- Dump captures are currently tagged via `aiMeta.captureMode = "dump"`
+- No dedicated schema field was added for dump mode in the current implementation
 
 #### Testing
 
@@ -599,7 +621,7 @@ ALTER TABLE "Note" ADD COLUMN "dumpMode" BOOLEAN NOT NULL DEFAULT false;
 
 ---
 
-### 10.3 Instrumentation Dashboard (Should Have — Priority 3)
+### 10.3 Instrumentation Dashboard (Shipped)
 
 **Goal**: Make AI performance measurable — for the user and the product team.
 
@@ -621,11 +643,16 @@ Response:
 ```json
 {
   "totalNotes": 142,
+  "processedNotes": 128,
+  "stillProcessing": 4,
+  "lowConfidenceCount": 18,
   "clarificationRate": 0.31,
-  "avgFirstPassConfidence": 0.61,
-  "avgPostClarificationConfidence": 0.84,
-  "avgEnrichmentLatencyMs": 1820,
-  "manualEditRate": 0.08
+  "clarificationConversionRate": 0.52,
+  "avgConfidence": 0.74,
+  "avgHintLift": 0.12,
+  "hintUses": 37,
+  "avgTimeToResolutionMs": 1820,
+  "failedJobs": 1
 }
 ```
 
@@ -643,6 +670,7 @@ Persisted history:
 - Store one daily `UserMetricSnapshot` row per user
 - Use last 30 daily snapshots to render inline sparklines on performance cards
 - Keep trend arrows based on 7-day vs 30-day comparison while the sparkline shows the actual month shape
+- Backfill missing recent days through `GET|POST /api/worker/metric-snapshots`
 
 Existing hint effectiveness table stays below this section.
 
@@ -1120,10 +1148,10 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 
 ## 16. Complete Gap Map
 
-### A. Immediate (explicit remaining Phase 3)
-1. Organize This Dump dedicated flow
-2. Dump Mode UX + keyboard-first triage
-3. Instrumentation dashboard
+### A. Current execution focus
+1. Semantic search UX with filters, snippets, and typeahead
+2. Project/topic cluster detection
+3. Resurfacing engine (forgotten notes + repeated patterns)
 
 ### B. Surface completeness
 1. Cards view
@@ -1175,37 +1203,34 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 ## 17. Priority Tiers
 
 ### Must Have — fastest path to undeniable value
-1. Organize This Dump
-2. Semantic search UX
-3. Project/topic clustering
-4. Resurfacing engine (forgotten + pattern)
-5. Multi-note synthesis
+1. Semantic search UX
+2. Project/topic clustering
+3. Resurfacing engine (forgotten + pattern)
+4. Multi-note synthesis
+5. RightPanel depth upgrades tied to clustering and synthesis
 
 ### Should Have
-1. Dump Mode + keyboard-first triage
-2. RightPanel depth upgrades
-3. Instrumentation dashboard
-4. Training-consent foundation
-5. OAuth login
+1. Training-consent foundation
+2. OAuth login
+3. Capture-from-anywhere stack
+4. Desktop/global hotkey
+5. Mobile/offline
 
 ### Nice to Have
-1. Capture-from-anywhere stack
-2. Desktop/global hotkey
-3. Mobile/offline
-4. Voice and OCR
-5. Team features
+1. Voice and OCR
+2. Team features
+3. Billing tier enforcement
 
 ---
 
 ## 18. Recommended Execution Sequence
 
-1. Organize This Dump — highest leverage, ships the differentiated UX today
-2. Search UX + relevance tuning — unblocks discoverability
-3. Cluster detection — first memory payoff moment
-4. Resurfacing — deepens memory payoff
-5. Multi-note synthesis — completes thinking-partner loop
-6. Instrumentation + training foundation — enables measurable iteration
-7. Capture surfaces — extends reach after core value is proved
+1. Search UX + relevance tuning — unblocks discoverability
+2. Cluster detection — first memory payoff moment
+3. Resurfacing — deepens memory payoff
+4. Multi-note synthesis — completes thinking-partner loop
+5. Training foundation — enables measurable iteration beyond local personalization
+6. Capture surfaces — extends reach after core value is proved
 
 ---
 
@@ -1247,11 +1272,6 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 
 ## 21. Database Migrations Needed (Upcoming)
 
-For Dump Mode:
-```sql
-ALTER TABLE "Note" ADD COLUMN "dumpMode" BOOLEAN NOT NULL DEFAULT false;
-```
-
 For resurfacing tracking:
 ```sql
 ALTER TABLE "Note" ADD COLUMN "lastOpenedAt" TIMESTAMP;
@@ -1279,13 +1299,16 @@ Always run `npx prisma migrate dev --name <description>` to generate and apply m
 
 ## 22. Files to Create or Update Per Phase
 
-### Phase 3 remaining
+### Phase 3 delivered reference
 
 New:
 - `src/app/api/notes/analyze-dump/route.ts`
 - `src/app/api/notes/analyze-dump/confirm/route.ts`
 - `src/app/api/user/stats/route.ts`
+- `src/app/api/worker/metric-snapshots/route.ts`
 - `src/components/notes/DumpModal.tsx`
+- `src/components/settings/AIPerformancePanel.tsx`
+- `src/lib/userStats.ts`
 
 Modify:
 - `src/components/layout/CaptureBar.tsx` — Dump Mode toggle + Organize Dump button
@@ -1357,6 +1380,10 @@ New:
 **Prisma client errors**
 - Run `npx prisma generate`
 - Delete `node_modules/.prisma` and regenerate if client is stale
+
+**Settings page loads but sparkline history is empty**
+- Run `npx prisma migrate deploy` to ensure `UserMetricSnapshot` exists
+- Trigger `GET /api/worker/metric-snapshots` with worker auth to backfill missing recent days
 
 **Semantic search returning nothing**
 - Verify `Note.embedding` column is populated after enrichment

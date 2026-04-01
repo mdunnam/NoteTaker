@@ -14,7 +14,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Foundation**: Next.js 14 + TypeScript + Tailwind CSS
 - **Database**: Prisma ORM + Vercel Postgres with pgvector
 - **Auth**: NextAuth.js with email/password
-- **AI**: Vercel AI SDK + OpenAI GPT-4o-mini
+- **AI**: Vercel AI SDK + OpenAI GPT-5.4
 
 ### Phase 2 ✅ (Implemented)
 - **Capture**: Universal capture bar at top of app
@@ -22,7 +22,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Inbox view**: Stream of new/recent notes
 - **Basic actions**: Archive, pin, delete notes
 
-### Phase 3 🚧 (In progress)
+### Phase 3 ✅ (Core shipped)
 - **AI organization**: Auto-generate titles, summaries, categories, tags
 - **Task extraction**: Pull actionable items from notes
 - **Entity detection**: Identify people, projects, topics
@@ -34,16 +34,18 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Bulk clarify**: Apply project/context hints to selected notes and regenerate
 - **Contextual RightPanel**: Intent, next action, contextual tasks, related notes on note detail routes
 - **Hint effectiveness analytics**: Settings view tracks per-hint usage and average confidence lift
+- **Organize This Dump**: Analyze a raw dump, review structured previews, and create selected notes
+- **Dump Mode**: Zero-friction background organization path with keyboard-first inbox triage
+- **AI performance dashboard**: Settings page shows confidence, clarification rate, trend deltas, and 30-day sparkline history
 
 ### Phase 4 ⏳ (Placeholder pages created)
 - Card, Project, Topic, Timeline, Search views
-- Broader workflow intelligence and synthesis features
+- Semantic search UX, clustering, and broader workflow intelligence
 
 ### Phase 5+ 📋
 - Resurface old notes
 - Related notes detection
 - Note health widget
-- Organize dump feature
 - Desktop (Tauri) and iOS (Capacitor) wrappers
 
 ## Quick Start
@@ -64,6 +66,7 @@ npm install
 # - DATABASE_URL (Vercel Postgres connection string)
 # - NEXTAUTH_SECRET (generate with `openssl rand -base64 32`)
 # - OPENAI_API_KEY
+# - WORKER_SECRET (recommended for protected worker endpoints)
 
 # Generate Prisma client
 npm run db:generate
@@ -91,6 +94,10 @@ NEXTAUTH_SECRET="your-secret-here"
 
 # AI
 OPENAI_API_KEY="sk-..."
+
+# Workers (recommended)
+WORKER_SECRET="your-worker-secret"
+CRON_SECRET="your-cron-secret"
 ```
 
 ## Project Structure
@@ -109,6 +116,10 @@ src/
       notes/[id]/route.ts   # Single note operations
       notes/[id]/split/route.ts    # Split single note into multiple cards
       notes/[id]/summary/route.ts  # Regenerate AI summary for a note
+      notes/analyze-dump/route.ts  # Analyze raw dump into note previews
+      notes/analyze-dump/confirm/route.ts  # Create reviewed dump notes
+      user/stats/route.ts   # AI performance dashboard metrics
+      worker/metric-snapshots/route.ts  # Metric snapshot backfill worker
       auth/signup/route.ts  # User signup
     login/page.tsx          # Login page
     signup/page.tsx         # Signup page
@@ -122,10 +133,14 @@ src/
     notes/
       NoteCard.tsx          # Individual note display
       InboxStream.tsx       # Note list view
+      DumpModal.tsx         # Organize This Dump modal
+    settings/
+      AIPerformancePanel.tsx  # AI instrumentation dashboard cards
 
   lib/
     db.ts                   # Prisma client singleton
     ai.ts                   # AI utilities (organize, embed, split)
+    userStats.ts            # AI performance metrics + snapshot history
 
   db/
     schema.prisma           # Data model
@@ -139,6 +154,9 @@ src/
 
 - **Note**: Raw notes with AI-generated metadata
 - **User**: Authentication & user data
+- **UserPreferences**: Per-user memory and preferences
+- **NoteJob**: Durable enrichment queue
+- **UserMetricSnapshot**: Daily AI performance history for dashboard sparklines
 - **Collection**: User-created containers (Work, Personal, etc.)
 - **Entity**: AI-detected people, projects, topics
 - **NoteEntity**: Junction table linking notes to entities
@@ -169,7 +187,7 @@ src/
 - [x] NoteCard with actions
 - [x] PATCH/DELETE note endpoints
 
-### Phase 3: AI Organization 🚧
+### Phase 3: AI Organization ✅
 - [x] AI service functions (organizeNote, splitNote, embedNote)
 - [x] Background organization trigger
 - [x] Split-note API + review modal flow
@@ -181,19 +199,22 @@ src/
 - [x] Bulk clarify + regenerate actions
 - [x] Right panel contextual insights for note detail
 - [x] Hint effectiveness analytics in settings
-- [ ] Organize This Dump dedicated flow
+- [x] Organize This Dump analyze + confirm flow
+- [x] Dump Mode capture path + keyboard-first inbox triage shortcuts
+- [x] AI performance dashboard with trend deltas and 30-day sparkline history
+- [x] Daily metric snapshots + snapshot backfill worker
 
 ### Phase 4: Views & Search ⏳
 - [x] Placeholder pages for all views
+- [ ] Semantic search UX with filters, snippets, and typeahead
 - [ ] Implement Card, Project, Topic, Timeline views
-- [ ] Search/Ask interface
-- [ ] Right panel integration
+- [ ] Project/topic clustering and broader RightPanel guidance
 
 ### Phase 5: Resurface ⏳
 - [ ] Related notes computation
 - [ ] Note health widget
 - [ ] Recurring idea detection
-- [ ] "Organize dump" feature
+- [ ] Forgotten-note resurfacing and pattern surfacing
 
 ### Phase 6: Desktop (Tauri) 📋
 - [ ] Tauri integration
@@ -250,9 +271,8 @@ organizeNote('call jim about invoices, look into unreal plugin crash, daughter n
 
 ## Roadmap
 
-- [ ] Phase 3: Complete AI integration with pgvector semantic search
-- [ ] Phase 4: Implement all views (cards, projects, topics, timeline, search)
-- [ ] Phase 5: Resurrect old notes intelligently
+- [ ] Phase 4: Ship semantic search UX and project/topic clustering
+- [ ] Phase 5: Resurface old notes intelligently
 - [ ] Phase 6: Desktop app via Tauri
 - [ ] Phase 7: iOS app via Capacitor
 - [ ] Phase 8: Team sharing & multi-user
