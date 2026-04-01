@@ -5,8 +5,10 @@
 "use client";
 
 import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
+import { parseNoteAiMeta } from "@/lib/clarification";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ClarificationLoop from "@/components/notes/ClarificationLoop";
 import SplitNoteModal from "@/components/notes/SplitNoteModal";
 import { getConfidenceBadgeConfig } from "@/lib/confidence";
 
@@ -26,25 +28,6 @@ interface NoteData {
   aiMeta: unknown;
   collection: { id: string; name: string; color?: string | null } | null;
   entities: Array<{ entity: { id: string; name: string; type: string } }>;
-}
-
-interface AiMeta {
-  intent?: string | null;
-  nextAction?: string | null;
-  clarificationQuestions?: string[];
-}
-
-/** Safely parse the aiMeta JSON blob. */
-function parseAiMeta(raw: unknown): AiMeta {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const obj = raw as Record<string, unknown>;
-  return {
-    intent: typeof obj.intent === "string" ? obj.intent : null,
-    nextAction: typeof obj.nextAction === "string" ? obj.nextAction : null,
-    clarificationQuestions: Array.isArray(obj.clarificationQuestions)
-      ? (obj.clarificationQuestions as string[]).filter((q) => typeof q === "string")
-      : [],
-  };
 }
 
 interface NoteCardProps {
@@ -73,9 +56,8 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
   const [splitMessage, setSplitMessage] = useState<string | null>(null);
   const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
   const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
-  const [isApplyingHint, setIsApplyingHint] = useState(false);
   const confidenceBadge = getConfidenceBadgeConfig(note.confidenceScore);
-  const aiMeta = parseAiMeta(note.aiMeta);
+  const aiMeta = parseNoteAiMeta(note.aiMeta);
   const hasClarifications = (aiMeta.clarificationQuestions?.length ?? 0) > 0 && (note.confidenceScore ?? 1) < 0.65;
 
   useEffect(() => {
@@ -216,51 +198,6 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
       setSummaryMessage("Could not regenerate summary.");
     } finally {
       setIsRegeneratingSummary(false);
-    }
-  };
-
-  /**
-   * Apply a project/context clarification and regenerate summary immediately.
-   */
-  const handleApplyHint = async (kind: "project" | "context", value: string) => {
-    setIsApplyingHint(true);
-    setSummaryMessage(null);
-
-    try {
-      const patchBody = kind === "project"
-        ? { suggestedProject: value }
-        : { category: value };
-
-      const patchResponse = await fetch(`/api/notes/${note.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patchBody),
-      });
-
-      if (!patchResponse.ok) {
-        throw new Error("Failed to apply clarification");
-      }
-
-      const summaryResponse = await fetch(`/api/notes/${note.id}/summary`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectHint: kind === "project" ? value : undefined,
-          contextHint: kind === "context" ? value : undefined,
-        }),
-      });
-
-      if (!summaryResponse.ok) {
-        throw new Error("Failed to regenerate summary");
-      }
-
-      setSummaryMessage(`Applied ${kind} hint: ${value}`);
-      router.refresh();
-    } catch (error) {
-      console.error("Error applying clarification hint:", error);
-      setSummaryMessage("Could not apply clarification hint.");
-    } finally {
-      setIsApplyingHint(false);
     }
   };
 
@@ -414,51 +351,14 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
 
       {/* Clarification questions for low-confidence notes */}
       {!isEditing && hasClarifications && (
-        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2">
-          <p className="mb-1 text-[11px] font-semibold text-amber-800">AI needs clarification:</p>
-          <ul className="space-y-0.5">
-            {aiMeta.clarificationQuestions!.map((q, i) => (
-              <li key={i} className="text-xs text-amber-900">• {q}</li>
-            ))}
-          </ul>
-
-          {quickHints?.projects && quickHints.projects.length > 0 && (
-            <div className="mt-2">
-              <p className="text-[11px] font-medium text-amber-800 mb-1">Quick project hints:</p>
-              <div className="flex flex-wrap gap-1">
-                {quickHints.projects.map((project) => (
-                  <button
-                    key={`project-${project}`}
-                    type="button"
-                    onClick={() => handleApplyHint("project", project)}
-                    disabled={isApplyingHint}
-                    className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
-                  >
-                    {project}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {quickHints?.contexts && quickHints.contexts.length > 0 && (
-            <div className="mt-2">
-              <p className="text-[11px] font-medium text-amber-800 mb-1">Quick context hints:</p>
-              <div className="flex flex-wrap gap-1">
-                {quickHints.contexts.map((context) => (
-                  <button
-                    key={`context-${context}`}
-                    type="button"
-                    onClick={() => handleApplyHint("context", context)}
-                    disabled={isApplyingHint}
-                    className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
-                  >
-                    {context}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+        <div className="mb-3">
+          <ClarificationLoop
+            noteId={note.id}
+            aiMeta={note.aiMeta}
+            quickHints={quickHints}
+            compact
+            onUpdated={(_, nextMessage) => setSummaryMessage(nextMessage)}
+          />
         </div>
       )}
 

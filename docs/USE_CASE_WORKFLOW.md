@@ -59,14 +59,17 @@ If confidence is low:
 
 - inbox cards and note detail show clarification questions,
 - quick project/context chips appear,
+- user can answer the question directly in natural language,
 - user can click one hint,
-- note is regenerated immediately using the selected hint.
+- note is regenerated immediately using the selected hint or answer,
+- follow-up questions narrow based on the conversation so far.
 
 Expected behavior:
 
 - confidence should increase,
 - intent/next action should sharpen,
-- category/project assignment should improve.
+- category/project assignment should improve,
+- the same clarification should not need to be asked repeatedly once it has been answered.
 
 ### Step 4: Bulk Clarify During Triage
 

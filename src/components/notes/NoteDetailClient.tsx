@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
+import ClarificationLoop from "@/components/notes/ClarificationLoop";
+import { parseNoteAiMeta } from "@/lib/clarification";
 import SplitNoteModal from "@/components/notes/SplitNoteModal";
 import { getConfidenceBadgeConfig } from "@/lib/confidence";
 
@@ -37,25 +39,6 @@ interface NoteDetailData {
   relatedNotesTo: Array<{ score: number; sourceNote: RelatedNote }>;
 }
 
-interface AiMeta {
-  intent?: string | null;
-  nextAction?: string | null;
-  clarificationQuestions?: string[];
-}
-
-/** Safely parse aiMeta JSON. */
-function parseAiMeta(raw: unknown): AiMeta {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const obj = raw as Record<string, unknown>;
-  return {
-    intent: typeof obj.intent === "string" ? obj.intent : null,
-    nextAction: typeof obj.nextAction === "string" ? obj.nextAction : null,
-    clarificationQuestions: Array.isArray(obj.clarificationQuestions)
-      ? (obj.clarificationQuestions as string[]).filter((q) => typeof q === "string")
-      : [],
-  };
-}
-
 interface NoteDetailClientProps {
   note: NoteDetailData;
   quickHints?: {
@@ -77,12 +60,11 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
   const [splitMessage, setSplitMessage] = useState<string | null>(null);
   const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
   const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
-  const [isApplyingHint, setIsApplyingHint] = useState(false);
   const [displayedSummary, setDisplayedSummary] = useState(note.summary);
   const [displayedConfidence, setDisplayedConfidence] = useState(note.confidenceScore);
 
   const confidenceBadge = getConfidenceBadgeConfig(displayedConfidence);
-  const aiMeta = parseAiMeta(note.aiMeta);
+  const aiMeta = parseNoteAiMeta(note.aiMeta);
   const hasClarifications = (aiMeta.clarificationQuestions?.length ?? 0) > 0 && (note.confidenceScore ?? 1) < 0.65;
 
   const extractedTasks = Array.isArray(note.extractedTasks)
@@ -95,6 +77,11 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
   ]
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
+
+  useEffect(() => {
+    setDisplayedSummary(note.summary);
+    setDisplayedConfidence(note.confidenceScore);
+  }, [note.summary, note.confidenceScore]);
 
   /** Save edited title and content. */
   const handleSave = async () => {
@@ -178,44 +165,6 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
       setSummaryMessage("Could not regenerate summary. Please try again.");
     } finally {
       setIsRegeneratingSummary(false);
-    }
-  };
-
-  /**
-   * Apply a clarification hint and regenerate note insights.
-   */
-  const handleApplyHint = async (kind: "project" | "context", value: string) => {
-    setIsApplyingHint(true);
-    setSummaryMessage(null);
-
-    try {
-      const response = await fetch(`/api/notes/${note.id}/summary`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectHint: kind === "project" ? value : undefined,
-          contextHint: kind === "context" ? value : undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to apply hint");
-      }
-
-      const payload = (await response.json()) as {
-        summary: string | null;
-        confidenceScore: number | null;
-      };
-
-      setDisplayedSummary(payload.summary);
-      setDisplayedConfidence(payload.confidenceScore);
-      setSummaryMessage(`Applied ${kind} hint: ${value}`);
-      router.refresh();
-    } catch (error) {
-      console.error("Error applying hint:", error);
-      setSummaryMessage("Could not apply clarification hint.");
-    } finally {
-      setIsApplyingHint(false);
     }
   };
 
@@ -379,53 +328,18 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
         )}
 
         {/* Clarification questions */}
-        {hasClarifications && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p className="mb-2 text-xs font-semibold text-amber-800">AI has questions about this note:</p>
-            <ul className="space-y-1">
-              {aiMeta.clarificationQuestions!.map((q, i) => (
-                <li key={i} className="text-sm text-amber-900">• {q}</li>
-              ))}
-            </ul>
-            {quickHints?.projects && quickHints.projects.length > 0 && (
-              <div className="mt-3">
-                <p className="text-[11px] font-semibold text-amber-800 mb-1">Quick project hints</p>
-                <div className="flex flex-wrap gap-1">
-                  {quickHints.projects.map((project) => (
-                    <button
-                      key={`detail-project-${project}`}
-                      type="button"
-                      disabled={isApplyingHint}
-                      onClick={() => handleApplyHint("project", project)}
-                      className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
-                    >
-                      {project}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {quickHints?.contexts && quickHints.contexts.length > 0 && (
-              <div className="mt-2">
-                <p className="text-[11px] font-semibold text-amber-800 mb-1">Quick context hints</p>
-                <div className="flex flex-wrap gap-1">
-                  {quickHints.contexts.map((context) => (
-                    <button
-                      key={`detail-context-${context}`}
-                      type="button"
-                      disabled={isApplyingHint}
-                      onClick={() => handleApplyHint("context", context)}
-                      className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
-                    >
-                      {context}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <p className="mt-2 text-[11px] text-amber-700">Add project/context hints to the capture bar and regenerate, or edit the note to clarify.</p>
-          </div>
+        {(hasClarifications || aiMeta.clarificationHistory.length > 0) && (
+          <ClarificationLoop
+            noteId={note.id}
+            aiMeta={note.aiMeta}
+            quickHints={quickHints}
+            alwaysShowHistory
+            onUpdated={(payload, nextMessage) => {
+              setDisplayedSummary(payload.summary);
+              setDisplayedConfidence(payload.confidenceScore);
+              setSummaryMessage(nextMessage);
+            }}
+          />
         )}
 
         {/* Extracted tasks */}

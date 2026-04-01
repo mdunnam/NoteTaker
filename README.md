@@ -30,7 +30,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Split workflow**: Split messy notes into multiple cards with review modal
 - **Summary refresh**: Regenerate weak summaries from detail and inbox cards
 - **Semantic search**: Uses stored pgvector embeddings with on-the-fly fallback
-- **Clarification loop**: One-click project/context hints in inbox and note detail
+- **Clarification loop**: Conversational follow-up answers plus quick project/context hints in inbox and note detail
 - **Bulk clarify**: Apply project/context hints to selected notes and regenerate
 - **Contextual RightPanel**: Intent, next action, contextual tasks, related notes on note detail routes
 - **Hint effectiveness analytics**: Settings view tracks per-hint usage and average confidence lift
@@ -116,6 +116,7 @@ src/
     api/
       notes/route.ts        # CRUD endpoints for notes
       notes/[id]/route.ts   # Single note operations
+      notes/[id]/clarify/route.ts  # Conversational clarification for one note
       notes/[id]/split/route.ts    # Split single note into multiple cards
       notes/[id]/summary/route.ts  # Regenerate AI summary for a note
       notes/analyze-dump/route.ts  # Analyze raw dump into note previews
@@ -135,6 +136,7 @@ src/
     notes/
       NoteCard.tsx          # Individual note display
       InboxStream.tsx       # Note list view
+      ClarificationLoop.tsx # Shared conversational clarification UI
       DumpModal.tsx         # Organize This Dump modal
     settings/
       AIPerformancePanel.tsx  # AI instrumentation dashboard cards
@@ -142,6 +144,7 @@ src/
   lib/
     db.ts                   # Prisma client singleton
     ai.ts                   # AI utilities (organize, embed, split)
+    clarification.ts        # aiMeta clarification parsing + transcript helpers
     userStats.ts            # AI performance metrics + snapshot history
 
   db/
@@ -197,7 +200,7 @@ src/
 - [x] Summary regeneration endpoint + UI actions
 - [x] Confidence state badges in note UI
 - [x] User-memory-aware organization hints
-- [x] Clarification chips in inbox and note detail
+- [x] Conversational clarification loop in inbox and note detail
 - [x] Bulk clarify + regenerate actions
 - [x] Right panel contextual insights for note detail
 - [x] Hint effectiveness analytics in settings

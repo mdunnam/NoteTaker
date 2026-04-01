@@ -182,6 +182,7 @@ CORE RULES
 6. Tasks must be atomic and immediately executable. "Reply to Sarah’s message about contract renewal" not "emails". One clear action per item.
 7. Use known projects: if a known project from the user’s memory profile fits, use its exact name as suggestedProject. Do not invent project names.
 8. Be honest about confidence. Do not inflate it. If you are guessing, lower the score and add clarificationQuestions.
+9. If clarification answers are provided, treat them as authoritative user guidance. Incorporate them directly and do not ask the same question again.
 
 PRIORITY
 Assign note-level priority:
@@ -190,7 +191,7 @@ Assign note-level priority:
 - "low": ideas, reference material, future thoughts, nothing actionable now
 
 CLARIFICATION QUESTIONS
-Only include when confidenceScore < 0.65. Write each so the user can answer in a word or phrase. Max 3. Examples: "Which project is this for?", "Is this a task or an idea?", "Who is this assigned to?"
+Only include when confidenceScore < 0.65. Write each so the user can answer in a word or phrase. Max 3. If clarification history already answers something, ask only what is still unresolved. Examples: "Which project is this for?", "Is this a task or an idea?", "Who is this assigned to?"
 
 ENTITY RULES
 - PERSON: real people’s first name or full name only
@@ -228,6 +229,7 @@ interface OrganizeNoteOptions {
   userContext?: string;
   explicitProject?: string;
   explicitContext?: string;
+  clarificationContext?: string;
 }
 
 /**
@@ -251,6 +253,10 @@ function buildOrganizationHints(options?: OrganizeNoteOptions): string {
   if (options.userContext?.trim()) {
     hints.push("User memory profile:");
     hints.push(options.userContext.trim());
+  }
+
+  if (options.clarificationContext?.trim()) {
+    hints.push(options.clarificationContext.trim());
   }
 
   if (hints.length === 0) {

@@ -1,10 +1,19 @@
 import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
-import { appendClarificationTurn, buildClarificationContext, parseNoteAiMeta } from "@/lib/clarification";
-import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import {
+  appendClarificationTurn,
+  buildClarificationContext,
+  parseNoteAiMeta,
+} from "@/lib/clarification";
+import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory, recordHintUsage } from "@/lib/userMemory";
+import {
+  buildThinkingMemoryPrompt,
+  getThinkingMemory,
+  recordHintUsage,
+  updateThinkingMemory,
+} from "@/lib/userMemory";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -14,14 +23,21 @@ interface Params {
   };
 }
 
-const SummaryHintSchema = z.object({
-  projectHint: z.string().min(1).max(160).optional(),
-  contextHint: z.string().min(1).max(160).optional(),
-});
+const ClarifyNoteSchema = z
+  .object({
+    question: z.string().min(1).max(240).optional(),
+    answer: z.string().min(1).max(1000).optional(),
+    projectHint: z.string().min(1).max(160).optional(),
+    contextHint: z.string().min(1).max(160).optional(),
+  })
+  .refine(
+    (value) => Boolean(value.answer?.trim() || value.projectHint?.trim() || value.contextHint?.trim()),
+    "A clarification answer or hint is required"
+  );
 
 /**
- * POST /api/notes/[id]/summary
- * Regenerate AI summary (and confidence score) for an existing note.
+ * POST /api/notes/[id]/clarify
+ * Continue the note clarification conversation and regenerate organization.
  */
 export async function POST(request: NextRequest, { params }: Params) {
   try {
@@ -31,7 +47,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const rateLimitResult = checkRateLimit(session.user.id, "/api/notes/summary");
+    const rateLimitResult = checkRateLimit(session.user.id, "/api/notes/clarify");
     if (!rateLimitResult.ok) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a moment." },
@@ -39,17 +55,12 @@ export async function POST(request: NextRequest, { params }: Params) {
       );
     }
 
-    let parsedHints: z.infer<typeof SummaryHintSchema> = {};
-    try {
-      const rawBody = await request.json();
-      const parsed = SummaryHintSchema.safeParse(rawBody);
-      if (parsed.success) {
-        parsedHints = parsed.data;
-      }
-    } catch {
-      // Empty body is valid for this endpoint.
+    const parsedBody = ClarifyNoteSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: "Invalid clarification payload" }, { status: 400 });
     }
 
+    const body = parsedBody.data;
     const note = await prisma.note.findFirst({
       where: {
         id: params.id,
@@ -74,20 +85,33 @@ export async function POST(request: NextRequest, { params }: Params) {
       : {};
     const currentAiMeta = parseNoteAiMeta(note.aiMeta);
     let clarificationHistory = [...currentAiMeta.clarificationHistory];
+    const baseQuestion =
+      body.question ||
+      currentAiMeta.clarificationQuestions[0] ||
+      "What does this note need clarified?";
 
-    if (parsedHints.projectHint) {
+    if (body.answer?.trim()) {
       clarificationHistory = appendClarificationTurn(clarificationHistory, {
-        question: currentAiMeta.clarificationQuestions.find((question) => question.toLowerCase().includes("project")) || "Quick project hint",
-        answer: parsedHints.projectHint,
+        question: baseQuestion,
+        answer: body.answer.trim(),
+        kind: "freeform",
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    if (body.projectHint?.trim()) {
+      clarificationHistory = appendClarificationTurn(clarificationHistory, {
+        question: baseQuestion,
+        answer: body.projectHint.trim(),
         kind: "project",
         createdAt: new Date().toISOString(),
       });
     }
 
-    if (parsedHints.contextHint) {
+    if (body.contextHint?.trim()) {
       clarificationHistory = appendClarificationTurn(clarificationHistory, {
-        question: currentAiMeta.clarificationQuestions.find((question) => question.toLowerCase().includes("context") || question.toLowerCase().includes("category")) || "Quick context hint",
-        answer: parsedHints.contextHint,
+        question: baseQuestion,
+        answer: body.contextHint.trim(),
         kind: "context",
         createdAt: new Date().toISOString(),
       });
@@ -95,8 +119,8 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const memory = await getThinkingMemory(session.user.id);
     const organized = await organizeNote(note.rawContent, {
-      explicitProject: parsedHints.projectHint || note.suggestedProject || undefined,
-      explicitContext: parsedHints.contextHint || note.category || undefined,
+      explicitProject: body.projectHint || note.suggestedProject || undefined,
+      explicitContext: body.contextHint || note.category || undefined,
       userContext: buildThinkingMemoryPrompt(memory),
       clarificationContext: buildClarificationContext(clarificationHistory),
     });
@@ -106,10 +130,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       data: {
         title: organized.title,
         summary: organized.summary,
-        category: organized.category,
+        category: body.contextHint || organized.category,
         type: organized.type,
         tags: organized.tags,
-        suggestedProject: organized.suggestedProject || parsedHints.projectHint || null,
+        suggestedProject: organized.suggestedProject || body.projectHint || null,
         extractedTasks: organized.extractedTasks || null,
         extractedDates: organized.extractedDates || null,
         extractedEntities: organized.extractedEntities || null,
@@ -122,7 +146,6 @@ export async function POST(request: NextRequest, { params }: Params) {
           clarificationHistory,
         } as unknown as Prisma.InputJsonValue,
         confidenceScore: organized.confidenceScore,
-        ...(parsedHints.contextHint && { category: parsedHints.contextHint }),
       },
       select: {
         id: true,
@@ -141,24 +164,23 @@ export async function POST(request: NextRequest, { params }: Params) {
     });
 
     await updateThinkingMemory(session.user.id, {
-      explicitProject: parsedHints.projectHint,
-      explicitContext: parsedHints.contextHint,
+      explicitProject: body.projectHint,
+      explicitContext: body.contextHint,
       organized,
     });
 
-    // Record confidence lift when the user clicked a specific hint chip.
     const confidenceBefore = note.confidenceScore ?? 0;
     const confidenceAfter = updated.confidenceScore ?? 0;
-    if (parsedHints.projectHint) {
-      await recordHintUsage(session.user.id, parsedHints.projectHint, "project", confidenceBefore, confidenceAfter);
+    if (body.projectHint) {
+      await recordHintUsage(session.user.id, body.projectHint, "project", confidenceBefore, confidenceAfter);
     }
-    if (parsedHints.contextHint) {
-      await recordHintUsage(session.user.id, parsedHints.contextHint, "context", confidenceBefore, confidenceAfter);
+    if (body.contextHint) {
+      await recordHintUsage(session.user.id, body.contextHint, "context", confidenceBefore, confidenceAfter);
     }
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {
-    console.error("Error regenerating note summary:", error);
-    return NextResponse.json({ error: "Failed to regenerate summary" }, { status: 500 });
+    console.error("Error clarifying note:", error);
+    return NextResponse.json({ error: "Failed to clarify note" }, { status: 500 });
   }
 }

@@ -35,6 +35,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Bulk clarify and regenerate for selected note batches
 - Per-user memory profile: projects, contexts, people, topics
 - Organization prompts conditioned on per-user memory
+- Conversational clarification loop with persisted Q/A history per note
 - Chip-click confidence lift tracking
 - Hint effectiveness analytics in settings
 - AI performance dashboard in settings
@@ -91,8 +92,9 @@ Expected behavior by confidence tier:
 When confidence is low:
 - inbox cards and note detail show the AI's clarification questions
 - quick project/context chip buttons appear
-- user clicks one hint
+- user can click one hint or answer directly in natural language
 - note regenerates immediately with updated context
+- follow-up questions narrow based on prior clarification answers
 - confidence, intent, and category all improve from the re-run
 
 **Step 4 — Bulk Clarify During Triage**
@@ -193,6 +195,7 @@ src/
     api/
       notes/route.ts                 # GET, POST notes
       notes/[id]/route.ts            # PATCH, DELETE single note
+      notes/[id]/clarify/route.ts    # POST continue clarification conversation for a note
       notes/[id]/split/route.ts      # POST preview/create split
       notes/[id]/summary/route.ts    # POST regenerate AI summary
       notes/analyze-dump/route.ts    # POST analyze raw dump into note previews
@@ -220,6 +223,7 @@ src/
       NoteCard.tsx
       InboxStream.tsx
       InboxFilterBar.tsx
+      ClarificationLoop.tsx
       NoteDetailClient.tsx
       DumpModal.tsx
     search/
@@ -239,6 +243,7 @@ src/
     enrichNote.ts                    # full enrichment pipeline
     db.ts                            # Prisma client singleton
     userMemory.ts                    # memory CRUD + hint stats
+    clarification.ts                 # clarification history parsing + transcript helpers
     userStats.ts                     # AI performance metrics + snapshot history
     searchRanking.ts                 # semantic + keyword blending
     rateLimit.ts                     # per-user API rate limiting
@@ -275,6 +280,7 @@ DELETE /api/notes/[id]               Delete note
 
 ### AI Operations
 ```
+POST   /api/notes/[id]/clarify       Continue note clarification conversation
 POST   /api/notes/[id]/split         Preview or create split cards
 POST   /api/notes/[id]/summary       Regenerate AI organization and confidence
 POST   /api/notes/analyze-dump       Analyze raw dump into organized previews

@@ -69,6 +69,7 @@ describe("/api/notes/[id]/summary POST", () => {
       knownContexts: [],
       knownPeople: [],
       knownTopics: [],
+      hintStats: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);
@@ -143,6 +144,10 @@ describe("/api/notes/[id]/summary POST", () => {
       rawContent: "Discuss Q2 launch blockers",
       suggestedProject: null,
       category: null,
+      aiMeta: {
+        clarificationQuestions: ["Which project is this for?", "What context is this in?"],
+        clarificationHistory: [],
+      },
     } as never);
     mockedOrganizeNote.mockResolvedValue({
       title: "Q2 blockers",
@@ -174,6 +179,19 @@ describe("/api/notes/[id]/summary POST", () => {
       expect.objectContaining({
         explicitProject: "Project A",
         explicitContext: "Sprint planning",
+        clarificationContext: expect.stringContaining("Project A"),
+      })
+    );
+    expect(mockedUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          aiMeta: expect.objectContaining({
+            clarificationHistory: expect.arrayContaining([
+              expect.objectContaining({ answer: "Project A", kind: "project" }),
+              expect.objectContaining({ answer: "Sprint planning", kind: "context" }),
+            ]),
+          }),
+        }),
       })
     );
   });
