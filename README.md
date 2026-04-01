@@ -41,7 +41,8 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 ### Phase 4 ⏳ (Placeholder pages created)
 - Card, Project, Topic, Timeline, Search views
 - Semantic search UX with filters, snippets, and typeahead
-- Project/topic clustering and broader workflow intelligence
+- Project/topic clustering with cross-note grouping and reorganization suggestions
+- Broader workflow intelligence
 
 ### Phase 5+ 📋
 - Resurface old notes
@@ -208,8 +209,10 @@ src/
 ### Phase 4: Views & Search ⏳
 - [x] Placeholder pages for all views
 - [x] Semantic search UX with filters, snippets, and typeahead
+- [x] Project/topic clustering with browsable grouped notes
+- [x] Note-level reorganization suggestions from shared topic/project context
 - [ ] Implement Card, Project, Topic, Timeline views
-- [ ] Project/topic clustering and broader RightPanel guidance
+- [ ] Broader RightPanel guidance and cluster actions
 
 ### Phase 5: Resurface ⏳
 - [ ] Related notes computation
@@ -272,7 +275,7 @@ organizeNote('call jim about invoices, look into unreal plugin crash, daughter n
 
 ## Roadmap
 
-- [ ] Phase 4: Ship project/topic clustering and deeper search intelligence
+- [ ] Phase 4: Deepen clustering, resurfacing, and broader browsing views
 - [ ] Phase 5: Resurface old notes intelligently
 - [ ] Phase 6: Desktop app via Tauri
 - [ ] Phase 7: iOS app via Capacitor

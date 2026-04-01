@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { getNoteKnowledgeContext } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -56,10 +57,14 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 });
     }
 
+    const knowledgeContext = await getNoteKnowledgeContext(session.user.id, params.id);
+
     return NextResponse.json({
       noteId: note.id,
       aiMeta: note.aiMeta,
       extractedTasks: note.extractedTasks,
+      clusters: knowledgeContext?.clusters || [],
+      reorganizationSuggestion: knowledgeContext?.suggestion || null,
       related: [
         ...note.relatedNotesFrom.map((r) => ({
           id: r.targetNote.id,

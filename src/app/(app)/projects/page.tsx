@@ -1,9 +1,11 @@
 import { auth } from "@/auth";
+import { getUserKnowledgeClusters } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 /**
- * Projects page grouped by AI-suggested project and fallback category.
+ * Projects page showing inferred project clusters and their related notes.
  */
 export default async function ProjectsPage() {
   const session = await auth();
@@ -12,50 +14,72 @@ export default async function ProjectsPage() {
     redirect("/login");
   }
 
-  const notes = await prisma.note.findMany({
-    where: {
-      userId: session.user.id,
-      isArchived: false,
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const grouped = notes.reduce<Record<string, typeof notes>>((acc, note) => {
-    const key = note.suggestedProject || note.category || "Unsorted";
-    acc[key] = acc[key] || [];
-    acc[key].push(note);
-    return acc;
-  }, {});
-
-  const groupEntries = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length);
+  const [clusters, noteCount] = await Promise.all([
+    getUserKnowledgeClusters(session.user.id, { kind: "project" }),
+    prisma.note.count({
+      where: {
+        userId: session.user.id,
+        isArchived: false,
+        status: "PROCESSED",
+      },
+    }),
+  ]);
 
   return (
     <div className="p-6">
       <h1 className="text-3xl font-bold mb-2 text-gray-900">Projects</h1>
-      <p className="mb-6 text-gray-600">Notes grouped by AI-inferred projects and categories.</p>
+      <p className="mb-6 max-w-3xl text-gray-600">
+        Project clusters combine AI-suggested projects, entity signals, and shared topics so notes can gradually reorganize into the work they actually belong to.
+      </p>
 
-      {groupEntries.length === 0 ? (
+      {noteCount === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-6 text-gray-600">
           No notes available yet.
         </div>
+      ) : clusters.length === 0 ? (
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-gray-600">
+          No strong project clusters yet. As notes connect around the same work stream, they will appear here.
+        </div>
       ) : (
         <div className="space-y-4">
-          {groupEntries.map(([name, groupNotes]) => (
-            <section key={name} className="rounded-lg border border-gray-200 bg-white p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900">{name}</h2>
+          {clusters.map((cluster) => (
+            <section key={cluster.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 className="text-lg font-semibold text-gray-900">{cluster.label}</h2>
                 <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
-                  {groupNotes.length}
+                  {cluster.noteCount}
                 </span>
               </div>
-              <ul className="space-y-2">
-                {groupNotes.slice(0, 6).map((note) => (
-                  <li key={note.id} className="rounded border border-gray-100 p-3">
+
+              {cluster.crossReferences.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {cluster.crossReferences.map((reference) => (
+                    <span key={`${cluster.id}-${reference}`} className="rounded-full bg-purple-100 px-2.5 py-1 text-xs text-purple-700">
+                      Topic: {reference}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {cluster.notes.map((note) => (
+                  <Link
+                    key={note.id}
+                    href={`/notes/${note.id}`}
+                    className="rounded-lg border border-gray-100 p-3 transition-colors hover:border-blue-300 hover:bg-blue-50/40"
+                  >
                     <div className="text-sm font-medium text-gray-900">{note.title || "Untitled note"}</div>
-                    <div className="mt-1 text-sm text-gray-600 line-clamp-2">{note.summary || note.rawContent}</div>
-                  </li>
+                    <div className="mt-1 line-clamp-2 text-sm text-gray-600">{note.summary || "No summary yet."}</div>
+                    <div className="mt-2 text-[11px] text-gray-500">
+                      {new Date(note.createdAt).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </div>
+                  </Link>
                 ))}
-              </ul>
+              </div>
             </section>
           ))}
         </div>

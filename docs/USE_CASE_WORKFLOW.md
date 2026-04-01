@@ -87,13 +87,14 @@ Expected behavior:
 On note detail routes:
 
 - main content shows summary, intent, next action, tasks, clarifications,
-- RightPanel shows contextual related notes and note-level guidance.
+- RightPanel shows contextual related notes, inferred topic/project clusters, and note-level reorganization suggestions.
 
 Expected behavior:
 
 - user understands why the note matters,
 - user sees what to do next,
-- user can quickly navigate to relevant prior notes.
+- user can quickly navigate to relevant prior notes,
+- user can apply better project/category context when new notes reveal a stronger grouping.
 
 ### Step 6: Learning Feedback Visibility
 
@@ -129,6 +130,7 @@ Execution:
 
 - user opens high-priority notes,
 - follows next-action guidance,
+- browses project/topic clusters when trying to reconnect fragmented conversations,
 - works through extracted tasks.
 
 Reflection:
@@ -165,13 +167,14 @@ In scope now:
 - clarify,
 - regenerate,
 - semantic and keyword search with filters and typeahead,
+- inferred project/topic clustering,
+- note-level reorganization suggestions,
 - keyboard-first inbox triage,
 - AI performance visibility,
 - learn from hint interactions.
 
 Planned next:
 
-- project/topic clustering,
 - resurfacing forgotten thinking,
 - deeper workflow synthesis across notes,
 - optional opt-in global training pipeline with strict privacy controls.

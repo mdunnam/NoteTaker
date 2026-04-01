@@ -1,0 +1,396 @@
+import { prisma } from "@/lib/db";
+
+type KnowledgeEntityType = "PROJECT" | "APP" | "TOPIC" | "COMPANY" | "PERSON" | "PLACE";
+
+interface KnowledgeNoteEntity {
+  entity: {
+    id: string;
+    name: string;
+    type: KnowledgeEntityType;
+  };
+}
+
+export interface KnowledgeNoteInput {
+  id: string;
+  title: string | null;
+  summary: string | null;
+  rawContent: string;
+  createdAt: Date;
+  updatedAt: Date;
+  category: string | null;
+  type: string | null;
+  tags: string[];
+  suggestedProject: string | null;
+  entities: KnowledgeNoteEntity[];
+}
+
+type KnowledgeNote = KnowledgeNoteInput;
+
+export interface ClusterNotePreview {
+  id: string;
+  title: string | null;
+  summary: string | null;
+  category: string | null;
+  suggestedProject: string | null;
+  createdAt: string;
+}
+
+export interface KnowledgeCluster {
+  id: string;
+  kind: "project" | "topic";
+  label: string;
+  noteCount: number;
+  dominantCategory: string | null;
+  crossReferences: string[];
+  notes: ClusterNotePreview[];
+}
+
+export interface ReorganizationSuggestion {
+  suggestedProject: string | null;
+  suggestedCategory: string | null;
+  reason: string;
+  confidence: number;
+  basedOnTopics: string[];
+  supportingNotes: ClusterNotePreview[];
+}
+
+export interface NoteKnowledgeContext {
+  clusters: KnowledgeCluster[];
+  suggestion: ReorganizationSuggestion | null;
+}
+
+interface ClusterAccumulator {
+  id: string;
+  kind: "project" | "topic";
+  label: string;
+  notes: KnowledgeNote[];
+  crossReferences: Map<string, number>;
+}
+
+interface ProjectCandidate {
+  label: string;
+  score: number;
+  topics: Set<string>;
+  supportingNotes: KnowledgeNote[];
+}
+
+/** Normalize a cluster or signal label for matching. */
+function normalizeSignalLabel(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+/** Build a stable cluster id from kind and label. */
+function buildClusterId(kind: "project" | "topic", label: string): string {
+  return `${kind}:${normalizeSignalLabel(label).toLowerCase()}`;
+}
+
+/** Convert a note into a small preview payload for UI consumption. */
+function toClusterNotePreview(note: KnowledgeNote): ClusterNotePreview {
+  return {
+    id: note.id,
+    title: note.title,
+    summary: note.summary || note.rawContent.slice(0, 180),
+    category: note.category,
+    suggestedProject: note.suggestedProject,
+    createdAt: note.createdAt.toISOString(),
+  };
+}
+
+/** Collect project signals from a note. */
+function getProjectSignals(note: KnowledgeNote): string[] {
+  const signals = new Set<string>();
+
+  if (note.suggestedProject?.trim()) {
+    signals.add(normalizeSignalLabel(note.suggestedProject));
+  }
+
+  for (const entity of note.entities) {
+    if (entity.entity.type === "PROJECT" || entity.entity.type === "APP") {
+      signals.add(normalizeSignalLabel(entity.entity.name));
+    }
+  }
+
+  return [...signals];
+}
+
+/** Collect topic signals from a note. */
+function getTopicSignals(note: KnowledgeNote): string[] {
+  const signals = new Set<string>();
+
+  for (const entity of note.entities) {
+    if (entity.entity.type === "TOPIC" || entity.entity.type === "COMPANY") {
+      signals.add(normalizeSignalLabel(entity.entity.name));
+    }
+  }
+
+  for (const tag of note.tags || []) {
+    const normalizedTag = normalizeSignalLabel(tag);
+    if (normalizedTag) {
+      signals.add(normalizedTag);
+    }
+  }
+
+  return [...signals];
+}
+
+/** Pick the most common non-empty category from a note set. */
+function getDominantCategory(notes: KnowledgeNote[]): string | null {
+  const counts = new Map<string, number>();
+
+  for (const note of notes) {
+    const category = note.category?.trim();
+    if (!category) {
+      continue;
+    }
+    counts.set(category, (counts.get(category) || 0) + 1);
+  }
+
+  const winner = [...counts.entries()].sort((left, right) => right[1] - left[1])[0];
+  return winner?.[0] || null;
+}
+
+/** Load processed notes with entity links for clustering and context inference. */
+async function loadKnowledgeNotes(userId: string): Promise<KnowledgeNote[]> {
+  return prisma.note.findMany({
+    where: {
+      userId,
+      isArchived: false,
+      status: "PROCESSED",
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+    take: 400,
+    select: {
+      id: true,
+      title: true,
+      summary: true,
+      rawContent: true,
+      createdAt: true,
+      updatedAt: true,
+      category: true,
+      type: true,
+      tags: true,
+      suggestedProject: true,
+      entities: {
+        include: {
+          entity: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+/** Build project and topic cluster maps from note signals. */
+function buildClusterMaps(notes: KnowledgeNote[]) {
+  const clusters = new Map<string, ClusterAccumulator>();
+
+  for (const note of notes) {
+    const projectSignals = getProjectSignals(note);
+    const topicSignals = getTopicSignals(note);
+
+    for (const label of projectSignals) {
+      const clusterId = buildClusterId("project", label);
+      const current = clusters.get(clusterId) || {
+        id: clusterId,
+        kind: "project" as const,
+        label,
+        notes: [],
+        crossReferences: new Map<string, number>(),
+      };
+      current.notes.push(note);
+
+      for (const topic of topicSignals) {
+        current.crossReferences.set(topic, (current.crossReferences.get(topic) || 0) + 1);
+      }
+
+      clusters.set(clusterId, current);
+    }
+
+    for (const label of topicSignals) {
+      const clusterId = buildClusterId("topic", label);
+      const current = clusters.get(clusterId) || {
+        id: clusterId,
+        kind: "topic" as const,
+        label,
+        notes: [],
+        crossReferences: new Map<string, number>(),
+      };
+      current.notes.push(note);
+
+      for (const project of projectSignals) {
+        current.crossReferences.set(project, (current.crossReferences.get(project) || 0) + 1);
+      }
+
+      clusters.set(clusterId, current);
+    }
+  }
+
+  return clusters;
+}
+
+/** Convert an internal cluster accumulator into a UI-friendly cluster. */
+function toKnowledgeCluster(cluster: ClusterAccumulator): KnowledgeCluster {
+  const uniqueNotes = [...new Map(cluster.notes.map((note) => [note.id, note])).values()];
+
+  return {
+    id: cluster.id,
+    kind: cluster.kind,
+    label: cluster.label,
+    noteCount: uniqueNotes.length,
+    dominantCategory: getDominantCategory(uniqueNotes),
+    crossReferences: [...cluster.crossReferences.entries()]
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 4)
+      .map(([label]) => label),
+    notes: uniqueNotes
+      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+      .slice(0, 6)
+      .map(toClusterNotePreview),
+  };
+}
+
+/** Infer a project suggestion for a note from topic-to-project co-occurrence across the note corpus. */
+function inferProjectSuggestion(notes: KnowledgeNote[], targetNote: KnowledgeNote): ReorganizationSuggestion | null {
+  const existingProjects = new Set(getProjectSignals(targetNote).map((label) => label.toLowerCase()));
+  const topicSignals = getTopicSignals(targetNote);
+
+  if (topicSignals.length === 0) {
+    return null;
+  }
+
+  const candidates = new Map<string, ProjectCandidate>();
+
+  for (const note of notes) {
+    if (note.id === targetNote.id) {
+      continue;
+    }
+
+    const noteTopics = new Set(getTopicSignals(note).map((label) => label.toLowerCase()));
+    const sharedTopics = topicSignals.filter((topic) => noteTopics.has(topic.toLowerCase()));
+    if (sharedTopics.length === 0) {
+      continue;
+    }
+
+    const noteProjects = getProjectSignals(note);
+    for (const project of noteProjects) {
+      const normalizedProject = project.toLowerCase();
+      const current = candidates.get(normalizedProject) || {
+        label: project,
+        score: 0,
+        topics: new Set<string>(),
+        supportingNotes: [],
+      };
+
+      current.score += sharedTopics.length;
+      for (const topic of sharedTopics) {
+        current.topics.add(topic);
+      }
+
+      if (!current.supportingNotes.some((candidateNote) => candidateNote.id === note.id)) {
+        current.supportingNotes.push(note);
+      }
+
+      candidates.set(normalizedProject, current);
+    }
+  }
+
+  const best = [...candidates.values()].sort((left, right) => right.score - left.score)[0];
+  if (!best) {
+    return null;
+  }
+
+  if (existingProjects.has(best.label.toLowerCase())) {
+    return null;
+  }
+
+  const supportingNotes = best.supportingNotes
+    .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+    .slice(0, 3);
+
+  const suggestedCategory = getDominantCategory(supportingNotes);
+  const confidence = Math.min(0.95, 0.5 + best.score * 0.1 + supportingNotes.length * 0.05);
+  const joinedTopics = [...best.topics].slice(0, 3);
+
+  return {
+    suggestedProject: best.label,
+    suggestedCategory,
+    reason: joinedTopics.length > 0
+      ? `Notes mentioning ${joinedTopics.join(", ")} are already clustering under ${best.label}.`
+      : `${best.label} is the strongest project signal among related notes.`,
+    confidence,
+    basedOnTopics: joinedTopics,
+    supportingNotes: supportingNotes.map(toClusterNotePreview),
+  };
+}
+
+/**
+ * Infer browsable knowledge clusters from an in-memory note set.
+ */
+export function inferKnowledgeClustersFromNotes(
+  notes: KnowledgeNote[],
+  options?: { kind?: "project" | "topic" }
+): KnowledgeCluster[] {
+  const clusterMap = buildClusterMaps(notes);
+
+  return [...clusterMap.values()]
+    .map(toKnowledgeCluster)
+    .filter((cluster) => cluster.noteCount >= 2)
+    .filter((cluster) => !options?.kind || cluster.kind === options.kind)
+    .sort((left, right) => right.noteCount - left.noteCount || left.label.localeCompare(right.label));
+}
+
+/**
+ * Build topic/project context and possible reorganization suggestion for a single note.
+ */
+export function inferNoteKnowledgeContextFromNotes(notes: KnowledgeNote[], noteId: string): NoteKnowledgeContext | null {
+  const targetNote = notes.find((note) => note.id === noteId);
+
+  if (!targetNote) {
+    return null;
+  }
+
+  const clusterMap = buildClusterMaps(notes);
+  const noteSignals = [
+    ...getProjectSignals(targetNote).map((label) => buildClusterId("project", label)),
+    ...getTopicSignals(targetNote).map((label) => buildClusterId("topic", label)),
+  ];
+
+  const clusters = noteSignals
+    .map((signalId) => clusterMap.get(signalId))
+    .filter((cluster): cluster is ClusterAccumulator => Boolean(cluster))
+    .map(toKnowledgeCluster)
+    .filter((cluster) => cluster.noteCount >= 2)
+    .sort((left, right) => right.noteCount - left.noteCount)
+    .slice(0, 4);
+
+  return {
+    clusters,
+    suggestion: inferProjectSuggestion(notes, targetNote),
+  };
+}
+
+/**
+ * Infer browsable knowledge clusters from existing notes, entities, and project signals.
+ */
+export async function getUserKnowledgeClusters(
+  userId: string,
+  options?: { kind?: "project" | "topic" }
+): Promise<KnowledgeCluster[]> {
+  const notes = await loadKnowledgeNotes(userId);
+  return inferKnowledgeClustersFromNotes(notes, options);
+}
+
+/**
+ * Load note corpus and build cluster context for a single note.
+ */
+export async function getNoteKnowledgeContext(userId: string, noteId: string): Promise<NoteKnowledgeContext | null> {
+  const notes = await loadKnowledgeNotes(userId);
+  return inferNoteKnowledgeContextFromNotes(notes, noteId);
+}

@@ -44,6 +44,8 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Embedding persistence into pgvector-compatible column
 - Semantic ranking with on-the-fly keyword fallback
 - Semantic search page with semantic/keyword mode toggle, filters, typeahead, snippets, and highlighted results
+- Inferred project and topic clusters from existing notes, entities, tags, and project signals
+- Note-level reorganization suggestions when new context links an older note into a stronger project cluster
 - Related note relation links
 - Contextual right panel on note detail routes
 - Durable enrichment queue (`NoteJob`) with worker retry loop
@@ -55,7 +57,6 @@ Shipped:
 
 Not yet shipped:
 - Full surface depth for Cards, Projects, Topics, Timeline, Favorites, Archive
-- Project/topic cluster detection
 - Smart resurfacing
 - Multi-note synthesis
 - Capture from outside the app
@@ -1149,9 +1150,9 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 ## 16. Complete Gap Map
 
 ### A. Current execution focus
-1. Project/topic cluster detection
-2. Resurfacing engine (forgotten notes + repeated patterns)
-3. Multi-note synthesis
+1. Resurfacing engine (forgotten notes + repeated patterns)
+2. Multi-note synthesis
+3. Deeper cluster actions and broader browsing views
 
 ### B. Surface completeness
 1. Cards view
@@ -1203,11 +1204,11 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 ## 17. Priority Tiers
 
 ### Must Have — fastest path to undeniable value
-1. Project/topic clustering
-2. Resurfacing engine (forgotten + pattern)
-3. Multi-note synthesis
-4. RightPanel depth upgrades tied to clustering and synthesis
-5. Review mode and planning outputs
+1. Resurfacing engine (forgotten + pattern)
+2. Multi-note synthesis
+3. RightPanel depth upgrades tied to clustering and synthesis
+4. Review mode and planning outputs
+5. Capture-from-anywhere surfaces
 
 ### Should Have
 1. Training-consent foundation
@@ -1225,11 +1226,10 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 
 ## 18. Recommended Execution Sequence
 
-1. Cluster detection — first memory payoff moment
-2. Resurfacing — deepens memory payoff
-3. Multi-note synthesis — completes thinking-partner loop
-4. Training foundation — enables measurable iteration beyond local personalization
-5. Capture surfaces — extends reach after core value is proved
+1. Resurfacing — deepens memory payoff
+2. Multi-note synthesis — completes thinking-partner loop
+3. Training foundation — enables measurable iteration beyond local personalization
+4. Capture surfaces — extends reach after core value is proved
 
 ---
 
