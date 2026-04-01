@@ -9,11 +9,73 @@ import { embedNote, cosineSimilarity } from "@/lib/ai";
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { parsePgVectorLiteral } from "@/lib/pgvector";
-import { rankKeywordCandidates, selectTopSemanticCandidates } from "@/lib/searchRanking";
+import {
+  buildSearchSnippet,
+  rankKeywordCandidates,
+  scoreKeywordCandidate,
+  selectTopSemanticCandidates,
+} from "@/lib/searchRanking";
+import { z } from "zod";
 
-interface SemanticSearchRequest {
-  query: string;
-  limit?: number;
+const SearchFiltersSchema = z.object({
+  category: z.string().trim().max(120).optional(),
+  type: z.string().trim().max(60).optional(),
+  tag: z.string().trim().max(60).optional(),
+  dateRange: z.enum(["all", "7d", "30d", "90d", "365d"]).optional().default("all"),
+});
+
+const SemanticSearchRequestSchema = z.object({
+  query: z.string().trim().min(1).max(400),
+  limit: z.number().int().min(1).max(50).optional().default(20),
+  mode: z.enum(["semantic", "keyword"]).optional().default("semantic"),
+  typeahead: z.boolean().optional().default(false),
+  filters: SearchFiltersSchema.optional().default({}),
+});
+
+type SemanticSearchRequest = z.infer<typeof SemanticSearchRequestSchema>;
+
+interface SearchNote {
+  id: string;
+  title: string | null;
+  summary: string | null;
+  rawContent: string;
+  createdAt: Date;
+  category?: string | null;
+  type?: string | null;
+  tags?: string[];
+  suggestedProject?: string | null;
+}
+
+/** Build optional createdAt filter from a date-range token. */
+function getCreatedAtFilter(dateRange?: SemanticSearchRequest["filters"]["dateRange"]) {
+  const now = Date.now();
+
+  if (dateRange === "7d") return { gte: new Date(now - 7 * 24 * 60 * 60 * 1000) };
+  if (dateRange === "30d") return { gte: new Date(now - 30 * 24 * 60 * 60 * 1000) };
+  if (dateRange === "90d") return { gte: new Date(now - 90 * 24 * 60 * 60 * 1000) };
+  if (dateRange === "365d") return { gte: new Date(now - 365 * 24 * 60 * 60 * 1000) };
+
+  return undefined;
+}
+
+/** Shape a note into the UI-facing search result payload. */
+function buildSearchResult(note: SearchNote, score: number, query: string) {
+  const { snippet, matchedTerms } = buildSearchSnippet(note, query);
+
+  return {
+    id: note.id,
+    title: note.title,
+    summary: note.summary,
+    rawContent: note.rawContent,
+    createdAt: note.createdAt,
+    category: note.category ?? null,
+    type: note.type ?? null,
+    tags: note.tags ?? [],
+    suggestedProject: note.suggestedProject ?? null,
+    snippet,
+    matchedTerms,
+    score: Math.round(score),
+  };
 }
 
 /**
@@ -37,13 +99,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as SemanticSearchRequest;
-    const query = (body.query || "").trim();
-    const limit = Math.min(body.limit || 20, 50);
-
-    if (!query) {
-      return NextResponse.json({ error: "Query is required" }, { status: 400 });
+    const parsedBody = SemanticSearchRequestSchema.safeParse(await request.json());
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { error: "Invalid request", details: parsedBody.error.flatten() },
+        { status: 400 }
+      );
     }
+
+    const body = parsedBody.data;
+    const query = body.query;
+    const limit = body.typeahead ? Math.min(body.limit, 5) : body.limit;
+    const createdAtFilter = getCreatedAtFilter(body.filters?.dateRange);
 
     // Get active processed notes to score semantically.
     const notes = await prisma.note.findMany({
@@ -51,6 +118,10 @@ export async function POST(request: NextRequest) {
         userId: session.user.id,
         isArchived: false,
         status: "PROCESSED",
+        ...(body.filters?.category ? { category: body.filters.category } : {}),
+        ...(body.filters?.type ? { type: body.filters.type } : {}),
+        ...(body.filters?.tag ? { tags: { has: body.filters.tag } } : {}),
+        ...(createdAtFilter ? { createdAt: createdAtFilter } : {}),
       },
       select: {
         id: true,
@@ -58,22 +129,33 @@ export async function POST(request: NextRequest) {
         summary: true,
         rawContent: true,
         createdAt: true,
+        category: true,
+        type: true,
+        tags: true,
+        suggestedProject: true,
       },
       orderBy: { createdAt: "desc" },
-      take: 100, // Search pool
+      take: 200,
     });
 
-    const storedEmbeddings = await prisma.$queryRaw<Array<{ id: string; embeddingText: string | null }>>(
-      Prisma.sql`
-        SELECT "id", "embedding"::text AS "embeddingText"
-        FROM "Note"
-        WHERE "userId" = ${session.user.id}
-          AND "isArchived" = false
-          AND "status" = 'PROCESSED'
-        ORDER BY "createdAt" DESC
-        LIMIT 100
-      `
-    );
+    if (notes.length === 0) {
+      return NextResponse.json({ results: [], method: body.mode }, { status: 200 });
+    }
+
+    if (body.mode === "keyword") {
+      return performKeywordSearch(notes, query, limit);
+    }
+
+    const noteIds = notes.map((note) => note.id);
+    const storedEmbeddings = noteIds.length === 0
+      ? []
+      : await prisma.$queryRaw<Array<{ id: string; embeddingText: string | null }>>(
+          Prisma.sql`
+            SELECT "id", "embedding"::text AS "embeddingText"
+            FROM "Note"
+            WHERE "id" IN (${Prisma.join(noteIds)})
+          `
+        );
 
     const embeddingById = new Map(
       storedEmbeddings.map((row) => [row.id, parsePgVectorLiteral(row.embeddingText)])
@@ -85,7 +167,6 @@ export async function POST(request: NextRequest) {
       queryEmbedding = await embedNote(query);
     } catch (error) {
       console.error("Error embedding query:", error);
-      // Fall back to keyword search if embedding fails
       return performKeywordSearch(notes, query, limit);
     }
 
@@ -93,43 +174,32 @@ export async function POST(request: NextRequest) {
       return performKeywordSearch(notes, query, limit);
     }
 
-    const scored: Array<{
-      id: string;
-      title: string | null;
-      summary: string | null;
-      rawContent: string;
-      createdAt: Date;
-      score: number;
-    }> = [];
+    const scored: Array<SearchNote & { score: number }> = [];
 
     for (const note of notes) {
-      const candidateText = `${note.title || ""}\n${note.summary || note.rawContent}`.trim();
       const storedEmbedding = embeddingById.get(note.id) || [];
-      const candidateEmbedding = storedEmbedding.length > 0
-        ? storedEmbedding
-        : await embedNote(candidateText);
 
-      if (candidateEmbedding.length === 0) {
+      if (storedEmbedding.length === 0) {
         continue;
       }
 
-      const score = cosineSimilarity(queryEmbedding, candidateEmbedding);
-      if (score > 0.5) {
-        scored.push({ ...note, score });
+      const semanticScore = cosineSimilarity(queryEmbedding, storedEmbedding);
+      const keywordScore = scoreKeywordCandidate(note, query);
+      const blendedScore = semanticScore * 0.85 + Math.min(keywordScore / 10, 1) * 0.15;
+
+      if (blendedScore > 0.45) {
+        scored.push({ ...note, score: blendedScore });
       }
     }
 
-    const semanticResults = selectTopSemanticCandidates(scored, limit, 0.5);
+    if (scored.length === 0) {
+      return performKeywordSearch(notes, query, limit);
+    }
+
+    const semanticResults = selectTopSemanticCandidates(scored, limit, 0.45);
 
     return NextResponse.json({
-      results: semanticResults.map((note) => ({
-        id: note.id,
-        title: note.title,
-        summary: note.summary,
-        rawContent: note.rawContent,
-        createdAt: note.createdAt,
-        score: Math.round(note.score * 100),
-      })),
+      results: semanticResults.map((note) => buildSearchResult(note, note.score * 100, query)),
       method: "semantic",
     });
   } catch (error) {
@@ -142,21 +212,14 @@ export async function POST(request: NextRequest) {
  * Fallback keyword-based search when embeddings unavailable.
  */
 function performKeywordSearch(
-  notes: Array<{ id: string; title: string | null; summary: string | null; rawContent: string; createdAt: Date }>,
+  notes: SearchNote[],
   query: string,
   limit: number
 ) {
   const scored = rankKeywordCandidates(notes, query, limit);
 
   return NextResponse.json({
-    results: scored.map((note) => ({
-      id: note.id,
-      title: note.title,
-      summary: note.summary,
-      rawContent: note.rawContent,
-      createdAt: note.createdAt,
-      score: note.score,
-    })),
+    results: scored.map((note) => buildSearchResult(note, note.score, query)),
     method: "keyword",
   });
 }

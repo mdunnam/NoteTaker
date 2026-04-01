@@ -43,6 +43,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Snapshot backfill worker route for warming missing daily history
 - Embedding persistence into pgvector-compatible column
 - Semantic ranking with on-the-fly keyword fallback
+- Semantic search page with semantic/keyword mode toggle, filters, typeahead, snippets, and highlighted results
 - Related note relation links
 - Contextual right panel on note detail routes
 - Durable enrichment queue (`NoteJob`) with worker retry loop
@@ -53,7 +54,6 @@ Shipped:
 - capture, dump capture, dump analysis, organize, clarify, regenerate, keyboard-first triage, AI performance visibility, learn from hint interactions
 
 Not yet shipped:
-- Semantic search UX with filters, snippets, and typeahead
 - Full surface depth for Cards, Projects, Topics, Timeline, Favorites, Archive
 - Project/topic cluster detection
 - Smart resurfacing
@@ -688,9 +688,9 @@ Existing hint effectiveness table stays below this section.
 
 ---
 
-### 11.1 Semantic Search UX (Must Have — Priority 1)
+### 11.1 Semantic Search UX (Shipped)
 
-Current state: backend search endpoint exists with keyword fallback. Search page is a placeholder.
+Current state: semantic and keyword search are both available on the `/search` page with filters, snippets, typeahead suggestions, and highlighted result previews.
 
 #### API (update `POST /api/search/semantic`)
 
@@ -1149,9 +1149,9 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 ## 16. Complete Gap Map
 
 ### A. Current execution focus
-1. Semantic search UX with filters, snippets, and typeahead
-2. Project/topic cluster detection
-3. Resurfacing engine (forgotten notes + repeated patterns)
+1. Project/topic cluster detection
+2. Resurfacing engine (forgotten notes + repeated patterns)
+3. Multi-note synthesis
 
 ### B. Surface completeness
 1. Cards view
@@ -1203,11 +1203,11 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 ## 17. Priority Tiers
 
 ### Must Have — fastest path to undeniable value
-1. Semantic search UX
-2. Project/topic clustering
-3. Resurfacing engine (forgotten + pattern)
-4. Multi-note synthesis
-5. RightPanel depth upgrades tied to clustering and synthesis
+1. Project/topic clustering
+2. Resurfacing engine (forgotten + pattern)
+3. Multi-note synthesis
+4. RightPanel depth upgrades tied to clustering and synthesis
+5. Review mode and planning outputs
 
 ### Should Have
 1. Training-consent foundation
@@ -1225,12 +1225,11 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 
 ## 18. Recommended Execution Sequence
 
-1. Search UX + relevance tuning — unblocks discoverability
-2. Cluster detection — first memory payoff moment
-3. Resurfacing — deepens memory payoff
-4. Multi-note synthesis — completes thinking-partner loop
-5. Training foundation — enables measurable iteration beyond local personalization
-6. Capture surfaces — extends reach after core value is proved
+1. Cluster detection — first memory payoff moment
+2. Resurfacing — deepens memory payoff
+3. Multi-note synthesis — completes thinking-partner loop
+4. Training foundation — enables measurable iteration beyond local personalization
+5. Capture surfaces — extends reach after core value is proved
 
 ---
 

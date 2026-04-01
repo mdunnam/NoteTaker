@@ -134,6 +134,7 @@ Execution:
 Reflection:
 
 - user checks related/contextual notes in RightPanel,
+- user searches by meaning or exact wording to reconnect older notes quickly,
 - revisits unresolved low-confidence items.
 
 ## Confidence-State Handling
@@ -163,13 +164,13 @@ In scope now:
 - organize,
 - clarify,
 - regenerate,
+- semantic and keyword search with filters and typeahead,
 - keyboard-first inbox triage,
 - AI performance visibility,
 - learn from hint interactions.
 
 Planned next:
 
-- semantic search UX,
 - project/topic clustering,
 - resurfacing forgotten thinking,
 - deeper workflow synthesis across notes,

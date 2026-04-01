@@ -78,6 +78,10 @@ describe("/api/search/semantic POST", () => {
         summary: "Q2 planning",
         rawContent: "Build a roadmap",
         createdAt: new Date("2026-01-01"),
+        category: "Work",
+        type: "NOTE",
+        tags: ["roadmap"],
+        suggestedProject: "QNote",
       },
       {
         id: "n2",
@@ -85,6 +89,10 @@ describe("/api/search/semantic POST", () => {
         summary: "Groceries",
         rawContent: "Milk and eggs",
         createdAt: new Date("2026-01-02"),
+        category: "Personal",
+        type: "TASK",
+        tags: ["home"],
+        suggestedProject: null,
       },
     ] as never);
 
@@ -100,11 +108,12 @@ describe("/api/search/semantic POST", () => {
       .mockReturnValueOnce(0.22);
 
     const response = await POST(makeRequest({ query: "roadmap", limit: 10 }));
-    const payload = (await response.json()) as { method: string; results: Array<{ id: string }> };
+    const payload = (await response.json()) as { method: string; results: Array<{ id: string; snippet: string }> };
 
     expect(response.status).toBe(200);
     expect(payload.method).toBe("semantic");
     expect(payload.results[0]?.id).toBe("n1");
+    expect(payload.results[0]?.snippet).toBeTruthy();
   });
 
   it("falls back to keyword mode when query embedding fails", async () => {
@@ -116,6 +125,10 @@ describe("/api/search/semantic POST", () => {
         summary: null,
         rawContent: "Plan the launch roadmap",
         createdAt: new Date("2026-01-01"),
+        category: "Work",
+        type: "NOTE",
+        tags: ["launch"],
+        suggestedProject: null,
       },
     ] as never);
 
@@ -127,5 +140,47 @@ describe("/api/search/semantic POST", () => {
     expect(response.status).toBe(200);
     expect(payload.method).toBe("keyword");
     expect(payload.results[0]?.id).toBe("n1");
+  });
+
+  it("supports explicit keyword mode with filters", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "u1" } } as never);
+    mockedFindMany.mockResolvedValue([
+      {
+        id: "n1",
+        title: "Invoice cleanup",
+        summary: "Finance follow-up",
+        rawContent: "Review invoice backlog",
+        createdAt: new Date("2026-01-03"),
+        category: "Work",
+        type: "TASK",
+        tags: ["finance"],
+        suggestedProject: "Ops",
+      },
+    ] as never);
+
+    const response = await POST(makeRequest({
+      query: "invoice",
+      mode: "keyword",
+      filters: {
+        category: "Work",
+        type: "TASK",
+        tag: "finance",
+        dateRange: "30d",
+      },
+    }));
+    const payload = (await response.json()) as { method: string; results: Array<{ id: string }> };
+
+    expect(response.status).toBe(200);
+    expect(payload.method).toBe("keyword");
+    expect(payload.results[0]?.id).toBe("n1");
+    expect(mockedFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          category: "Work",
+          type: "TASK",
+          tags: { has: "finance" },
+        }),
+      })
+    );
   });
 });

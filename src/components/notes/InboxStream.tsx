@@ -129,22 +129,22 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
   };
 
   /** Set small transient message for keyboard triage feedback. */
-  const flashMessage = (text: string) => {
+  const flashMessage = useCallback((text: string) => {
     setShortcutMessage(text);
     setTimeout(() => setShortcutMessage(null), 2000);
-  };
+  }, []);
 
   /** Apply a patch to one note by id. */
-  const patchOne = async (id: string, patch: Record<string, unknown>) => {
+  const patchOne = useCallback(async (id: string, patch: Record<string, unknown>) => {
     await fetch(`/api/notes/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-  };
+  }, []);
 
   /** Perform keyboard-first triage actions for focused card. */
-  const handleShortcutAction = async (key: string) => {
+  const handleShortcutAction = useCallback(async (key: string) => {
     if (!focusedNote) return;
 
     if (key === "a") {
@@ -189,7 +189,7 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
       flashMessage("Deleted note.");
       router.refresh();
     }
-  };
+  }, [flashMessage, focusedNote, patchOne, router]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -233,7 +233,7 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [notes.length, focusedNote]);
+  }, [handleShortcutAction, notes.length]);
 
   if (notes.length === 0) {
     return (
