@@ -152,7 +152,7 @@ async function buildSnapshotValuesForDate(userId: string, snapshotDate: Date): P
   };
 }
 
-/** Upsert a single daily metric snapshot for a user. */
+/** Upsert a single daily metric snapshot for a user. Throws if the table is missing — callers should wrap in try/catch. */
 export async function upsertUserMetricSnapshotForDate(userId: string, snapshotDate: Date): Promise<void> {
   const values = await buildSnapshotValuesForDate(userId, snapshotDate);
 
@@ -408,25 +408,31 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     "lower"
   );
 
-  await ensureRecentUserMetricSnapshots(userId, 30);
-  await upsertUserMetricSnapshotForDate(userId, now);
-
-  const snapshots = await snapshotClient.userMetricSnapshot.findMany({
-    where: {
-      userId,
-      snapshotDate: { gte: startOfDay(thirtyDaysAgo) },
-    },
-    orderBy: {
-      snapshotDate: "asc",
-    },
-    take: 30,
-    select: {
-      snapshotDate: true,
-      avgConfidence: true,
-      clarificationRate: true,
-      avgTimeToResolutionMs: true,
-    },
-  });
+  // Write today's snapshot non-blocking — do not backfill here (belongs in worker).
+  // Wrapped in try/catch so the page degrades gracefully if the table doesn't exist yet.
+  let snapshots: SnapshotRow[] = [];
+  try {
+    await upsertUserMetricSnapshotForDate(userId, now);
+    snapshots = await snapshotClient.userMetricSnapshot.findMany({
+      where: {
+        userId,
+        snapshotDate: { gte: startOfDay(thirtyDaysAgo) },
+      },
+      orderBy: {
+        snapshotDate: "asc",
+      },
+      take: 30,
+      select: {
+        snapshotDate: true,
+        avgConfidence: true,
+        clarificationRate: true,
+        avgTimeToResolutionMs: true,
+      },
+    });
+  } catch (snapshotError) {
+    // Table may not be migrated yet — log and continue with empty history
+    console.warn("UserMetricSnapshot unavailable (migration pending?):", snapshotError);
+  }
 
   return {
     totalNotes,
