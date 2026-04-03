@@ -47,6 +47,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Semantic search page with semantic/keyword mode toggle, filters, typeahead, snippets, and highlighted results
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
+- Reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
 - Related note relation links
 - Contextual right panel on note detail routes
 - Durable enrichment queue (`NoteJob`) with worker retry loop
@@ -105,6 +106,14 @@ For batches of related notes:
 - runs "Clarify + Regenerate"
 - all selected notes regenerate with the shared context
 - consistent classification across the cluster
+
+**Step 4.5 — Reclassification Queue When Context Changes**
+
+When newer notes clarify older work:
+- QNote ranks notes whose project/category likely changed
+- inbox and right panel surface those candidates automatically
+- user can apply one or many regrouping suggestions
+- notes regenerate with the newer cluster context
 
 **Step 5 — Contextual Review in Note Detail**
 
@@ -220,6 +229,7 @@ src/
       CaptureBar.tsx
       RightPanel.tsx
     notes/
+      ReclassificationQueue.tsx
       NoteCard.tsx
       InboxStream.tsx
       InboxFilterBar.tsx

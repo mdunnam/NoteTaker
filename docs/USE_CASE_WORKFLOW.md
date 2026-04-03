@@ -85,6 +85,21 @@ Expected behavior:
 - consistent classification across a cluster,
 - less repetitive manual editing.
 
+### Step 4.5: Reclassification Queue When Context Changes
+
+When later notes reveal stronger context for older notes:
+
+- inbox surfaces a reclassification queue,
+- right panel surfaces top changed-meaning notes,
+- user can apply one or many suggested regroupings,
+- affected notes are regenerated with the newer project/category context.
+
+Expected behavior:
+
+- older notes move toward the project/topic they actually belong to,
+- context improvements can be applied in batches,
+- QNote becomes less static and more self-correcting over time.
+
 ### Step 5: Contextual Review in Note Detail + RightPanel
 
 On note detail routes:
@@ -172,6 +187,7 @@ In scope now:
 - semantic and keyword search with filters and typeahead,
 - inferred project/topic clustering,
 - note-level reorganization suggestions,
+- changed-meaning reclassification queue,
 - keyboard-first inbox triage,
 - AI performance visibility,
 - learn from hint interactions.

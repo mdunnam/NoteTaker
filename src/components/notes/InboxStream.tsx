@@ -4,24 +4,27 @@
 
 "use client";
 
+import type { ReclassificationCandidate } from "@/lib/clusters";
 import { Note } from "@prisma/client";
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Trash2 } from "lucide-react";
 import NoteCard from "./NoteCard";
+import ReclassificationQueue from "./ReclassificationQueue";
 
 interface InboxStreamProps {
   notes: (Note & {
     collection: { id: string; name: string; color?: string | null } | null;
     entities: Array<{ entity: { id: string; name: string; type: string } }>;
   })[];
+  reclassificationCandidates?: ReclassificationCandidate[];
   quickHints?: {
     projects: string[];
     contexts: string[];
   };
 }
 
-export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
+export default function InboxStream({ notes, reclassificationCandidates, quickHints }: InboxStreamProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
@@ -252,6 +255,12 @@ export default function InboxStream({ notes, quickHints }: InboxStreamProps) {
 
   return (
     <div className="max-w-3xl">
+      {!!reclassificationCandidates?.length && (
+        <div className="mb-4">
+          <ReclassificationQueue candidates={reclassificationCandidates} showBatchActions title="Reclassification Queue" />
+        </div>
+      )}
+
       {showShortcuts && (
         <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
           <p className="font-semibold mb-1">Triage shortcuts</p>

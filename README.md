@@ -37,11 +37,13 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Organize This Dump**: Analyze a raw dump, review structured previews, and create selected notes
 - **Dump Mode**: Zero-friction background organization path with keyboard-first inbox triage
 - **AI performance dashboard**: Settings page shows confidence, clarification rate, trend deltas, and 30-day sparkline history
+- **Reclassification queue**: Surfaces notes whose project/category meaning changed based on newer linked context and lets you apply suggestions in batches
 
 ### Phase 4 ⏳ (Placeholder pages created)
 - Card, Project, Topic, Timeline, Search views
 - Semantic search UX with filters, snippets, and typeahead
 - Project/topic clustering with cross-note grouping and reorganization suggestions
+- Reclassification queue for changed-meaning notes in inbox and right panel
 - Broader workflow intelligence
 
 ### Phase 5+ 📋
@@ -214,6 +216,7 @@ src/
 - [x] Semantic search UX with filters, snippets, and typeahead
 - [x] Project/topic clustering with browsable grouped notes
 - [x] Note-level reorganization suggestions from shared topic/project context
+- [x] Reclassification queue with batch apply for changed-meaning notes
 - [ ] Implement Card, Project, Topic, Timeline views
 - [ ] Broader RightPanel guidance and cluster actions
 

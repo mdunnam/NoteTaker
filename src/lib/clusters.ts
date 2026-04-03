@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { parseNoteAiMeta } from "@/lib/clarification";
 
 type KnowledgeEntityType = "PROJECT" | "APP" | "TOPIC" | "COMPANY" | "PERSON" | "PLACE";
 
@@ -21,6 +22,8 @@ export interface KnowledgeNoteInput {
   type: string | null;
   tags: string[];
   suggestedProject: string | null;
+  confidenceScore?: number | null;
+  aiMeta?: unknown;
   entities: KnowledgeNoteEntity[];
 }
 
@@ -57,6 +60,20 @@ export interface ReorganizationSuggestion {
 export interface NoteKnowledgeContext {
   clusters: KnowledgeCluster[];
   suggestion: ReorganizationSuggestion | null;
+}
+
+export interface ReclassificationCandidate {
+  note: ClusterNotePreview;
+  currentProject: string | null;
+  currentCategory: string | null;
+  suggestedProject: string | null;
+  suggestedCategory: string | null;
+  reason: string;
+  confidence: number;
+  basedOnTopics: string[];
+  supportingNotes: ClusterNotePreview[];
+  changedByNewerContext: boolean;
+  clarificationTurns: number;
 }
 
 interface ClusterAccumulator {
@@ -172,6 +189,8 @@ async function loadKnowledgeNotes(userId: string): Promise<KnowledgeNote[]> {
       type: true,
       tags: true,
       suggestedProject: true,
+      confidenceScore: true,
+      aiMeta: true,
       entities: {
         include: {
           entity: {
@@ -376,6 +395,63 @@ export function inferNoteKnowledgeContextFromNotes(notes: KnowledgeNote[], noteI
   };
 }
 
+/** Rank reclassification candidates from an in-memory note set. */
+export function inferReclassificationCandidatesFromNotes(
+  notes: KnowledgeNote[],
+  limit = 8
+): ReclassificationCandidate[] {
+  return notes
+    .map((note) => {
+      const context = inferNoteKnowledgeContextFromNotes(notes, note.id);
+      const suggestion = context?.suggestion;
+      if (!suggestion) {
+        return null;
+      }
+
+      const sameProject = (note.suggestedProject || "").trim().toLowerCase() === (suggestion.suggestedProject || "").trim().toLowerCase();
+      const sameCategory = (note.category || "").trim().toLowerCase() === (suggestion.suggestedCategory || "").trim().toLowerCase();
+
+      if (sameProject && (sameCategory || !suggestion.suggestedCategory)) {
+        return null;
+      }
+
+      const meta = parseNoteAiMeta(note.aiMeta);
+      const latestSupportingChange = suggestion.supportingNotes.reduce<number>((latest, supportingNote) => {
+        const createdAt = new Date(supportingNote.createdAt).getTime();
+        return Math.max(latest, createdAt);
+      }, 0);
+      const changedByNewerContext = latestSupportingChange > note.updatedAt.getTime();
+
+      return {
+        note: toClusterNotePreview(note),
+        currentProject: note.suggestedProject,
+        currentCategory: note.category,
+        suggestedProject: suggestion.suggestedProject,
+        suggestedCategory: suggestion.suggestedCategory,
+        reason: suggestion.reason,
+        confidence: suggestion.confidence,
+        basedOnTopics: suggestion.basedOnTopics,
+        supportingNotes: suggestion.supportingNotes,
+        changedByNewerContext,
+        clarificationTurns: meta.clarificationHistory.length,
+        sortScore:
+          suggestion.confidence * 100 +
+          (changedByNewerContext ? 15 : 0) +
+          meta.clarificationHistory.length * 5 +
+          suggestion.supportingNotes.length * 4 +
+          (note.confidenceScore !== null && note.confidenceScore !== undefined ? (1 - note.confidenceScore) * 10 : 0),
+      };
+    })
+    .filter((candidate): candidate is ReclassificationCandidate & { sortScore: number } => Boolean(candidate))
+    .sort((left, right) => right.sortScore - left.sortScore)
+    .slice(0, limit)
+    .map((candidateWithScore) => {
+      const candidate = { ...candidateWithScore } as ReclassificationCandidate & { sortScore?: number };
+      delete candidate.sortScore;
+      return candidate as ReclassificationCandidate;
+    });
+}
+
 /**
  * Infer browsable knowledge clusters from existing notes, entities, and project signals.
  */
@@ -393,4 +469,15 @@ export async function getUserKnowledgeClusters(
 export async function getNoteKnowledgeContext(userId: string, noteId: string): Promise<NoteKnowledgeContext | null> {
   const notes = await loadKnowledgeNotes(userId);
   return inferNoteKnowledgeContextFromNotes(notes, noteId);
+}
+
+/**
+ * Load note corpus and compute ranked reclassification suggestions for notes whose context likely changed.
+ */
+export async function getUserReclassificationCandidates(
+  userId: string,
+  limit = 8
+): Promise<ReclassificationCandidate[]> {
+  const notes = await loadKnowledgeNotes(userId);
+  return inferReclassificationCandidatesFromNotes(notes, limit);
 }

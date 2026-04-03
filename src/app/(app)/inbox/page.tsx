@@ -4,6 +4,7 @@
 
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
+import { getUserReclassificationCandidates } from "@/lib/clusters";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import InboxStream from "@/components/notes/InboxStream";
@@ -24,26 +25,29 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   const activeCategory = searchParams?.category || "";
   const activeTag = searchParams?.tag || "";
 
-  const notes = await prisma.note.findMany({
-    where: {
-      userId: session.user.id,
-      status: { in: ["UNPROCESSED", "PROCESSED"] },
-      isArchived: false,
-      ...(activeCategory ? { category: activeCategory } : {}),
-      ...(activeTag ? { tags: { has: activeTag } } : {}),
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-    include: {
-      collection: true,
-      entities: {
-        include: {
-          entity: true,
+  const [notes, reclassificationCandidates] = await Promise.all([
+    prisma.note.findMany({
+      where: {
+        userId: session.user.id,
+        status: { in: ["UNPROCESSED", "PROCESSED"] },
+        isArchived: false,
+        ...(activeCategory ? { category: activeCategory } : {}),
+        ...(activeTag ? { tags: { has: activeTag } } : {}),
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+      include: {
+        collection: true,
+        entities: {
+          include: {
+            entity: true,
+          },
         },
       },
-    },
-  });
+    }),
+    getUserReclassificationCandidates(session.user.id, 6),
+  ]);
 
   // Collect unique categories and tags from ALL non-archived notes for the filter bar.
   const allNotes = await prisma.note.findMany({
@@ -73,7 +77,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         </Suspense>
       )}
 
-      <InboxStream notes={notes} quickHints={quickHints} />
+      <InboxStream notes={notes} reclassificationCandidates={reclassificationCandidates} quickHints={quickHints} />
     </div>
   );
 }

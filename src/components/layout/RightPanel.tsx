@@ -1,5 +1,7 @@
 import { auth } from "@/auth";
+import { getUserReclassificationCandidates } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
+import ReclassificationQueue from "@/components/notes/ReclassificationQueue";
 import RightPanelContextual from "@/components/layout/RightPanelContextual";
 
 /**
@@ -20,6 +22,7 @@ export default async function RightPanel() {
     topRelations,
     lowConfidenceNotes,
     highPriorityNotes,
+    reclassificationCandidates,
   ] = await Promise.all([
     prisma.note.count({
       where: {
@@ -108,6 +111,7 @@ export default async function RightPanel() {
         aiMeta: true,
       },
     }),
+    getUserReclassificationCandidates(session.user.id, 3),
   ]);
 
   const extractedTasks: Array<{
@@ -150,6 +154,14 @@ export default async function RightPanel() {
     <aside className="w-80 border-l border-gray-200 bg-gray-50 p-6 overflow-y-auto">
       <div className="space-y-6">
         <RightPanelContextual />
+
+        {reclassificationCandidates.length > 0 && (
+          <ReclassificationQueue
+            candidates={reclassificationCandidates}
+            compact
+            title="Changed Meaning"
+          />
+        )}
 
         <div>
           <h3 className="font-semibold text-sm mb-3">Note Health</h3>
