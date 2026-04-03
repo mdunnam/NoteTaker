@@ -1,7 +1,12 @@
 # QNote Implementation Summary — Current State + Full Plan
 
-> Superseded as canonical plan by `docs/MASTER_PHASE_IMPLEMENTATION_PLAN.md`.
-> Keep this document for historical context and incremental notes.
+> Historical snapshot as of 2026-03-30.
+> Current canonical docs:
+> - [Master Phase Implementation Plan](../MASTER_PHASE_IMPLEMENTATION_PLAN.md)
+> - [Intended User Workflow](../USE_CASE_WORKFLOW.md)
+> - [AI Training Opt-In Plan](../AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)
+>
+> This file intentionally preserves the pre-Phase-4 planning view and is not updated for later shipped features such as semantic search UX, conversational clarification, cluster browsers, or the changed-meaning reclassification queue.
 
 ## Current Delivery Status (2026-03-30)
 

@@ -1,12 +1,17 @@
 # Phase 3 Implementation Plan: Thinking Modes Foundation
 
-> Superseded as canonical plan by `docs/MASTER_PHASE_IMPLEMENTATION_PLAN.md`.
-> Keep this file as a phase-specific historical checkpoint.
+> Historical snapshot as of 2026-03-30.
+> Current canonical docs:
+> - [Master Phase Implementation Plan](../MASTER_PHASE_IMPLEMENTATION_PLAN.md)
+> - [Intended User Workflow](../USE_CASE_WORKFLOW.md)
+> - [AI Training Opt-In Plan](../AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)
+>
+> This file preserves the original Phase 3 planning view. Items listed as remaining here may already be shipped in later phases.
 
 Related docs:
 - [Implementation Summary](IMPLEMENTATION.md)
-- [AI Training Opt-In Plan](AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)
-- [Intended User Workflow](USE_CASE_WORKFLOW.md)
+- [AI Training Opt-In Plan](../AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)
+- [Intended User Workflow](../USE_CASE_WORKFLOW.md)
 
 **Goal**: Transform QNote from note storage into a thinking partner.
 

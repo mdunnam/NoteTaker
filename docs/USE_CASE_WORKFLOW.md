@@ -141,7 +141,8 @@ Morning:
 Midday triage:
 
 - user opens inbox,
-- resolves low-confidence notes with chips,
+- resolves low-confidence notes with chips or direct answers,
+- applies any changed-meaning regrouping suggestions from the reclassification queue,
 - bulk clarifies any grouped cluster.
 
 Execution:
@@ -172,7 +173,7 @@ Reflection:
 ### Low confidence
 
 - Clarification behavior is required.
-- User should provide project/context hints.
+- User should provide project/context hints or answer directly in natural language.
 
 ## Product Boundaries (Current)
 
@@ -185,6 +186,7 @@ In scope now:
 - clarify,
 - regenerate,
 - semantic and keyword search with filters and typeahead,
+- projects and topics cluster browsers,
 - inferred project/topic clustering,
 - note-level reorganization suggestions,
 - changed-meaning reclassification queue,
@@ -196,6 +198,7 @@ Planned next:
 
 - resurfacing forgotten thinking,
 - deeper workflow synthesis across notes,
+- dedicated review surfaces for changed-context notes,
 - optional opt-in global training pipeline with strict privacy controls.
 
 ## Success Criteria for This Workflow

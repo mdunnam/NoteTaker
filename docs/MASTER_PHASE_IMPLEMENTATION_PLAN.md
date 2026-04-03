@@ -1,6 +1,6 @@
 # QNote Master Phase Implementation Plan (Canonical)
 
-This is the single-source implementation and roadmap document for QNote. Every shipped feature, every pending feature, every phase, every spec, every acceptance criterion is here. This document supersedes `IMPLEMENTATION.md`, `PHASE3_IMPLEMENTATION_PLAN.md`, and `USE_CASE_WORKFLOW.md`.
+This is the single-source implementation and roadmap document for QNote. Every shipped feature, every pending feature, every phase, every spec, every acceptance criterion is here. This document supersedes the older implementation summaries in `docs/archive/` and is the canonical source for current delivery status.
 
 AI training policy details are separately documented in `docs/AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md`.
 
@@ -21,7 +21,7 @@ The product target:
 
 The product wins when users say: *"I forgot I even wrote that, and it brought it back because it connected to what I am working on right now."*
 
-## 2. Current Engineering State (2026-04-01)
+## 2. Current Engineering State (2026-04-03)
 
 ### 2.1 Delivery Status
 
@@ -45,6 +45,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Embedding persistence into pgvector-compatible column
 - Semantic ranking with on-the-fly keyword fallback
 - Semantic search page with semantic/keyword mode toggle, filters, typeahead, snippets, and highlighted results
+- Projects and Topics pages backed by inferred knowledge clusters
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
 - Reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
@@ -55,10 +56,16 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 ### 2.2 Current Product Boundary
 
 Shipped:
-- capture, dump capture, dump analysis, organize, clarify, regenerate, keyboard-first triage, AI performance visibility, learn from hint interactions
+- capture, dump capture, dump analysis, organize, clarify, regenerate
+- semantic and keyword search with filters, typeahead, and snippets
+- project/topic browsing from inferred cluster context
+- keyboard-first triage, conversational clarification, and batch clarify
+- note-level reorganization suggestions and changed-meaning queues
+- AI performance visibility and learn-from-hint interactions
 
 Not yet shipped:
-- Full surface depth for Cards, Projects, Topics, Timeline, Favorites, Archive
+- Full surface depth for Cards, Timeline, Favorites, Archive
+- Deeper synthesis layers on top of Projects and Topics views
 - Smart resurfacing
 - Multi-note synthesis
 - Capture from outside the app
@@ -86,7 +93,7 @@ AI produces: title, interpretive summary, intent, next action, priority, extract
 Expected behavior by confidence tier:
 - High confidence: auto-applied. No user action needed.
 - Medium confidence: shown as a suggestion. Quick review recommended.
-- Low confidence: clarification questions appear. User provides a chip hint.
+- Low confidence: clarification questions appear. User provides a chip hint or direct answer.
 
 **Step 3 — Clarification Loop**
 
@@ -119,7 +126,7 @@ When newer notes clarify older work:
 
 On the note detail route:
 - main content shows summary, intent, next action, tasks, confidence state
-- RightPanel shows contextual related notes and note-level guidance
+- RightPanel shows contextual related notes, cluster context, reorganization suggestions, and note-level guidance
 - user understands why the note matters, and what to do next
 
 **Step 6 — Learning Feedback Visibility**
@@ -139,7 +146,8 @@ Morning:
 
 Midday triage:
 - open inbox
-- resolve low-confidence notes with chip hints
+- resolve low-confidence notes with chip hints or direct answers
+- apply any changed-meaning regrouping from the reclassification queue
 - bulk clarify any grouped cluster
 
 Execution:
@@ -160,7 +168,7 @@ Medium confidence:
 - suggestion chips shown. Quick review recommended.
 
 Low confidence:
-- clarification questions shown. User must provide a hint or edit manually.
+- clarification questions shown. User must provide a hint, answer directly, or edit manually.
 
 ### 3.4 Success Criteria for Current Workflow
 
@@ -193,10 +201,10 @@ src/
       inbox/page.tsx                 # Main triage view
       notes/[id]/page.tsx            # Note detail
       cards/page.tsx                 # Card grid (placeholder)
-      projects/page.tsx              # Projects view (placeholder)
-      topics/page.tsx                # Topics view (placeholder)
+      projects/page.tsx              # Project cluster browser
+      topics/page.tsx                # Topic cluster browser
       timeline/page.tsx              # Timeline (placeholder)
-      search/page.tsx                # Search (partial)
+      search/page.tsx                # Search & Ask experience
       favorites/page.tsx             # Favorites (placeholder)
       archive/page.tsx               # Archive (placeholder)
       settings/page.tsx              # Settings + hint analytics
@@ -228,6 +236,7 @@ src/
       Sidebar.tsx
       CaptureBar.tsx
       RightPanel.tsx
+      RightPanelContextual.tsx
     notes/
       ReclassificationQueue.tsx
       NoteCard.tsx
@@ -250,6 +259,7 @@ src/
 
   lib/
     ai.ts                            # organizeNote, splitNote, embedNote
+    clusters.ts                      # cluster inference + reclassification ranking
     enrichNote.ts                    # full enrichment pipeline
     db.ts                            # Prisma client singleton
     userMemory.ts                    # memory CRUD + hint stats
@@ -269,6 +279,8 @@ prisma/
 ### 4.3 Key Files to Know
 
 - `src/lib/ai.ts` — all AI functions: organize, split, embed
+- `src/lib/clusters.ts` — project/topic cluster inference and changed-meaning ranking
+- `src/lib/clarification.ts` — clarification history parsing and transcript building
 - `src/lib/userMemory.ts` — per-user memory buckets and hint telemetry
 - `src/lib/enrichNote.ts` — full pipeline called by the worker
 - `src/app/api/notes/route.ts` — note creation with AI trigger
@@ -350,7 +362,7 @@ Note
   extractedTasks (JSON), extractedDates (JSON), extractedEntities (JSON)
   status (UNPROCESSED | PROCESSING | PROCESSED)
   confidenceScore (0–1), priority (high | medium | low)
-  aiMeta (JSON — intent, nextAction, clarificationQuestions)
+  aiMeta (JSON — intent, nextAction, clarificationQuestions, clarificationHistory, captureMode)
   embedding (vector 1536 — pgvector)
   isArchived, isPinned, isSplitFrom
   collectionId
@@ -367,18 +379,17 @@ Collection
   createdAt, updatedAt
 
 Entity
-  id, userId, name, type, canonical
+  id, userId, type, name, description, permalink
   createdAt, updatedAt
 
 NoteEntity (junction)
-  noteId, entityId, confidence, context
+  id, noteId, entityId, mentionCount, lastMentioned
 
 NoteRelation
-  id, sourceId, targetId, type, strength
-  createdAt
+  id, sourceNoteId, targetNoteId, score, reason, createdAt
 
 ApiKey
-  id, userId, key (hashed), name, lastUsed, createdAt
+  id, userId, name, key, createdAt, updatedAt
 
 UserMetricSnapshot
   id, userId, snapshotDate
@@ -709,7 +720,7 @@ Existing hint effectiveness table stays below this section.
 
 Current state: semantic and keyword search are both available on the `/search` page with filters, snippets, typeahead suggestions, and highlighted result previews.
 
-#### API (update `POST /api/search/semantic`)
+#### API shape in production (`POST /api/search/semantic`)
 
 - Accept: `{ query: string, limit?: number, filters?: { category?, type?, tags? } }`
 - Return: ranked results with similarity score, matched snippet, highlight positions
@@ -717,7 +728,7 @@ Current state: semantic and keyword search are both available on the `/search` p
 
 #### UI
 
-Replace placeholder `/search` page:
+Current `/search` experience:
 
 Search input:
 - Large prominent input at top of page
@@ -751,65 +762,30 @@ Filters sidebar:
 
 ---
 
-### 11.2 Project/Topic Cluster Detection (Must Have — Priority 2)
+### 11.2 Project/Topic Cluster Detection (Shipped Foundation, Deeper Actions Pending)
 
-**Goal**: Detect when 5+ notes share a common theme and suggest a project or topic group.
+**Current state**
 
-#### Detection logic
+QNote already infers project and topic clusters from suggested projects, entity extraction, and tags.
 
-Run on enrichment completion and on a periodic background scan:
-- Group notes by `suggestedProject` and `extractedEntities` of type PROJECT or TOPIC
-- Find clusters where an entity appears in 5+ notes within the last 30 days
-- Score cluster: note count + recency + entity type weight + embedding proximity
-- Emit cluster suggestion when score exceeds threshold
+Shipped behavior:
+- Projects page shows project cluster browsers
+- Topics page shows topic cluster browsers
+- Note detail surfaces cluster context and reorganization suggestions
+- Inbox and right panel surface a changed-meaning reclassification queue
 
-#### API
+**What is still missing**
 
-`GET /api/clusters`
-
-Response:
-```json
-{
-  "clusters": [
-    {
-      "label": "QNote AI",
-      "kind": "project",
-      "noteCount": 9,
-      "strength": 0.87,
-      "noteIds": ["..."],
-      "suggestedAction": "Create project"
-    }
-  ]
-}
-```
-
-`POST /api/clusters/accept`
-- Input: `{ label, kind, noteIds }`
-- Creates a Collection and links all matching notes
-- Returns: `{ collectionId }`
-
-#### UI
-
-RightPanel global section: "Clusters Detected"
-- Top 2–3 candidates shown
-- Each: label + note count + "Create project" button
-- Dismiss option — suppresses that cluster for 7 days
-
-Inbox header: soft suggestion banner for high-strength clusters
-- "You have 7 notes about QNote AI. Group them?"
-- Accept → create collection and link notes
-
-#### Testing
-
-- Capture 8 notes mentioning same project → cluster should appear after enrichment
-- Accept cluster → verify collection created and notes linked
-- Dismiss → verify it suppresses for 7 days
+- Background rescoring immediately after enrichment rather than only on page load
+- Dismiss/snooze controls for noisy reclassification suggestions
+- Persisted cluster review state and dedicated cluster review surfaces
+- One-click “create collection from cluster” acceptance flow
 
 ---
 
 ### 11.3 Right Panel Depth Upgrade (Should Have — Priority 3)
 
-Current state: contextual RightPanel on note detail shows intent, next action, tasks, related notes, clarification questions.
+Current state: contextual RightPanel on note detail shows intent, next action, tasks, related notes, clarification questions, cluster context, reorganization suggestions, and the global panel shows a compact changed-meaning queue.
 
 New sections to add:
 
@@ -831,7 +807,7 @@ New sections to add:
 **Global panel additions (non-detail routes):**
 - Priority queue: top 3 high-priority uncompleted tasks
 - Needs clarification: notes still under 0.5 confidence
-- Cluster suggestions: top detected project/topic candidates
+- Reclassification queue: top changed-meaning notes whose grouping likely improved
 
 ---
 
@@ -1060,9 +1036,14 @@ UI: dedicated `/review` route
 
 ---
 
-### 14.1 Keyboard-First Triage (Should Have — near term)
+### 14.1 Keyboard-First Triage (Shipped Foundation)
 
-See Dump Mode section (10.2) for full keyboard shortcut spec.
+Keyboard-first triage is already available in the inbox via the Dump Mode / triage shortcuts described in section 10.2.
+
+What remains later:
+- broader keyboard coverage outside inbox
+- dedicated review-mode shortcuts
+- optional command palette style note actions
 
 ---
 
@@ -1168,19 +1149,18 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 ### A. Current execution focus
 1. Resurfacing engine (forgotten notes + repeated patterns)
 2. Multi-note synthesis
-3. Deeper cluster actions and broader browsing views
+3. Deeper cluster actions, review pages, and broader browsing views
 
 ### B. Surface completeness
 1. Cards view
-2. Projects view
-3. Topics view
-4. Timeline view
-5. Favorites view (filter + pin management)
-6. Archive view (filter + restore)
-7. Search UX depth, filters, and ranking tuning
+2. Timeline view
+3. Favorites view (filter + pin management)
+4. Archive view (filter + restore)
+5. Projects and Topics synthesis depth
+6. Search ranking tuning and synthesis actions
 
 ### C. Memory payoff
-1. Project/topic cluster detection
+1. Automatic background rescoring and resurfacing after enrichment
 2. Forgotten-note resurfacing
 3. Pattern surfacing
 4. Context-aware resurfacing
@@ -1194,14 +1174,13 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 5. Review mode habit loop
 
 ### E. Capture surfaces
-1. Keyboard-first triage shortcuts
-2. Desktop wrapper + global hotkey (Tauri)
-3. Browser extension
-4. Email-to-note
-5. Clipboard capture
-6. Mobile (iOS/Android)
-7. Voice capture
-8. OCR/screenshot capture
+1. Desktop wrapper + global hotkey (Tauri)
+2. Browser extension
+3. Email-to-note
+4. Clipboard capture
+5. Mobile (iOS/Android)
+6. Voice capture
+7. OCR/screenshot capture
 
 ### F. Platform maturity
 1. OAuth providers
@@ -1330,18 +1309,20 @@ Modify:
 - `src/app/(app)/settings/page.tsx` — instrumentation section
 - `src/app/api/notes/route.ts` — accept dumpMode param
 
-### Phase 4
+### Phase 4 current additions
 
 New:
-- `src/app/api/clusters/route.ts`
-- `src/app/api/clusters/accept/route.ts`
-- `src/app/api/topics/[entity]/page/route.ts`
-- `src/app/(app)/topics/[slug]/page.tsx`
+- `src/lib/clusters.ts`
+- `src/components/notes/ReclassificationQueue.tsx`
 
 Modify:
-- `src/app/(app)/search/page.tsx` — full semantic search UX
-- `src/components/layout/RightPanel.tsx` — unresolved threads + conversion actions
-- `src/components/search/SearchClient.tsx` — filters, typeahead, results
+- `src/app/(app)/projects/page.tsx` — project cluster browser
+- `src/app/(app)/topics/page.tsx` — topic cluster browser
+- `src/app/(app)/search/page.tsx` — semantic search UX
+- `src/components/layout/RightPanel.tsx` — changed-meaning queue
+- `src/components/layout/RightPanelContextual.tsx` — cluster context and regrouping actions
+- `src/components/search/SearchClient.tsx` — filters, typeahead, highlighted results
+- `src/components/notes/InboxStream.tsx` — reclassification queue above triage stream
 
 ### Phase 5
 

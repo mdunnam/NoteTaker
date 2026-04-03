@@ -37,9 +37,9 @@ Collect only what is necessary for model improvement:
 - AI output metadata
 - predicted category/type/priority, confidence score
 - User correction signals
-- chip clicks, manual project/context/category edits, regenerate actions, acceptance/rejection patterns
+- chip clicks, freeform clarification answers, manual project/context/category edits, regenerate actions, reclassification-queue apply actions, acceptance/rejection patterns
 - Outcome signal
-- confidence lift, reduction in clarification count, time-to-resolution
+- confidence lift, reduction in clarification count, time-to-resolution, reclassification acceptance rate
 
 Avoid collecting unnecessary raw note text unless explicitly included in consent scope.
 
@@ -81,8 +81,10 @@ Phase 1: Consent foundation
 Phase 2: Training event pipeline
 - Emit training events from:
   - hint chip usage
+  - freeform clarification answers and follow-up clarification turns
   - note edits after AI output
   - regeneration actions
+  - reclassification queue apply actions
   - split acceptance/rejection decisions
 - Build de-identification transform and retention policy.
 
@@ -104,9 +106,11 @@ Phase 4: Controlled production rollout
 
 Primary quality metrics:
 - Clarification rate per processed note
+- Clarification turns to resolution
 - Confidence lift after user interaction
 - Manual correction rate after AI organization
 - Time-to-resolved classification
+- Reclassification suggestion acceptance rate
 
 Safety metrics:
 - PII leakage checks in export samples
@@ -136,7 +140,8 @@ Before enabling any training job:
   - split-vs-no-split classifier
 - Current product already captures useful non-training signals:
   - hint effectiveness and confidence lift
-  - clarification conversion and time-to-resolution
+  - clarification conversion, freeform clarification history, and time-to-resolution
+  - changed-meaning reclassification suggestions and apply actions
   - daily AI performance snapshots for dashboard history
 - These signals are useful for evaluation and future training design, but they are not yet gated by opt-in consent.
 - Training consent, event export, deletion flows, and de-identification remain unimplemented.

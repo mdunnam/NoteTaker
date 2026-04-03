@@ -7,6 +7,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - [Master Phase Implementation Plan](docs/MASTER_PHASE_IMPLEMENTATION_PLAN.md)
 - [AI Training Opt-In Plan](docs/AI_TRAINING_OPTIN_IMPLEMENTATION_PLAN.md)
 - [Intended User Workflow](docs/USE_CASE_WORKFLOW.md)
+- Historical planning snapshots live under `docs/archive/`
 
 ## Features
 
@@ -14,7 +15,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Foundation**: Next.js 14 + TypeScript + Tailwind CSS
 - **Database**: Prisma ORM + Vercel Postgres with pgvector
 - **Auth**: NextAuth.js with email/password
-- **AI**: Vercel AI SDK + OpenAI GPT-5.4
+- **AI**: OpenAI SDK + GPT-5.4 organization pipeline
 
 ### Phase 2 ✅ (Implemented)
 - **Capture**: Universal capture bar at top of app
@@ -39,17 +40,17 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **AI performance dashboard**: Settings page shows confidence, clarification rate, trend deltas, and 30-day sparkline history
 - **Reclassification queue**: Surfaces notes whose project/category meaning changed based on newer linked context and lets you apply suggestions in batches
 
-### Phase 4 ⏳ (Placeholder pages created)
-- Card, Project, Topic, Timeline, Search views
+### Phase 4 🚧 (Knowledge browsing foundation shipped)
+- Search, Projects, and Topics now have real cluster/search behavior
 - Semantic search UX with filters, snippets, and typeahead
-- Project/topic clustering with cross-note grouping and reorganization suggestions
+- Project/topic clustering with browsable grouped notes and reorganization suggestions
 - Reclassification queue for changed-meaning notes in inbox and right panel
-- Broader workflow intelligence
+- Cards, Timeline, Favorites, and Archive still need deeper product depth
 
 ### Phase 5+ 📋
 - Resurface old notes
-- Related notes detection
-- Note health widget
+- Multi-note synthesis and planning outputs
+- Review and resurfacing workflows
 - Desktop (Tauri) and iOS (Capacitor) wrappers
 
 ## Quick Start
@@ -112,18 +113,24 @@ src/
     (app)/                  # Protected routes with layout
       layout.tsx            # App shell (sidebar, capture bar, right panel)
       inbox/page.tsx        # Main inbox view
-      cards/page.tsx        # Card grid view
-      projects/page.tsx     # Project-grouped view
+      cards/page.tsx        # Card grid view (still shallow)
+      projects/page.tsx     # Project cluster browser
+      topics/page.tsx       # Topic cluster browser
+      search/page.tsx       # Search & Ask experience
       ... (other views)
     api/
       notes/route.ts        # CRUD endpoints for notes
       notes/[id]/route.ts   # Single note operations
       notes/[id]/clarify/route.ts  # Conversational clarification for one note
+      notes/[id]/insights/route.ts # Related/contextual note intelligence
       notes/[id]/split/route.ts    # Split single note into multiple cards
       notes/[id]/summary/route.ts  # Regenerate AI summary for a note
       notes/analyze-dump/route.ts  # Analyze raw dump into note previews
       notes/analyze-dump/confirm/route.ts  # Create reviewed dump notes
+      search/semantic/route.ts  # Semantic + keyword search
+      search/ask/route.ts       # Ask across note corpus
       user/stats/route.ts   # AI performance dashboard metrics
+      user/hint-stats/route.ts # Hint effectiveness analytics
       worker/metric-snapshots/route.ts  # Metric snapshot backfill worker
       auth/signup/route.ts  # User signup
     login/page.tsx          # Login page
@@ -135,21 +142,29 @@ src/
       Sidebar.tsx           # Navigation sidebar
       CaptureBar.tsx        # Universal capture input
       RightPanel.tsx        # AI insights panel
+      RightPanelContextual.tsx # Note-detail context widgets
     notes/
       NoteCard.tsx          # Individual note display
       InboxStream.tsx       # Note list view
       ClarificationLoop.tsx # Shared conversational clarification UI
+      ReclassificationQueue.tsx # Batch apply changed-meaning regrouping
+      SplitNoteModal.tsx    # Split preview/create modal
       DumpModal.tsx         # Organize This Dump modal
     settings/
+      SettingsClient.tsx    # Settings page client shell
+      HintEffectivenessPanel.tsx # Per-hint lift table
       AIPerformancePanel.tsx  # AI instrumentation dashboard cards
 
   lib/
     db.ts                   # Prisma client singleton
     ai.ts                   # AI utilities (organize, embed, split)
     clarification.ts        # aiMeta clarification parsing + transcript helpers
+    clusters.ts             # Project/topic clustering + reclassification ranking
+    userMemory.ts           # Per-user memory profile and hint telemetry
+    searchRanking.ts        # Keyword/semantic ranking helpers
     userStats.ts            # AI performance metrics + snapshot history
 
-  db/
+  prisma/
     schema.prisma           # Data model
 
   auth.ts                   # NextAuth configuration
@@ -177,6 +192,7 @@ src/
 - `confidenceScore`: How confident the AI is (0-1)
 - `status`: UNPROCESSED → PROCESSING → PROCESSED
 - `embedding`: Vector for semantic search (pgvector)
+- `aiMeta`: Intent, next action, clarification questions/history, dump-mode capture hints
 
 ## Phase Breakdown
 
@@ -211,17 +227,18 @@ src/
 - [x] AI performance dashboard with trend deltas and 30-day sparkline history
 - [x] Daily metric snapshots + snapshot backfill worker
 
-### Phase 4: Views & Search ⏳
-- [x] Placeholder pages for all views
+### Phase 4: Knowledge Browsing & Search 🚧
 - [x] Semantic search UX with filters, snippets, and typeahead
+- [x] Projects view backed by inferred project clusters
+- [x] Topics view backed by inferred topic clusters
 - [x] Project/topic clustering with browsable grouped notes
 - [x] Note-level reorganization suggestions from shared topic/project context
 - [x] Reclassification queue with batch apply for changed-meaning notes
-- [ ] Implement Card, Project, Topic, Timeline views
+- [ ] Implement deeper Cards and Timeline views
+- [ ] Deepen Favorites and Archive views
 - [ ] Broader RightPanel guidance and cluster actions
 
 ### Phase 5: Resurface ⏳
-- [ ] Related notes computation
 - [ ] Note health widget
 - [ ] Recurring idea detection
 - [ ] Forgotten-note resurfacing and pattern surfacing
@@ -267,7 +284,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 - **Database**: Vercel Postgres free tier (3GB)
 - **OpenAI API**: ~$0.15-0.50/month for typical usage
-- **Hosting**: Vercel free tier (includes 12 serverless invocations/month)
+- **Hosting**: Vercel Hobby tier or equivalent
 
 ### Testing AI Organization
 
@@ -281,13 +298,13 @@ organizeNote('call jim about invoices, look into unreal plugin crash, daughter n
 
 ## Roadmap
 
-- [ ] Phase 4: Deepen clustering, resurfacing, and broader browsing views
-- [ ] Phase 5: Resurface old notes intelligently
-- [ ] Phase 6: Desktop app via Tauri
-- [ ] Phase 7: iOS app via Capacitor
-- [ ] Phase 8: Team sharing & multi-user
-- [ ] Phase 9: Offline-first with local sync
-- [ ] Phase 10: Knowledge graph & visualization
+- [ ] Phase 5: Build resurfacing and review workflows
+- [ ] Phase 6: Add synthesis, planning, and multi-note outputs
+- [ ] Phase 7: Desktop app via Tauri
+- [ ] Phase 8: iOS app via Capacitor
+- [ ] Phase 9: Team sharing & multi-user
+- [ ] Phase 10: Offline-first with local sync
+- [ ] Phase 11: Knowledge graph & visualization
 
 ## Contributing
 
