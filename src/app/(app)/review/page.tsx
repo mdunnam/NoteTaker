@@ -1,11 +1,12 @@
 import { auth } from "@/auth";
 import ClarificationLoop from "@/components/notes/ClarificationLoop";
+import ReviewSuppressionActions from "@/components/review/ReviewSuppressionActions";
 import ReclassificationQueue from "@/components/notes/ReclassificationQueue";
 import { getUserReclassificationCandidates } from "@/lib/clusters";
 import { getConfidenceBadgeConfig } from "@/lib/confidence";
 import { prisma } from "@/lib/db";
 import { getUserForgottenNoteCandidates, getUserReviewPatterns } from "@/lib/resurfacing";
-import { getThinkingMemory, getThinkingMemoryHints } from "@/lib/userMemory";
+import { getThinkingMemory, getThinkingMemoryHints, isReviewItemSuppressed } from "@/lib/userMemory";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -47,7 +48,13 @@ export default async function ReviewPage() {
   ]);
 
   const quickHints = getThinkingMemoryHints(thinkingMemory);
-  const totalReviewItems = lowConfidenceNotes.length + reclassificationCandidates.length + forgottenCandidates.length + reviewPatterns.length;
+  const visibleForgottenCandidates = forgottenCandidates.filter(
+    (candidate) => !isReviewItemSuppressed(thinkingMemory.reviewState, "forgotten-note", candidate.note.id)
+  );
+  const visibleReviewPatterns = reviewPatterns.filter(
+    (pattern) => !isReviewItemSuppressed(thinkingMemory.reviewState, "pattern", pattern.id)
+  );
+  const totalReviewItems = lowConfidenceNotes.length + reclassificationCandidates.length + visibleForgottenCandidates.length + visibleReviewPatterns.length;
 
   return (
     <div className="p-6">
@@ -79,7 +86,7 @@ export default async function ReviewPage() {
 
         <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Resurface</p>
-          <p className="mt-2 text-2xl font-bold text-indigo-900">{forgottenCandidates.length + reviewPatterns.length}</p>
+          <p className="mt-2 text-2xl font-bold text-indigo-900">{visibleForgottenCandidates.length + visibleReviewPatterns.length}</p>
           <p className="mt-1 text-xs text-indigo-800">Forgotten notes and recurring patterns worth revisiting now.</p>
         </div>
       </div>
@@ -174,7 +181,7 @@ export default async function ReviewPage() {
             </section>
           )}
 
-          {forgottenCandidates.length > 0 && (
+          {visibleForgottenCandidates.length > 0 && (
             <section className="space-y-3">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Forgotten Notes</h2>
@@ -184,7 +191,7 @@ export default async function ReviewPage() {
               </div>
 
               <div className="space-y-3">
-                {forgottenCandidates.map((candidate) => (
+                {visibleForgottenCandidates.map((candidate) => (
                   <article key={candidate.note.id} className="rounded-xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
@@ -216,13 +223,14 @@ export default async function ReviewPage() {
                     </div>
 
                     <p className="mt-3 text-sm text-indigo-900">{candidate.reason}</p>
+                    <ReviewSuppressionActions kind="forgotten-note" targetId={candidate.note.id} />
                   </article>
                 ))}
               </div>
             </section>
           )}
 
-          {reviewPatterns.length > 0 && (
+          {visibleReviewPatterns.length > 0 && (
             <section className="space-y-3">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Repeated Patterns</h2>
@@ -232,7 +240,7 @@ export default async function ReviewPage() {
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                {reviewPatterns.map((pattern) => (
+                {visibleReviewPatterns.map((pattern) => (
                   <article key={pattern.id} className="rounded-xl border border-purple-200 bg-purple-50 p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -268,6 +276,8 @@ export default async function ReviewPage() {
                         </li>
                       ))}
                     </ul>
+
+                    <ReviewSuppressionActions kind="pattern" targetId={pattern.id} />
                   </article>
                 ))}
               </div>

@@ -50,6 +50,10 @@ describe("/api/notes/analyze-dump POST", () => {
       knownPeople: [],
       knownTopics: [],
       hintStats: [],
+      reviewState: {
+        forgottenNotes: [],
+        patterns: [],
+      },
     } as never);
     mockedBuildPrompt.mockReturnValue("Known projects: (none)");
   });

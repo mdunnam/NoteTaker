@@ -48,6 +48,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Projects and Topics pages backed by inferred knowledge clusters
 - Dedicated Review route combining low-confidence clarification and changed-meaning regrouping
 - Forgotten-note resurfacing and repeated-pattern review cards on the Review route
+- Persisted snooze/dismiss review-state for forgotten-note and pattern cards
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
 - Background-rescored reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
@@ -63,6 +64,7 @@ Shipped:
 - project/topic browsing from inferred cluster context
 - keyboard-first triage, conversational clarification, and batch clarify
 - dedicated review surface for clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
+- persisted snooze/dismiss state for resurfacing review items
 - note-level reorganization suggestions and changed-meaning queues
 - AI performance visibility and learn-from-hint interactions
 
@@ -134,6 +136,7 @@ When the user wants one place to process system-generated work:
 - repeated-pattern cards show when recent notes keep circling the same theme
 - clarification can happen directly from the review page
 - regrouping suggestions can be applied in batches
+- forgotten-note and pattern cards can be snoozed or dismissed for a time window
 - future resurfacing queues and synthesis actions will plug into the same surface
 
 **Step 5 — Contextual Review in Note Detail**
@@ -234,6 +237,7 @@ src/
       notes/analyze-dump/route.ts    # POST analyze raw dump into note previews
       notes/analyze-dump/confirm/route.ts # POST create selected reviewed dump notes
       notes/[id]/insights/route.ts   # GET contextual note insights
+      review/state/route.ts          # POST snooze/dismiss review items
       search/semantic/route.ts       # POST semantic search
       search/ask/route.ts            # POST conversational ask
       auth/signup/route.ts           # POST create user
@@ -337,6 +341,11 @@ POST   /api/search/ask               Conversational question against note corpus
 PATCH  /api/user                     Update profile (name)
 GET    /api/user/hint-stats          Get per-hint usage and confidence lift stats
 GET    /api/user/stats               Get AI performance dashboard metrics, trends, and history
+```
+
+### Review
+```
+POST   /api/review/state             Persist snooze/dismiss windows for review items
 ```
 
 ### Collections

@@ -88,6 +88,10 @@ describe("enrichNote", () => {
       knownPeople: [],
       knownTopics: [],
       hintStats: [],
+      reviewState: {
+        forgottenNotes: [],
+        patterns: [],
+      },
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);

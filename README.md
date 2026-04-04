@@ -40,6 +40,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **AI performance dashboard**: Settings page shows confidence, clarification rate, trend deltas, and 30-day sparkline history
 - **Reclassification queue**: Background-rescored after enrichment, surfaces notes whose project/category meaning changed based on newer linked context, and lets you apply suggestions in batches
 - **Review page**: Dedicated workflow surface for low-confidence clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
+- **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
 
 ### Phase 4 🚧 (Knowledge browsing foundation shipped)
 - Search, Projects, and Topics now have real cluster/search behavior
@@ -131,6 +132,7 @@ src/
       notes/analyze-dump/confirm/route.ts  # Create reviewed dump notes
       search/semantic/route.ts  # Semantic + keyword search
       search/ask/route.ts       # Ask across note corpus
+      review/state/route.ts     # Persist snooze/dismiss review actions
       user/stats/route.ts   # AI performance dashboard metrics
       user/hint-stats/route.ts # Hint effectiveness analytics
       worker/metric-snapshots/route.ts  # Metric snapshot backfill worker
@@ -244,6 +246,7 @@ src/
 ### Phase 5: Resurface ⏳
 - [x] Forgotten-note resurfacing in Review
 - [x] Repeated-pattern review cards in Review
+- [x] Snooze/dismiss review-state persistence for resurfacing items
 - [ ] Note health widget
 - [ ] Recurring idea detection beyond review heuristics
 - [ ] Broader resurfacing across inbox, right panel, and notifications

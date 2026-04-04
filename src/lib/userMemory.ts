@@ -15,12 +15,25 @@ interface HintStat {
   lastUsed: string;
 }
 
+export type ReviewSuppressionKind = "forgotten-note" | "pattern";
+
+interface ReviewSuppression {
+  id: string;
+  until: string;
+}
+
+export interface ReviewState {
+  forgottenNotes: ReviewSuppression[];
+  patterns: ReviewSuppression[];
+}
+
 interface ThinkingMemory {
   knownProjects: MemoryItem[];
   knownContexts: MemoryItem[];
   knownPeople: MemoryItem[];
   knownTopics: MemoryItem[];
   hintStats: HintStat[];
+  reviewState: ReviewState;
 }
 
 export type { HintStat };
@@ -42,6 +55,7 @@ interface UpdateThinkingMemoryOptions {
 }
 
 const MAX_ITEMS_PER_BUCKET = 20;
+const MAX_REVIEW_SUPPRESSIONS_PER_KIND = 100;
 
 function normalizeName(value: string): string {
   return value.trim().replace(/\s+/g, " ");
@@ -90,6 +104,10 @@ function emptyMemory(): ThinkingMemory {
     knownPeople: [],
     knownTopics: [],
     hintStats: [],
+    reviewState: {
+      forgottenNotes: [],
+      patterns: [],
+    },
   };
 }
 
@@ -104,6 +122,81 @@ function parseHintStats(value: unknown): HintStat[] {
       typeof item.totalConfidenceLift === "number" &&
       typeof item.lastUsed === "string"
     );
+  });
+}
+
+function parseReviewSuppressions(value: unknown): ReviewSuppression[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is ReviewSuppression => {
+      if (!isRecord(item)) {
+        return false;
+      }
+
+      return typeof item.id === "string" && item.id.trim().length > 0 && typeof item.until === "string" && item.until.length > 0;
+    })
+    .slice(0, MAX_REVIEW_SUPPRESSIONS_PER_KIND);
+}
+
+function parseReviewState(value: unknown): ReviewState {
+  if (!isRecord(value)) {
+    return {
+      forgottenNotes: [],
+      patterns: [],
+    };
+  }
+
+  return {
+    forgottenNotes: parseReviewSuppressions(value.forgottenNotes),
+    patterns: parseReviewSuppressions(value.patterns),
+  };
+}
+
+function pruneReviewSuppressions(items: ReviewSuppression[], now = new Date()): ReviewSuppression[] {
+  return items
+    .filter((item) => {
+      const until = new Date(item.until);
+      return !Number.isNaN(until.getTime()) && until.getTime() > now.getTime();
+    })
+    .slice(0, MAX_REVIEW_SUPPRESSIONS_PER_KIND);
+}
+
+function pruneReviewState(reviewState: ReviewState, now = new Date()): ReviewState {
+  return {
+    forgottenNotes: pruneReviewSuppressions(reviewState.forgottenNotes, now),
+    patterns: pruneReviewSuppressions(reviewState.patterns, now),
+  };
+}
+
+async function persistThinkingMemory(userId: string, memory: ThinkingMemory): Promise<void> {
+  const reviewState = pruneReviewState(memory.reviewState);
+
+  await prisma.userPreferences.upsert({
+    where: { userId },
+    create: {
+      userId,
+      thinkingMemory: {
+        knownProjects: memory.knownProjects,
+        knownContexts: memory.knownContexts,
+        knownPeople: memory.knownPeople,
+        knownTopics: memory.knownTopics,
+        hintStats: memory.hintStats,
+        reviewState,
+      } as unknown as Prisma.InputJsonValue,
+    },
+    update: {
+      thinkingMemory: {
+        knownProjects: memory.knownProjects,
+        knownContexts: memory.knownContexts,
+        knownPeople: memory.knownPeople,
+        knownTopics: memory.knownTopics,
+        hintStats: memory.hintStats,
+        reviewState,
+      } as unknown as Prisma.InputJsonValue,
+    },
   });
 }
 
@@ -127,6 +220,7 @@ export async function getThinkingMemory(userId: string): Promise<ThinkingMemory>
     knownPeople: parseMemoryBucket(raw.knownPeople),
     knownTopics: parseMemoryBucket(raw.knownTopics),
     hintStats: parseHintStats(raw.hintStats),
+    reviewState: pruneReviewState(parseReviewState(raw.reviewState)),
   };
 }
 
@@ -239,27 +333,13 @@ export async function updateThinkingMemory(
 
   const hintStats = [...current.hintStats];
 
-  await prisma.userPreferences.upsert({
-    where: { userId },
-    create: {
-      userId,
-      thinkingMemory: {
-        knownProjects,
-        knownContexts,
-        knownPeople,
-        knownTopics,
-        hintStats,
-      } as unknown as Prisma.InputJsonValue,
-    },
-    update: {
-      thinkingMemory: {
-        knownProjects,
-        knownContexts,
-        knownPeople,
-        knownTopics,
-        hintStats,
-      } as unknown as Prisma.InputJsonValue,
-    },
+  await persistThinkingMemory(userId, {
+    knownProjects,
+    knownContexts,
+    knownPeople,
+    knownTopics,
+    hintStats,
+    reviewState: current.reviewState,
   });
 }
 
@@ -298,21 +378,9 @@ export async function recordHintUsage(
   stats.sort((a, b) => b.uses - a.uses);
   stats.splice(50);
 
-  await prisma.userPreferences.upsert({
-    where: { userId },
-    create: {
-      userId,
-      thinkingMemory: {
-        ...current,
-        hintStats: stats,
-      } as unknown as Prisma.InputJsonValue,
-    },
-    update: {
-      thinkingMemory: {
-        ...current,
-        hintStats: stats,
-      } as unknown as Prisma.InputJsonValue,
-    },
+  await persistThinkingMemory(userId, {
+    ...current,
+    hintStats: stats,
   });
 }
 
@@ -324,4 +392,52 @@ export async function getHintStats(userId: string): Promise<HintStat[]> {
   return memory.hintStats
     .filter((s) => s.uses > 0)
     .sort((a, b) => b.uses - a.uses);
+}
+
+/** Return whether a review item is currently suppressed. */
+export function isReviewItemSuppressed(
+  reviewState: ReviewState,
+  kind: ReviewSuppressionKind,
+  id: string,
+  now = new Date()
+): boolean {
+  const items = kind === "forgotten-note" ? reviewState.forgottenNotes : reviewState.patterns;
+
+  return items.some((item) => {
+    if (item.id !== id) {
+      return false;
+    }
+
+    const until = new Date(item.until);
+    return !Number.isNaN(until.getTime()) && until.getTime() > now.getTime();
+  });
+}
+
+/**
+ * Persist a review-item suppression window so snoozed or dismissed items stay out of the queue.
+ */
+export async function suppressReviewItem(
+  userId: string,
+  kind: ReviewSuppressionKind,
+  id: string,
+  durationDays: number
+): Promise<string> {
+  const current = await getThinkingMemory(userId);
+  const until = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+  const reviewState = pruneReviewState(current.reviewState);
+  const key = kind === "forgotten-note" ? "forgottenNotes" : "patterns";
+  const nextItems = reviewState[key]
+    .filter((item) => item.id !== id)
+    .concat({ id, until })
+    .slice(0, MAX_REVIEW_SUPPRESSIONS_PER_KIND);
+
+  await persistThinkingMemory(userId, {
+    ...current,
+    reviewState: {
+      ...reviewState,
+      [key]: nextItems,
+    },
+  });
+
+  return until;
 }
