@@ -20,6 +20,7 @@ export type ReviewSuppressionKind = "forgotten-note" | "pattern";
 interface ReviewSuppression {
   id: string;
   until: string;
+  label?: string;
 }
 
 export interface ReviewState {
@@ -136,7 +137,13 @@ function parseReviewSuppressions(value: unknown): ReviewSuppression[] {
         return false;
       }
 
-      return typeof item.id === "string" && item.id.trim().length > 0 && typeof item.until === "string" && item.until.length > 0;
+      return (
+        typeof item.id === "string" &&
+        item.id.trim().length > 0 &&
+        typeof item.until === "string" &&
+        item.until.length > 0 &&
+        (item.label === undefined || typeof item.label === "string")
+      );
     })
     .slice(0, MAX_REVIEW_SUPPRESSIONS_PER_KIND);
 }
@@ -420,7 +427,8 @@ export async function suppressReviewItem(
   userId: string,
   kind: ReviewSuppressionKind,
   id: string,
-  durationDays: number
+  durationDays: number,
+  label?: string
 ): Promise<string> {
   const current = await getThinkingMemory(userId);
   const until = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
@@ -428,7 +436,7 @@ export async function suppressReviewItem(
   const key = kind === "forgotten-note" ? "forgottenNotes" : "patterns";
   const nextItems = reviewState[key]
     .filter((item) => item.id !== id)
-    .concat({ id, until })
+    .concat({ id, until, ...(label ? { label } : {}) })
     .slice(0, MAX_REVIEW_SUPPRESSIONS_PER_KIND);
 
   await persistThinkingMemory(userId, {
@@ -440,4 +448,23 @@ export async function suppressReviewItem(
   });
 
   return until;
+}
+
+/** Remove a persisted review-item suppression so it can reappear immediately. */
+export async function restoreReviewItem(
+  userId: string,
+  kind: ReviewSuppressionKind,
+  id: string
+): Promise<void> {
+  const current = await getThinkingMemory(userId);
+  const reviewState = pruneReviewState(current.reviewState);
+  const key = kind === "forgotten-note" ? "forgottenNotes" : "patterns";
+
+  await persistThinkingMemory(userId, {
+    ...current,
+    reviewState: {
+      ...reviewState,
+      [key]: reviewState[key].filter((item) => item.id !== id),
+    },
+  });
 }

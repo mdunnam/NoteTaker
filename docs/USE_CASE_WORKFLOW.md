@@ -111,6 +111,7 @@ When the user wants one place to process system-generated work:
 - clarification can happen directly from the review page,
 - regrouping suggestions can be applied in batches,
 - forgotten-note and pattern cards can be snoozed or dismissed for a time window,
+- suppressed review items remain visible as a recoverable count and can be restored directly from Review,
 - this becomes the foundation for deeper resurfacing and synthesis.
 
 ### Step 5: Contextual Review in Note Detail + RightPanel

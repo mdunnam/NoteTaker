@@ -49,6 +49,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Dedicated Review route combining low-confidence clarification and changed-meaning regrouping
 - Forgotten-note resurfacing and repeated-pattern review cards on the Review route
 - Persisted snooze/dismiss review-state for forgotten-note and pattern cards
+- Suppressed-item counts and restore actions on the Review route
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
 - Background-rescored reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
@@ -65,6 +66,7 @@ Shipped:
 - keyboard-first triage, conversational clarification, and batch clarify
 - dedicated review surface for clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
 - persisted snooze/dismiss state for resurfacing review items
+- suppressed-item counts and restore controls in Review
 - note-level reorganization suggestions and changed-meaning queues
 - AI performance visibility and learn-from-hint interactions
 
@@ -137,6 +139,7 @@ When the user wants one place to process system-generated work:
 - clarification can happen directly from the review page
 - regrouping suggestions can be applied in batches
 - forgotten-note and pattern cards can be snoozed or dismissed for a time window
+- suppressed review items remain visible as a recoverable count and can be restored directly from Review
 - future resurfacing queues and synthesis actions will plug into the same surface
 
 **Step 5 — Contextual Review in Note Detail**
@@ -345,7 +348,7 @@ GET    /api/user/stats               Get AI performance dashboard metrics, trend
 
 ### Review
 ```
-POST   /api/review/state             Persist snooze/dismiss windows for review items
+POST   /api/review/state             Persist snooze/dismiss/restore actions for review items
 ```
 
 ### Collections

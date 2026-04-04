@@ -11,16 +11,18 @@ vi.mock("@/lib/rateLimit", () => ({
 
 vi.mock("@/lib/userMemory", () => ({
   suppressReviewItem: vi.fn(),
+  restoreReviewItem: vi.fn(),
 }));
 
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { suppressReviewItem } from "@/lib/userMemory";
+import { restoreReviewItem, suppressReviewItem } from "@/lib/userMemory";
 import { POST } from "./route";
 
 const mockedAuth = vi.mocked(auth);
 const mockedCheckRateLimit = vi.mocked(checkRateLimit);
 const mockedSuppressReviewItem = vi.mocked(suppressReviewItem);
+const mockedRestoreReviewItem = vi.mocked(restoreReviewItem);
 
 function makeRequest(body: unknown) {
   return new NextRequest("http://localhost/api/review/state", {
@@ -35,6 +37,7 @@ describe("/api/review/state POST", () => {
     vi.clearAllMocks();
     mockedCheckRateLimit.mockReturnValue({ ok: true });
     mockedSuppressReviewItem.mockResolvedValue("2026-04-11T00:00:00.000Z");
+    mockedRestoreReviewItem.mockResolvedValue(undefined);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -56,12 +59,12 @@ describe("/api/review/state POST", () => {
   it("persists snooze windows for forgotten-note review items", async () => {
     mockedAuth.mockResolvedValue({ user: { id: "u1" } } as never);
 
-    const response = await POST(makeRequest({ kind: "forgotten-note", targetId: "n1", action: "snooze" }));
+    const response = await POST(makeRequest({ kind: "forgotten-note", targetId: "n1", action: "snooze", label: "Old task note" }));
     const payload = (await response.json()) as { action: string; until: string };
 
     expect(response.status).toBe(200);
     expect(payload.action).toBe("snooze");
-    expect(mockedSuppressReviewItem).toHaveBeenCalledWith("u1", "forgotten-note", "n1", 7);
+    expect(mockedSuppressReviewItem).toHaveBeenCalledWith("u1", "forgotten-note", "n1", 7, "Old task note");
   });
 
   it("persists dismiss windows for pattern review items", async () => {
@@ -70,6 +73,15 @@ describe("/api/review/state POST", () => {
     const response = await POST(makeRequest({ kind: "pattern", targetId: "topic:downtime", action: "dismiss" }));
 
     expect(response.status).toBe(200);
-    expect(mockedSuppressReviewItem).toHaveBeenCalledWith("u1", "pattern", "topic:downtime", 30);
+    expect(mockedSuppressReviewItem).toHaveBeenCalledWith("u1", "pattern", "topic:downtime", 30, undefined);
+  });
+
+  it("restores previously suppressed review items", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "u1" } } as never);
+
+    const response = await POST(makeRequest({ kind: "pattern", targetId: "topic:downtime", action: "restore" }));
+
+    expect(response.status).toBe(200);
+    expect(mockedRestoreReviewItem).toHaveBeenCalledWith("u1", "pattern", "topic:downtime");
   });
 });

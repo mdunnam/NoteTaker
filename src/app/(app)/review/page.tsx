@@ -10,6 +10,14 @@ import { getThinkingMemory, getThinkingMemoryHints, isReviewItemSuppressed } fro
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+interface SuppressedReviewItem {
+  id: string;
+  label: string;
+  kind: "forgotten-note" | "pattern";
+  until: string;
+  href?: string;
+}
+
 /**
  * Dedicated review surface for low-confidence notes and changed-meaning regrouping suggestions.
  */
@@ -54,6 +62,23 @@ export default async function ReviewPage() {
   const visibleReviewPatterns = reviewPatterns.filter(
     (pattern) => !isReviewItemSuppressed(thinkingMemory.reviewState, "pattern", pattern.id)
   );
+  const suppressedCount =
+    thinkingMemory.reviewState.forgottenNotes.length + thinkingMemory.reviewState.patterns.length;
+  const suppressedReviewItems: SuppressedReviewItem[] = [
+    ...thinkingMemory.reviewState.forgottenNotes.map((item) => ({
+      id: item.id,
+      label: item.label || `Suppressed note ${item.id}`,
+      kind: "forgotten-note" as const,
+      until: item.until,
+      href: `/notes/${item.id}`,
+    })),
+    ...thinkingMemory.reviewState.patterns.map((item) => ({
+      id: item.id,
+      label: item.label || `Suppressed pattern ${item.id}`,
+      kind: "pattern" as const,
+      until: item.until,
+    })),
+  ].sort((left, right) => new Date(left.until).getTime() - new Date(right.until).getTime());
   const totalReviewItems = lowConfidenceNotes.length + reclassificationCandidates.length + visibleForgottenCandidates.length + visibleReviewPatterns.length;
 
   return (
@@ -65,7 +90,7 @@ export default async function ReviewPage() {
         </p>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Total review items</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">{totalReviewItems}</p>
@@ -89,9 +114,15 @@ export default async function ReviewPage() {
           <p className="mt-2 text-2xl font-bold text-indigo-900">{visibleForgottenCandidates.length + visibleReviewPatterns.length}</p>
           <p className="mt-1 text-xs text-indigo-800">Forgotten notes and recurring patterns worth revisiting now.</p>
         </div>
+
+        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Suppressed</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">{suppressedCount}</p>
+          <p className="mt-1 text-xs text-gray-600">Snoozed or dismissed review items hidden until restored or expiry.</p>
+        </div>
       </div>
 
-      {totalReviewItems === 0 ? (
+      {totalReviewItems === 0 && suppressedCount === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">Review queue clear</h2>
           <p className="mt-2 text-sm text-gray-600">
@@ -223,7 +254,11 @@ export default async function ReviewPage() {
                     </div>
 
                     <p className="mt-3 text-sm text-indigo-900">{candidate.reason}</p>
-                    <ReviewSuppressionActions kind="forgotten-note" targetId={candidate.note.id} />
+                    <ReviewSuppressionActions
+                      kind="forgotten-note"
+                      targetId={candidate.note.id}
+                      label={candidate.note.title || "Untitled note"}
+                    />
                   </article>
                 ))}
               </div>
@@ -277,7 +312,55 @@ export default async function ReviewPage() {
                       ))}
                     </ul>
 
-                    <ReviewSuppressionActions kind="pattern" targetId={pattern.id} />
+                    <ReviewSuppressionActions kind="pattern" targetId={pattern.id} label={pattern.label} />
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {suppressedReviewItems.length > 0 && (
+            <section className="space-y-3">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Suppressed In Review</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  These items are currently hidden because they were snoozed or dismissed. Restore them here if you want them back in the queue immediately.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {suppressedReviewItems.map((item) => (
+                  <article key={`${item.kind}-${item.id}`} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        {item.href ? (
+                          <Link href={item.href} className="text-base font-semibold text-gray-900 hover:text-blue-700 hover:underline">
+                            {item.label}
+                          </Link>
+                        ) : (
+                          <h3 className="text-base font-semibold text-gray-900">{item.label}</h3>
+                        )}
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                          <span className={`rounded-full px-2 py-0.5 ${item.kind === "forgotten-note" ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
+                            {item.kind === "forgotten-note" ? "forgotten note" : "pattern"}
+                          </span>
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
+                            Hidden until {new Date(item.until).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <ReviewSuppressionActions
+                      kind={item.kind}
+                      targetId={item.id}
+                      label={item.label}
+                      actions={["restore"]}
+                    />
                   </article>
                 ))}
               </div>

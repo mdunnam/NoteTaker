@@ -1,13 +1,14 @@
 import { auth } from "@/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { suppressReviewItem } from "@/lib/userMemory";
+import { restoreReviewItem, suppressReviewItem } from "@/lib/userMemory";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const ReviewStateSchema = z.object({
   kind: z.enum(["forgotten-note", "pattern"]),
   targetId: z.string().min(1).max(200),
-  action: z.enum(["snooze", "dismiss"]),
+  action: z.enum(["snooze", "dismiss", "restore"]),
+  label: z.string().min(1).max(180).optional(),
 });
 
 const ACTION_TO_DAYS: Record<"snooze" | "dismiss", number> = {
@@ -40,12 +41,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid review action payload" }, { status: 400 });
     }
 
+    if (parsedBody.data.action === "restore") {
+      await restoreReviewItem(session.user.id, parsedBody.data.kind, parsedBody.data.targetId);
+
+      return NextResponse.json(
+        {
+          success: true,
+          kind: parsedBody.data.kind,
+          targetId: parsedBody.data.targetId,
+          action: parsedBody.data.action,
+        },
+        { status: 200 }
+      );
+    }
+
     const durationDays = ACTION_TO_DAYS[parsedBody.data.action];
     const until = await suppressReviewItem(
       session.user.id,
       parsedBody.data.kind,
       parsedBody.data.targetId,
-      durationDays
+      durationDays,
+      parsedBody.data.label
     );
 
     return NextResponse.json(
