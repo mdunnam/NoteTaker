@@ -106,9 +106,11 @@ Expected behavior:
 When the user wants one place to process system-generated work:
 
 - `/review` combines low-confidence notes and changed-meaning suggestions,
+- forgotten-note resurfacing appears there when older notes still overlap with recent work,
+- repeated-pattern cards show when recent notes keep circling the same theme,
 - clarification can happen directly from the review page,
 - regrouping suggestions can be applied in batches,
-- this becomes the foundation for future forgotten-note and pattern resurfacing.
+- this becomes the foundation for deeper resurfacing and synthesis.
 
 ### Step 5: Contextual Review in Note Detail + RightPanel
 

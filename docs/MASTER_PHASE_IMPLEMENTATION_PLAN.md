@@ -47,6 +47,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Semantic search page with semantic/keyword mode toggle, filters, typeahead, snippets, and highlighted results
 - Projects and Topics pages backed by inferred knowledge clusters
 - Dedicated Review route combining low-confidence clarification and changed-meaning regrouping
+- Forgotten-note resurfacing and repeated-pattern review cards on the Review route
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
 - Background-rescored reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
@@ -61,7 +62,7 @@ Shipped:
 - semantic and keyword search with filters, typeahead, and snippets
 - project/topic browsing from inferred cluster context
 - keyboard-first triage, conversational clarification, and batch clarify
-- dedicated review surface for clarification and changed-meaning queues
+- dedicated review surface for clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
 - note-level reorganization suggestions and changed-meaning queues
 - AI performance visibility and learn-from-hint interactions
 
@@ -129,9 +130,11 @@ When newer notes clarify older work:
 
 When the user wants one place to process system-generated work:
 - `/review` combines low-confidence notes and changed-meaning suggestions
+- forgotten-note resurfacing appears there when older notes still overlap with recent work
+- repeated-pattern cards show when recent notes keep circling the same theme
 - clarification can happen directly from the review page
 - regrouping suggestions can be applied in batches
-- future resurfacing queues will plug into the same surface
+- future resurfacing queues and synthesis actions will plug into the same surface
 
 **Step 5 — Contextual Review in Note Detail**
 

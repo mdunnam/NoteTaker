@@ -39,7 +39,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Dump Mode**: Zero-friction background organization path with keyboard-first inbox triage
 - **AI performance dashboard**: Settings page shows confidence, clarification rate, trend deltas, and 30-day sparkline history
 - **Reclassification queue**: Background-rescored after enrichment, surfaces notes whose project/category meaning changed based on newer linked context, and lets you apply suggestions in batches
-- **Review page**: Dedicated workflow surface for low-confidence clarification and changed-meaning regrouping
+- **Review page**: Dedicated workflow surface for low-confidence clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
 
 ### Phase 4 🚧 (Knowledge browsing foundation shipped)
 - Search, Projects, and Topics now have real cluster/search behavior
@@ -242,9 +242,11 @@ src/
 - [ ] Broader RightPanel guidance and cluster actions
 
 ### Phase 5: Resurface ⏳
+- [x] Forgotten-note resurfacing in Review
+- [x] Repeated-pattern review cards in Review
 - [ ] Note health widget
-- [ ] Recurring idea detection
-- [ ] Forgotten-note resurfacing and pattern surfacing
+- [ ] Recurring idea detection beyond review heuristics
+- [ ] Broader resurfacing across inbox, right panel, and notifications
 
 ### Phase 6: Synthesis & Planning 📋
 - [ ] Multi-note synthesis
