@@ -39,6 +39,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Dump Mode**: Zero-friction background organization path with keyboard-first inbox triage
 - **AI performance dashboard**: Settings page shows confidence, clarification rate, trend deltas, and 30-day sparkline history
 - **Reclassification queue**: Background-rescored after enrichment, surfaces notes whose project/category meaning changed based on newer linked context, and lets you apply suggestions in batches
+- **Review page**: Dedicated workflow surface for low-confidence clarification and changed-meaning regrouping
 
 ### Phase 4 🚧 (Knowledge browsing foundation shipped)
 - Search, Projects, and Topics now have real cluster/search behavior
@@ -115,6 +116,7 @@ src/
       inbox/page.tsx        # Main inbox view
       cards/page.tsx        # Card grid view (still shallow)
       projects/page.tsx     # Project cluster browser
+      review/page.tsx       # Dedicated review workflow
       topics/page.tsx       # Topic cluster browser
       search/page.tsx       # Search & Ask experience
       ... (other views)
@@ -231,6 +233,7 @@ src/
 - [x] Semantic search UX with filters, snippets, and typeahead
 - [x] Projects view backed by inferred project clusters
 - [x] Topics view backed by inferred topic clusters
+- [x] Dedicated Review page for clarification and changed-meaning queues
 - [x] Project/topic clustering with browsable grouped notes
 - [x] Note-level reorganization suggestions from shared topic/project context
 - [x] Background-rescored reclassification queue with batch apply for changed-meaning notes
@@ -303,7 +306,7 @@ organizeNote('call jim about invoices, look into unreal plugin crash, daughter n
 
 ## Roadmap
 
-- [ ] Phase 5: Build resurfacing and review workflows
+- [ ] Phase 5: Build resurfacing and deeper review workflows
 - [ ] Phase 6: Add synthesis, planning, and multi-note outputs
 - [ ] Phase 7: Desktop app via Tauri
 - [ ] Phase 8: iOS app via Capacitor

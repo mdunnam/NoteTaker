@@ -8,6 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Inbox,
+  ClipboardCheck,
   Grid3x3,
   Folder,
   Tag,
@@ -23,6 +24,7 @@ import { signOut } from "next-auth/react";
 
 const navigationItems = [
   { label: "Inbox", href: "/inbox", icon: Inbox },
+  { label: "Review", href: "/review", icon: ClipboardCheck },
   { label: "Cards", href: "/cards", icon: Grid3x3 },
   { label: "Collections", href: "/collections", icon: Library },
   { label: "Projects", href: "/projects", icon: Folder },

@@ -101,6 +101,15 @@ Expected behavior:
 - context improvements can be applied in batches,
 - QNote becomes less static and more self-correcting over time.
 
+### Step 4.75: Dedicated Review Surface
+
+When the user wants one place to process system-generated work:
+
+- `/review` combines low-confidence notes and changed-meaning suggestions,
+- clarification can happen directly from the review page,
+- regrouping suggestions can be applied in batches,
+- this becomes the foundation for future forgotten-note and pattern resurfacing.
+
 ### Step 5: Contextual Review in Note Detail + RightPanel
 
 On note detail routes:
@@ -142,6 +151,7 @@ Morning:
 Midday triage:
 
 - user opens inbox,
+- user can switch to Review when they want a dedicated queue for clarification and regrouping,
 - resolves low-confidence notes with chips or direct answers,
 - applies any changed-meaning regrouping suggestions from the reclassification queue,
 - bulk clarifies any grouped cluster.
@@ -199,7 +209,6 @@ Planned next:
 
 - resurfacing forgotten thinking,
 - deeper workflow synthesis across notes,
-- dedicated review surfaces for changed-context notes,
 - optional opt-in global training pipeline with strict privacy controls.
 
 ## Success Criteria for This Workflow

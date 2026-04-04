@@ -21,7 +21,7 @@ The product target:
 
 The product wins when users say: *"I forgot I even wrote that, and it brought it back because it connected to what I am working on right now."*
 
-## 2. Current Engineering State (2026-04-03)
+## 2. Current Engineering State (2026-04-04)
 
 ### 2.1 Delivery Status
 
@@ -46,6 +46,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Semantic ranking with on-the-fly keyword fallback
 - Semantic search page with semantic/keyword mode toggle, filters, typeahead, snippets, and highlighted results
 - Projects and Topics pages backed by inferred knowledge clusters
+- Dedicated Review route combining low-confidence clarification and changed-meaning regrouping
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
 - Background-rescored reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
@@ -60,6 +61,7 @@ Shipped:
 - semantic and keyword search with filters, typeahead, and snippets
 - project/topic browsing from inferred cluster context
 - keyboard-first triage, conversational clarification, and batch clarify
+- dedicated review surface for clarification and changed-meaning queues
 - note-level reorganization suggestions and changed-meaning queues
 - AI performance visibility and learn-from-hint interactions
 
@@ -123,6 +125,14 @@ When newer notes clarify older work:
 - user can apply one or many regrouping suggestions
 - notes regenerate with the newer cluster context
 
+**Step 4.75 — Dedicated Review Surface**
+
+When the user wants one place to process system-generated work:
+- `/review` combines low-confidence notes and changed-meaning suggestions
+- clarification can happen directly from the review page
+- regrouping suggestions can be applied in batches
+- future resurfacing queues will plug into the same surface
+
 **Step 5 — Contextual Review in Note Detail**
 
 On the note detail route:
@@ -147,6 +157,7 @@ Morning:
 
 Midday triage:
 - open inbox
+- switch to Review when you want a dedicated queue for clarification and regrouping
 - resolve low-confidence notes with chip hints or direct answers
 - apply any changed-meaning regrouping from the reclassification queue
 - bulk clarify any grouped cluster
@@ -201,6 +212,7 @@ src/
       layout.tsx                     # App shell: sidebar, capture bar, right panel
       inbox/page.tsx                 # Main triage view
       notes/[id]/page.tsx            # Note detail
+      review/page.tsx                # Dedicated review workflow
       cards/page.tsx                 # Card grid (placeholder)
       projects/page.tsx              # Project cluster browser
       topics/page.tsx                # Topic cluster browser
