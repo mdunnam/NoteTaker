@@ -44,6 +44,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Suppressed review recovery**: Review shows suppressed-item counts and lets you restore snoozed or dismissed resurfacing items immediately
 - **Review telemetry in Settings**: Settings now shows active suppressions plus snooze/dismiss/restore history so resurfacing noise is visible and manageable
 - **Feedback-aware resurfacing**: Repeated dismisses and snoozes now automatically down-rank or suppress noisy forgotten-note and pattern signals
+- **Feedback-aware regrouping**: Reclassification suggestions now support lightweight `Not useful` feedback and repeated dismisses down-rank or suppress the same regrouping suggestion later
 
 ### Phase 4 🚧 (Knowledge browsing foundation shipped)
 - Search, Projects, and Topics now have real cluster/search behavior
@@ -242,6 +243,7 @@ src/
 - [x] Project/topic clustering with browsable grouped notes
 - [x] Note-level reorganization suggestions from shared topic/project context
 - [x] Background-rescored reclassification queue with batch apply for changed-meaning notes
+- [x] Reclassification queue feedback loop with `Not useful` dismissal and telemetry-aware downranking
 - [ ] Implement deeper Cards and Timeline views
 - [ ] Deepen Favorites and Archive views
 - [ ] Broader RightPanel guidance and cluster actions

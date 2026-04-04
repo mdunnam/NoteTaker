@@ -5,10 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 const ReviewStateSchema = z.object({
-  kind: z.enum(["forgotten-note", "pattern"]),
-  targetId: z.string().min(1).max(200),
+  kind: z.enum(["forgotten-note", "pattern", "reclassification"]),
+  targetId: z.string().min(1).max(500),
   action: z.enum(["snooze", "dismiss", "restore"]),
-  label: z.string().min(1).max(180).optional(),
+  label: z.string().min(1).max(240).optional(),
 });
 
 const ACTION_TO_DAYS: Record<"snooze" | "dismiss", number> = {

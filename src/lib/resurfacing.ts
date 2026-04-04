@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/db";
-import { getReviewActionStats, type ReviewActionStat, type ReviewSuppressionKind } from "@/lib/userMemory";
+import { getReviewActionStats, type ReviewActionStat } from "@/lib/userMemory";
+import {
+  buildReviewActionKey,
+  buildReviewActionStatMap,
+  getReviewNoiseAssessment,
+} from "@/lib/reviewFeedback";
 
 type ResurfacingEntityType = "PROJECT" | "APP" | "TOPIC" | "COMPANY" | "PERSON" | "PLACE";
 
@@ -55,17 +60,6 @@ export interface ReviewPatternCandidate {
   supportingNotes: ReviewNotePreview[];
 }
 
-export interface ReviewNoiseAssessment {
-  noiseScore: number;
-  penalty: number;
-  level: "normal" | "downranked" | "suppressed";
-}
-
-export const REVIEW_NOISE_THRESHOLDS = {
-  downranked: 2,
-  suppressed: 5,
-} as const;
-
 interface PatternAccumulator {
   id: string;
   label: string;
@@ -77,14 +71,6 @@ interface PatternAccumulator {
 
 function normalizeSignal(value: string): string {
   return value.trim().replace(/\s+/g, " ");
-}
-
-function buildReviewActionKey(kind: ReviewSuppressionKind, id: string): string {
-  return `${kind}:${id}`;
-}
-
-function buildReviewActionStatMap(actionStats: ReviewActionStat[] | undefined): Map<string, ReviewActionStat> {
-  return new Map((actionStats || []).map((stat) => [buildReviewActionKey(stat.kind, stat.id), stat]));
 }
 
 function toPreview(note: ResurfacingNoteInput): ReviewNotePreview {
@@ -160,44 +146,6 @@ function buildReason(overlapSignals: string[], taskCount: number, priority: stri
   return "Older note that may be worth revisiting.";
 }
 
-/**
- * Convert user review feedback into a resurfacing penalty.
- * Repeated dismisses count more heavily than snoozes, while restores offset past noise.
- */
-export function getReviewNoiseAssessment(actionStat?: ReviewActionStat | null): ReviewNoiseAssessment {
-  if (!actionStat) {
-    return {
-      noiseScore: 0,
-      penalty: 0,
-      level: "normal",
-    };
-  }
-
-  const rawNoiseScore = actionStat.dismisses * 2 + actionStat.snoozes - actionStat.restores * 2;
-  const noiseScore = Math.max(0, rawNoiseScore);
-
-  if (noiseScore >= REVIEW_NOISE_THRESHOLDS.suppressed && actionStat.dismisses >= 2) {
-    return {
-      noiseScore,
-      penalty: 999,
-      level: "suppressed",
-    };
-  }
-
-  if (noiseScore >= REVIEW_NOISE_THRESHOLDS.downranked) {
-    return {
-      noiseScore,
-      penalty: noiseScore * 12,
-      level: "downranked",
-    };
-  }
-
-  return {
-    noiseScore,
-    penalty: 0,
-    level: "normal",
-  };
-}
 
 /**
  * Infer forgotten-note candidates from an in-memory note corpus using age, stale updates, task count, and overlap with recent signals.

@@ -15,7 +15,7 @@ interface HintStat {
   lastUsed: string;
 }
 
-export type ReviewSuppressionKind = "forgotten-note" | "pattern";
+export type ReviewSuppressionKind = "forgotten-note" | "pattern" | "reclassification";
 export type ReviewActionType = "snooze" | "dismiss" | "restore";
 
 interface ReviewSuppression {
@@ -38,6 +38,7 @@ export interface ReviewActionStat {
 export interface ReviewState {
   forgottenNotes: ReviewSuppression[];
   patterns: ReviewSuppression[];
+  reclassifications: ReviewSuppression[];
 }
 
 interface ThinkingMemory {
@@ -122,6 +123,7 @@ function emptyMemory(): ThinkingMemory {
     reviewState: {
       forgottenNotes: [],
       patterns: [],
+      reclassifications: [],
     },
     reviewActionStats: [],
   };
@@ -168,12 +170,14 @@ function parseReviewState(value: unknown): ReviewState {
     return {
       forgottenNotes: [],
       patterns: [],
+      reclassifications: [],
     };
   }
 
   return {
     forgottenNotes: parseReviewSuppressions(value.forgottenNotes),
     patterns: parseReviewSuppressions(value.patterns),
+    reclassifications: parseReviewSuppressions(value.reclassifications),
   };
 }
 
@@ -191,7 +195,7 @@ function parseReviewActionStats(value: unknown): ReviewActionStat[] {
       return (
         typeof item.id === "string" &&
         item.id.trim().length > 0 &&
-        (item.kind === "forgotten-note" || item.kind === "pattern") &&
+        (item.kind === "forgotten-note" || item.kind === "pattern" || item.kind === "reclassification") &&
         (item.label === undefined || typeof item.label === "string") &&
         typeof item.snoozes === "number" &&
         typeof item.dismisses === "number" &&
@@ -216,7 +220,20 @@ function pruneReviewState(reviewState: ReviewState, now = new Date()): ReviewSta
   return {
     forgottenNotes: pruneReviewSuppressions(reviewState.forgottenNotes, now),
     patterns: pruneReviewSuppressions(reviewState.patterns, now),
+    reclassifications: pruneReviewSuppressions(reviewState.reclassifications, now),
   };
+}
+
+function getReviewStateKey(kind: ReviewSuppressionKind): keyof ReviewState {
+  if (kind === "forgotten-note") {
+    return "forgottenNotes";
+  }
+
+  if (kind === "pattern") {
+    return "patterns";
+  }
+
+  return "reclassifications";
 }
 
 function sortReviewActionStats(stats: ReviewActionStat[]): ReviewActionStat[] {
@@ -512,7 +529,7 @@ export function isReviewItemSuppressed(
   id: string,
   now = new Date()
 ): boolean {
-  const items = kind === "forgotten-note" ? reviewState.forgottenNotes : reviewState.patterns;
+  const items = reviewState[getReviewStateKey(kind)];
 
   return items.some((item) => {
     if (item.id !== id) {
@@ -539,7 +556,7 @@ export async function suppressReviewItem(
   const until = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
   const reviewState = pruneReviewState(current.reviewState);
   const reviewActionStats = upsertReviewActionStat(current.reviewActionStats, kind, id, action, label);
-  const key = kind === "forgotten-note" ? "forgottenNotes" : "patterns";
+  const key = getReviewStateKey(kind);
   const nextItems = reviewState[key]
     .filter((item) => item.id !== id)
     .concat({ id, until, ...(label ? { label } : {}) })
@@ -565,7 +582,7 @@ export async function restoreReviewItem(
 ): Promise<void> {
   const current = await getThinkingMemory(userId);
   const reviewState = pruneReviewState(current.reviewState);
-  const key = kind === "forgotten-note" ? "forgottenNotes" : "patterns";
+  const key = getReviewStateKey(kind);
   const existingLabel = reviewState[key].find((item) => item.id === id)?.label;
   const reviewActionStats = upsertReviewActionStat(current.reviewActionStats, kind, id, "restore", existingLabel);
 

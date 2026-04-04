@@ -32,6 +32,7 @@ describe("userMemory review state", () => {
         reviewState: {
           forgottenNotes: [],
           patterns: [],
+          reclassifications: [],
         },
         reviewActionStats: [],
       },
@@ -75,6 +76,7 @@ describe("userMemory review state", () => {
         reviewState: {
           forgottenNotes: [{ id: "n1", until: "2026-04-20T00:00:00.000Z", label: "Old task note" }],
           patterns: [],
+          reclassifications: [],
         },
         reviewActionStats: [
           {
@@ -99,6 +101,7 @@ describe("userMemory review state", () => {
           thinkingMemory: expect.objectContaining({
             reviewState: expect.objectContaining({
               forgottenNotes: [],
+              reclassifications: [],
             }),
             reviewActionStats: expect.arrayContaining([
               expect.objectContaining({

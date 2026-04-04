@@ -25,6 +25,7 @@ export default function ReclassificationQueue({
   const [activeCandidates, setActiveCandidates] = useState(candidates);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isApplying, setIsApplying] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -116,6 +117,43 @@ export default function ReclassificationQueue({
     }
   };
 
+  /** Persist lightweight negative feedback for one reclassification suggestion and hide it from the queue. */
+  const handleDismissOne = async (candidate: ReclassificationCandidate) => {
+    setIsDismissing(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/review/state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "reclassification",
+          targetId: candidate.feedbackKey,
+          action: "dismiss",
+          label: `${candidate.note.title || "Untitled note"} → ${candidate.suggestedProject || "keep project unset"}${candidate.suggestedCategory ? ` · ${candidate.suggestedCategory}` : ""}`,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to dismiss reclassification suggestion");
+      }
+
+      setMessage(`Dismissed reclassification for ${candidate.note.title || "Untitled note"}.`);
+      setActiveCandidates((current) => current.filter((item) => item.feedbackKey !== candidate.feedbackKey));
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(candidate.note.id);
+        return next;
+      });
+      router.refresh();
+    } catch (error) {
+      console.error("Error dismissing reclassification suggestion:", error);
+      setMessage("Could not dismiss this reclassification suggestion.");
+    } finally {
+      setIsDismissing(false);
+    }
+  };
+
   return (
     <div className={`rounded-lg border border-emerald-200 bg-emerald-50 ${compact ? "p-3" : "p-4"}`}>
       <div className="flex items-center justify-between gap-3">
@@ -203,10 +241,19 @@ export default function ReclassificationQueue({
               <button
                 type="button"
                 onClick={() => void handleApplyOne(candidate)}
-                disabled={isApplying}
+                disabled={isApplying || isDismissing}
                 className="shrink-0 rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
               >
                 Apply
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void handleDismissOne(candidate)}
+                disabled={isApplying || isDismissing}
+                className="shrink-0 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {isDismissing ? "Saving..." : "Not useful"}
               </button>
             </div>
           </li>

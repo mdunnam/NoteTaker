@@ -53,6 +53,7 @@ describe("/api/notes/analyze-dump POST", () => {
       reviewState: {
         forgottenNotes: [],
         patterns: [],
+        reclassifications: [],
       },
       reviewActionStats: [],
     } as never);

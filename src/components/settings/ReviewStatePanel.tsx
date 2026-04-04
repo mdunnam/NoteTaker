@@ -1,5 +1,5 @@
 import ReviewSuppressionActions from "@/components/review/ReviewSuppressionActions";
-import { getReviewNoiseAssessment } from "@/lib/resurfacing";
+import { getReviewNoiseAssessment } from "@/lib/reviewFeedback";
 import type { ReviewActionStat, ReviewState } from "@/lib/userMemory";
 import Link from "next/link";
 
@@ -11,7 +11,7 @@ interface ReviewStatePanelProps {
 interface ActiveSuppressionItem {
   id: string;
   label: string;
-  kind: "forgotten-note" | "pattern";
+  kind: "forgotten-note" | "pattern" | "reclassification";
   until: string;
   href?: string;
 }
@@ -29,6 +29,12 @@ function buildActiveSuppressions(reviewState: ReviewState): ActiveSuppressionIte
       id: item.id,
       label: item.label || `Suppressed pattern ${item.id}`,
       kind: "pattern" as const,
+      until: item.until,
+    })),
+    ...reviewState.reclassifications.map((item) => ({
+      id: item.id,
+      label: item.label || `Suppressed reclassification ${item.id}`,
+      kind: "reclassification" as const,
       until: item.until,
     })),
   ].sort((left, right) => new Date(left.until).getTime() - new Date(right.until).getTime());
@@ -51,7 +57,7 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs uppercase tracking-wide text-gray-500">Active suppressions</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">{activeSuppressions.length}</p>
@@ -65,6 +71,11 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
         <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
           <p className="text-xs uppercase tracking-wide text-purple-700">Patterns hidden</p>
           <p className="mt-1 text-2xl font-bold text-purple-900">{reviewState.patterns.length}</p>
+        </div>
+
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-xs uppercase tracking-wide text-emerald-700">Regrouping hidden</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-900">{reviewState.reclassifications.length}</p>
         </div>
 
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -93,8 +104,8 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
                       <h4 className="text-sm font-semibold text-gray-900">{item.label}</h4>
                     )}
                     <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                      <span className={`rounded-full px-2 py-0.5 ${item.kind === "forgotten-note" ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
-                        {item.kind === "forgotten-note" ? "forgotten note" : "pattern"}
+                      <span className={`rounded-full px-2 py-0.5 ${item.kind === "forgotten-note" ? "bg-indigo-100 text-indigo-700" : item.kind === "pattern" ? "bg-purple-100 text-purple-700" : "bg-emerald-100 text-emerald-700"}`}>
+                        {item.kind === "forgotten-note" ? "forgotten note" : item.kind === "pattern" ? "pattern" : "reclassification"}
                       </span>
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
                         Hidden until {new Date(item.until).toLocaleDateString("en-US", {
@@ -139,9 +150,13 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
                   <td className="px-4 py-2.5 font-medium text-gray-900">{stat.label || stat.id}</td>
                   <td className="px-4 py-2.5">
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                      stat.kind === "forgotten-note" ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"
+                      stat.kind === "forgotten-note"
+                        ? "bg-indigo-100 text-indigo-700"
+                        : stat.kind === "pattern"
+                          ? "bg-purple-100 text-purple-700"
+                          : "bg-emerald-100 text-emerald-700"
                     }`}>
-                      {stat.kind === "forgotten-note" ? "forgotten note" : "pattern"}
+                      {stat.kind === "forgotten-note" ? "forgotten note" : stat.kind === "pattern" ? "pattern" : "reclassification"}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">

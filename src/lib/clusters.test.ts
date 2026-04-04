@@ -6,6 +6,7 @@ import {
   inferReclassificationCandidatesFromNotes,
   type KnowledgeNoteInput,
 } from "@/lib/clusters";
+import type { ReviewActionStat } from "@/lib/userMemory";
 
 function makeNote(overrides: Partial<KnowledgeNoteInput>): KnowledgeNoteInput {
   return {
@@ -101,6 +102,7 @@ describe("knowledge cluster inference", () => {
         rawContent: "Downtime belongs inside Couch Heroes and affects the game tone.",
         createdAt: new Date("2026-03-28T00:00:00.000Z"),
         updatedAt: new Date("2026-03-28T00:00:00.000Z"),
+        category: "Worldbuilding",
         suggestedProject: "Couch Heroes",
         entities: [
           { entity: { id: "e2", name: "Downtime", type: "TOPIC" } },
@@ -116,6 +118,50 @@ describe("knowledge cluster inference", () => {
     expect(candidates[0]?.suggestedProject).toBe("Couch Heroes");
     expect(candidates[0]?.changedByNewerContext).toBe(true);
     expect(candidates[0]?.clarificationTurns).toBe(1);
+    expect(candidates[0]?.feedbackKey).toContain("n1");
+  });
+
+  it("suppresses reclassification candidates with dismiss-heavy feedback", () => {
+    const notes: KnowledgeNoteInput[] = [
+      makeNote({
+        id: "n1",
+        title: "Downtime art direction",
+        rawContent: "Downtime should feel grimy and medieval.",
+        createdAt: new Date("2026-03-20T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-20T00:00:00.000Z"),
+        entities: [{ entity: { id: "e1", name: "Downtime", type: "TOPIC" } }],
+      }),
+      makeNote({
+        id: "n2",
+        title: "Couch Heroes downtime note",
+        rawContent: "Downtime belongs inside Couch Heroes and affects the game tone.",
+        createdAt: new Date("2026-03-28T00:00:00.000Z"),
+        updatedAt: new Date("2026-03-28T00:00:00.000Z"),
+        suggestedProject: "Couch Heroes",
+        entities: [
+          { entity: { id: "e2", name: "Downtime", type: "TOPIC" } },
+          { entity: { id: "e3", name: "Couch Heroes", type: "PROJECT" } },
+        ],
+      }),
+    ];
+    const initialCandidates = inferReclassificationCandidatesFromNotes(notes, 5);
+    const feedbackKey = initialCandidates[0]?.feedbackKey;
+    expect(feedbackKey).toBeTruthy();
+
+    const actionStats: ReviewActionStat[] = [{
+      id: feedbackKey!,
+      kind: "reclassification",
+      label: "Downtime art direction → Couch Heroes · Worldbuilding",
+      snoozes: 1,
+      dismisses: 2,
+      restores: 0,
+      lastAction: "dismiss",
+      lastActionAt: "2026-04-04T00:00:00.000Z",
+    }];
+
+    const candidates = inferReclassificationCandidatesFromNotes(notes, 5, { actionStats });
+
+    expect(candidates).toHaveLength(0);
   });
 
   it("reads persisted reclassification snapshots from aiMeta without recomputing cluster state", () => {
@@ -125,6 +171,7 @@ describe("knowledge cluster inference", () => {
         title: "Downtime art direction",
         aiMeta: {
           reclassificationSuggestion: {
+            feedbackKey: "n1::couch heroes::worldbuilding",
             currentProject: null,
             currentCategory: "Work",
             suggestedProject: "Couch Heroes",
@@ -156,5 +203,6 @@ describe("knowledge cluster inference", () => {
     expect(candidates[0]?.note.id).toBe("n1");
     expect(candidates[0]?.suggestedProject).toBe("Couch Heroes");
     expect(candidates[0]?.clarificationTurns).toBe(2);
+    expect(candidates[0]?.feedbackKey).toBe("n1::couch heroes::worldbuilding");
   });
 });

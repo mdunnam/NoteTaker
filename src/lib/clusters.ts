@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { parseNoteAiMeta } from "@/lib/clarification";
+import { buildReviewActionKey, buildReviewActionStatMap, getReviewNoiseAssessment } from "@/lib/reviewFeedback";
+import { getThinkingMemory, isReviewItemSuppressed, type ReviewActionStat, type ReviewState } from "@/lib/userMemory";
 
 type KnowledgeEntityType = "PROJECT" | "APP" | "TOPIC" | "COMPANY" | "PERSON" | "PLACE";
 
@@ -65,6 +67,7 @@ export interface NoteKnowledgeContext {
 
 export interface ReclassificationCandidate {
   note: ClusterNotePreview;
+  feedbackKey: string;
   currentProject: string | null;
   currentCategory: string | null;
   suggestedProject: string | null;
@@ -78,6 +81,7 @@ export interface ReclassificationCandidate {
 }
 
 interface PersistedReclassificationSuggestion {
+  feedbackKey: string;
   currentProject: string | null;
   currentCategory: string | null;
   suggestedProject: string | null;
@@ -125,6 +129,19 @@ function buildClusterId(kind: "project" | "topic", label: string): string {
   return `${kind}:${normalizeSignalLabel(label).toLowerCase()}`;
 }
 
+/** Build a stable feedback key for one concrete reclassification suggestion. */
+function buildReclassificationFeedbackKey(
+  noteId: string,
+  suggestedProject: string | null,
+  suggestedCategory: string | null
+): string {
+  return [
+    noteId,
+    normalizeSignalLabel(suggestedProject || "(none)").toLowerCase(),
+    normalizeSignalLabel(suggestedCategory || "(none)").toLowerCase(),
+  ].join("::");
+}
+
 /** Convert a note into a small preview payload for UI consumption. */
 function toClusterNotePreview(note: KnowledgeNote): ClusterNotePreview {
   return {
@@ -137,12 +154,29 @@ function toClusterNotePreview(note: KnowledgeNote): ClusterNotePreview {
   };
 }
 
+/** Calculate a stable priority score for one reclassification candidate. */
+function calculateReclassificationSortScore(
+  note: KnowledgeNote,
+  candidate: Pick<ReclassificationCandidate, "confidence" | "changedByNewerContext" | "clarificationTurns" | "supportingNotes">,
+  noisePenalty = 0
+): number {
+  return (
+    candidate.confidence * 100 +
+    (candidate.changedByNewerContext ? 15 : 0) +
+    candidate.clarificationTurns * 5 +
+    candidate.supportingNotes.length * 4 +
+    (note.confidenceScore !== null && note.confidenceScore !== undefined ? (1 - note.confidenceScore) * 10 : 0) -
+    noisePenalty
+  );
+}
+
 /** Persist only the stable parts of a reclassification candidate into aiMeta. */
 function toPersistedReclassificationSuggestion(
   candidate: ReclassificationCandidate,
   queuedAt: string
 ): PersistedReclassificationSuggestion {
   return {
+    feedbackKey: candidate.feedbackKey,
     currentProject: candidate.currentProject,
     currentCategory: candidate.currentCategory,
     suggestedProject: candidate.suggestedProject,
@@ -165,6 +199,7 @@ function parsePersistedReclassificationSuggestion(raw: unknown): PersistedReclas
 
   const value = raw as Record<string, unknown>;
   if (
+    typeof value.feedbackKey !== "string" ||
     typeof value.reason !== "string" ||
     typeof value.confidence !== "number" ||
     typeof value.queuedAt !== "string" ||
@@ -177,6 +212,7 @@ function parsePersistedReclassificationSuggestion(raw: unknown): PersistedReclas
   }
 
   return {
+    feedbackKey: value.feedbackKey,
     currentProject: typeof value.currentProject === "string" ? value.currentProject : null,
     currentCategory: typeof value.currentCategory === "string" ? value.currentCategory : null,
     suggestedProject: typeof value.suggestedProject === "string" ? value.suggestedProject : null,
@@ -219,6 +255,7 @@ function isSameReclassificationSuggestion(
   }
 
   return JSON.stringify({
+    feedbackKey: existing.feedbackKey,
     currentProject: existing.currentProject,
     currentCategory: existing.currentCategory,
     suggestedProject: existing.suggestedProject,
@@ -230,6 +267,7 @@ function isSameReclassificationSuggestion(
     changedByNewerContext: existing.changedByNewerContext,
     clarificationTurns: existing.clarificationTurns,
   }) === JSON.stringify({
+    feedbackKey: candidate.feedbackKey,
     currentProject: candidate.currentProject,
     currentCategory: candidate.currentCategory,
     suggestedProject: candidate.suggestedProject,
@@ -528,8 +566,11 @@ export function inferNoteKnowledgeContextFromNotes(notes: KnowledgeNote[], noteI
 /** Rank reclassification candidates from an in-memory note set. */
 export function inferReclassificationCandidatesFromNotes(
   notes: KnowledgeNote[],
-  limit = 8
+  limit = 8,
+  options?: { actionStats?: ReviewActionStat[]; reviewState?: ReviewState }
 ): ReclassificationCandidate[] {
+  const actionStatMap = buildReviewActionStatMap(options?.actionStats);
+
   return notes
     .map((note) => {
       const context = inferNoteKnowledgeContextFromNotes(notes, note.id);
@@ -551,9 +592,26 @@ export function inferReclassificationCandidatesFromNotes(
         return Math.max(latest, createdAt);
       }, 0);
       const changedByNewerContext = latestSupportingChange > note.updatedAt.getTime();
+      const feedbackKey = buildReclassificationFeedbackKey(
+        note.id,
+        suggestion.suggestedProject,
+        suggestion.suggestedCategory
+      );
 
-      return {
+      if (options?.reviewState && isReviewItemSuppressed(options.reviewState, "reclassification", feedbackKey)) {
+        return null;
+      }
+
+      const noise = getReviewNoiseAssessment(
+        actionStatMap.get(buildReviewActionKey("reclassification", feedbackKey))
+      );
+      if (noise.level === "suppressed") {
+        return null;
+      }
+
+      const baseCandidate: ReclassificationCandidate = {
         note: toClusterNotePreview(note),
+        feedbackKey,
         currentProject: note.suggestedProject,
         currentCategory: note.category,
         suggestedProject: suggestion.suggestedProject,
@@ -564,12 +622,16 @@ export function inferReclassificationCandidatesFromNotes(
         supportingNotes: suggestion.supportingNotes,
         changedByNewerContext,
         clarificationTurns: meta.clarificationHistory.length,
-        sortScore:
-          suggestion.confidence * 100 +
-          (changedByNewerContext ? 15 : 0) +
-          meta.clarificationHistory.length * 5 +
-          suggestion.supportingNotes.length * 4 +
-          (note.confidenceScore !== null && note.confidenceScore !== undefined ? (1 - note.confidenceScore) * 10 : 0),
+      };
+
+      const sortScore = calculateReclassificationSortScore(note, baseCandidate, noise.penalty);
+      if (sortScore <= 0) {
+        return null;
+      }
+
+      return {
+        ...baseCandidate,
+        sortScore,
       };
     })
     .filter((candidate): candidate is ReclassificationCandidate & { sortScore: number } => Boolean(candidate))
@@ -585,8 +647,11 @@ export function inferReclassificationCandidatesFromNotes(
 /** Read persisted reclassification snapshots from note aiMeta without recomputing the full graph. */
 export function getPersistedReclassificationCandidatesFromNotes(
   notes: KnowledgeNote[],
-  limit = 8
+  limit = 8,
+  options?: { actionStats?: ReviewActionStat[]; reviewState?: ReviewState }
 ): ReclassificationCandidate[] {
+  const actionStatMap = buildReviewActionStatMap(options?.actionStats);
+
   return notes
     .map((note) => {
       const aiMeta = getAiMetaRecord(note.aiMeta);
@@ -595,8 +660,13 @@ export function getPersistedReclassificationCandidatesFromNotes(
         return null;
       }
 
-      return {
+      if (options?.reviewState && isReviewItemSuppressed(options.reviewState, "reclassification", persisted.feedbackKey)) {
+        return null;
+      }
+
+      const candidate: ReclassificationCandidate = {
         note: toClusterNotePreview(note),
+        feedbackKey: persisted.feedbackKey,
         currentProject: persisted.currentProject,
         currentCategory: persisted.currentCategory,
         suggestedProject: persisted.suggestedProject,
@@ -607,12 +677,29 @@ export function getPersistedReclassificationCandidatesFromNotes(
         supportingNotes: persisted.supportingNotes,
         changedByNewerContext: persisted.changedByNewerContext,
         clarificationTurns: persisted.clarificationTurns,
+      };
+
+      const noise = getReviewNoiseAssessment(
+        actionStatMap.get(buildReviewActionKey("reclassification", persisted.feedbackKey))
+      );
+      if (noise.level === "suppressed") {
+        return null;
+      }
+
+      const sortScore = calculateReclassificationSortScore(note, candidate, noise.penalty);
+      if (sortScore <= 0) {
+        return null;
+      }
+
+      return {
+        ...candidate,
         queuedAt: persisted.queuedAt,
+        sortScore,
       };
     })
-    .filter((candidate): candidate is ReclassificationCandidate & { queuedAt: string } => Boolean(candidate))
+    .filter((candidate): candidate is ReclassificationCandidate & { queuedAt: string; sortScore: number } => Boolean(candidate))
     .sort((left, right) => {
-      const scoreDelta = right.confidence - left.confidence;
+      const scoreDelta = right.sortScore - left.sortScore;
       if (scoreDelta !== 0) {
         return scoreDelta;
       }
@@ -621,8 +708,9 @@ export function getPersistedReclassificationCandidatesFromNotes(
     })
     .slice(0, limit)
     .map((candidateWithQueuedAt) => {
-      const candidate = { ...candidateWithQueuedAt } as ReclassificationCandidate & { queuedAt?: string };
+      const candidate = { ...candidateWithQueuedAt } as ReclassificationCandidate & { queuedAt?: string; sortScore?: number };
       delete candidate.queuedAt;
+      delete candidate.sortScore;
       return candidate as ReclassificationCandidate;
     });
 }
@@ -653,13 +741,24 @@ export async function getUserReclassificationCandidates(
   userId: string,
   limit = 8
 ): Promise<ReclassificationCandidate[]> {
-  const notes = await loadKnowledgeNotes(userId);
-  const persisted = getPersistedReclassificationCandidatesFromNotes(notes, limit);
+  const [notes, thinkingMemory] = await Promise.all([
+    loadKnowledgeNotes(userId),
+    getThinkingMemory(userId),
+  ]);
+
+  const options = {
+    reviewState: thinkingMemory.reviewState,
+    actionStats: thinkingMemory.reviewActionStats.filter(
+      (stat) => stat.snoozes > 0 || stat.dismisses > 0 || stat.restores > 0
+    ),
+  };
+
+  const persisted = getPersistedReclassificationCandidatesFromNotes(notes, limit, options);
   if (persisted.length > 0) {
     return persisted;
   }
 
-  return inferReclassificationCandidatesFromNotes(notes, limit);
+  return inferReclassificationCandidatesFromNotes(notes, limit, options);
 }
 
 /**

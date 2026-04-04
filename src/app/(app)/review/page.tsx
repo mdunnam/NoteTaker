@@ -13,7 +13,7 @@ import { redirect } from "next/navigation";
 interface SuppressedReviewItem {
   id: string;
   label: string;
-  kind: "forgotten-note" | "pattern";
+  kind: "forgotten-note" | "pattern" | "reclassification";
   until: string;
   href?: string;
 }
@@ -76,6 +76,12 @@ export default async function ReviewPage() {
       id: item.id,
       label: item.label || `Suppressed pattern ${item.id}`,
       kind: "pattern" as const,
+      until: item.until,
+    })),
+    ...thinkingMemory.reviewState.reclassifications.map((item) => ({
+      id: item.id,
+      label: item.label || `Suppressed regrouping ${item.id}`,
+      kind: "reclassification" as const,
       until: item.until,
     })),
   ].sort((left, right) => new Date(left.until).getTime() - new Date(right.until).getTime());
@@ -341,8 +347,8 @@ export default async function ReviewPage() {
                           <h3 className="text-base font-semibold text-gray-900">{item.label}</h3>
                         )}
                         <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-                          <span className={`rounded-full px-2 py-0.5 ${item.kind === "forgotten-note" ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
-                            {item.kind === "forgotten-note" ? "forgotten note" : "pattern"}
+                          <span className={`rounded-full px-2 py-0.5 ${item.kind === "forgotten-note" ? "bg-indigo-100 text-indigo-700" : item.kind === "pattern" ? "bg-purple-100 text-purple-700" : "bg-emerald-100 text-emerald-700"}`}>
+                            {item.kind === "forgotten-note" ? "forgotten note" : item.kind === "pattern" ? "pattern" : "reclassification"}
                           </span>
                           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-600">
                             Hidden until {new Date(item.until).toLocaleDateString("en-US", {

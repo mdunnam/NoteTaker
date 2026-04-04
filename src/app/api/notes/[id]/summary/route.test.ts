@@ -79,6 +79,7 @@ describe("/api/notes/[id]/summary POST", () => {
       reviewState: {
         forgottenNotes: [],
         patterns: [],
+        reclassifications: [],
       },
       reviewActionStats: [],
     });

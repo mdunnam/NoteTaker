@@ -93,6 +93,7 @@ When later notes reveal stronger context for older notes:
 - inbox surfaces a reclassification queue,
 - right panel surfaces top changed-meaning notes,
 - user can apply one or many suggested regroupings,
+- user can mark a regrouping suggestion as not useful,
 - affected notes are regenerated with the newer project/category context.
 
 Expected behavior:
@@ -110,10 +111,12 @@ When the user wants one place to process system-generated work:
 - repeated-pattern cards show when recent notes keep circling the same theme,
 - clarification can happen directly from the review page,
 - regrouping suggestions can be applied in batches,
+- regrouping suggestions can also be dismissed as not useful,
 - forgotten-note and pattern cards can be snoozed or dismissed for a time window,
 - suppressed review items remain visible as a recoverable count and can be restored directly from Review,
 - Settings shows active suppressions and the snooze/dismiss/restore history for review items,
 - repeated dismisses and snoozes automatically make resurfacing less aggressive for the same signals,
+- repeated dismissal of the same regrouping suggestion also makes reclassification less aggressive for that exact suggestion,
 - this becomes the foundation for deeper resurfacing and synthesis.
 
 ### Step 5: Contextual Review in Note Detail + RightPanel

@@ -91,6 +91,7 @@ describe("enrichNote", () => {
       reviewState: {
         forgottenNotes: [],
         patterns: [],
+        reclassifications: [],
       },
       reviewActionStats: [],
     });

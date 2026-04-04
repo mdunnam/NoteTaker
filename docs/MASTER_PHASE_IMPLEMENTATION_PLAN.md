@@ -55,6 +55,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
 - Background-rescored reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
+- Reclassification queue feedback with `Not useful` dismissal and telemetry-aware downranking of repeated false positives
 - Related note relation links
 - Contextual right panel on note detail routes
 - Durable enrichment queue (`NoteJob`) with worker retry loop
@@ -72,6 +73,7 @@ Shipped:
 - settings visibility for active suppressions and review-action history
 - feedback-aware resurfacing that uses review telemetry to down-rank noisy signals
 - note-level reorganization suggestions and changed-meaning queues
+- reclassification queue feedback that down-ranks repeated false positives
 - AI performance visibility and learn-from-hint interactions
 
 Not yet shipped:
@@ -132,6 +134,7 @@ When newer notes clarify older work:
 - QNote ranks notes whose project/category likely changed
 - inbox and right panel surface those candidates automatically
 - user can apply one or many regrouping suggestions
+- user can mark regrouping suggestions as not useful
 - notes regenerate with the newer cluster context
 
 **Step 4.75 — Dedicated Review Surface**
@@ -146,6 +149,7 @@ When the user wants one place to process system-generated work:
 - suppressed review items remain visible as a recoverable count and can be restored directly from Review
 - Settings shows active suppressions and the snooze/dismiss/restore history for review items
 - repeated dismisses and snoozes automatically make resurfacing less aggressive for the same signals
+- repeated dismisses also down-rank or suppress the same regrouping suggestion in the reclassification queue
 - future resurfacing queues and synthesis actions will plug into the same surface
 
 **Step 5 — Contextual Review in Note Detail**

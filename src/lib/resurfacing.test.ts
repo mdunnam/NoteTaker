@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  getReviewNoiseAssessment,
   inferForgottenNoteCandidatesFromNotes,
   inferReviewPatternsFromNotes,
   type ResurfacingNoteInput,
 } from "@/lib/resurfacing";
+import { getReviewNoiseAssessment } from "@/lib/reviewFeedback";
 import type { ReviewActionStat } from "@/lib/userMemory";
 
 function makeNote(overrides: Partial<ResurfacingNoteInput>): ResurfacingNoteInput {
