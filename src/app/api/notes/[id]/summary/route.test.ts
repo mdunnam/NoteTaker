@@ -13,6 +13,10 @@ vi.mock("@/lib/rateLimit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
+vi.mock("@/lib/clusters", () => ({
+  rescoreUserReclassificationQueue: vi.fn(),
+}));
+
 vi.mock("@/lib/userMemory", () => ({
   getThinkingMemory: vi.fn(),
   buildThinkingMemoryPrompt: vi.fn(),
@@ -31,6 +35,7 @@ vi.mock("@/lib/db", () => ({
 
 import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
+import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory, recordHintUsage } from "@/lib/userMemory";
@@ -45,6 +50,7 @@ const mockedGetThinkingMemory = vi.mocked(getThinkingMemory);
 const mockedBuildThinkingMemoryPrompt = vi.mocked(buildThinkingMemoryPrompt);
 const mockedUpdateThinkingMemory = vi.mocked(updateThinkingMemory);
 const mockedRecordHintUsage = vi.mocked(recordHintUsage);
+const mockedRescoreUserReclassificationQueue = vi.mocked(rescoreUserReclassificationQueue);
 
 function makeRequest() {
   return new NextRequest("http://localhost/api/notes/n1/summary", {
@@ -74,6 +80,7 @@ describe("/api/notes/[id]/summary POST", () => {
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);
     mockedRecordHintUsage.mockResolvedValue(undefined);
+    mockedRescoreUserReclassificationQueue.mockResolvedValue(undefined);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -135,6 +142,7 @@ describe("/api/notes/[id]/summary POST", () => {
       expect.objectContaining({ userContext: "Known projects: (none)" })
     );
     expect(mockedUpdate).toHaveBeenCalled();
+    expect(mockedRescoreUserReclassificationQueue).toHaveBeenCalledWith("u1");
   });
 
   it("uses project/context hints when provided", async () => {

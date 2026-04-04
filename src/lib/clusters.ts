@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { parseNoteAiMeta } from "@/lib/clarification";
 
@@ -76,6 +77,20 @@ export interface ReclassificationCandidate {
   clarificationTurns: number;
 }
 
+interface PersistedReclassificationSuggestion {
+  currentProject: string | null;
+  currentCategory: string | null;
+  suggestedProject: string | null;
+  suggestedCategory: string | null;
+  reason: string;
+  confidence: number;
+  basedOnTopics: string[];
+  supportingNotes: ClusterNotePreview[];
+  changedByNewerContext: boolean;
+  clarificationTurns: number;
+  queuedAt: string;
+}
+
 interface ClusterAccumulator {
   id: string;
   kind: "project" | "topic";
@@ -96,6 +111,15 @@ function normalizeSignalLabel(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
+/** Return a mutable aiMeta record shape when present, else an empty object. */
+function getAiMetaRecord(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return {};
+  }
+
+  return raw as Record<string, unknown>;
+}
+
 /** Build a stable cluster id from kind and label. */
 function buildClusterId(kind: "project" | "topic", label: string): string {
   return `${kind}:${normalizeSignalLabel(label).toLowerCase()}`;
@@ -111,6 +135,112 @@ function toClusterNotePreview(note: KnowledgeNote): ClusterNotePreview {
     suggestedProject: note.suggestedProject,
     createdAt: note.createdAt.toISOString(),
   };
+}
+
+/** Persist only the stable parts of a reclassification candidate into aiMeta. */
+function toPersistedReclassificationSuggestion(
+  candidate: ReclassificationCandidate,
+  queuedAt: string
+): PersistedReclassificationSuggestion {
+  return {
+    currentProject: candidate.currentProject,
+    currentCategory: candidate.currentCategory,
+    suggestedProject: candidate.suggestedProject,
+    suggestedCategory: candidate.suggestedCategory,
+    reason: candidate.reason,
+    confidence: candidate.confidence,
+    basedOnTopics: candidate.basedOnTopics,
+    supportingNotes: candidate.supportingNotes,
+    changedByNewerContext: candidate.changedByNewerContext,
+    clarificationTurns: candidate.clarificationTurns,
+    queuedAt,
+  };
+}
+
+/** Parse a persisted reclassification snapshot from note aiMeta. */
+function parsePersistedReclassificationSuggestion(raw: unknown): PersistedReclassificationSuggestion | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+
+  const value = raw as Record<string, unknown>;
+  if (
+    typeof value.reason !== "string" ||
+    typeof value.confidence !== "number" ||
+    typeof value.queuedAt !== "string" ||
+    !Array.isArray(value.basedOnTopics) ||
+    !Array.isArray(value.supportingNotes) ||
+    typeof value.changedByNewerContext !== "boolean" ||
+    typeof value.clarificationTurns !== "number"
+  ) {
+    return null;
+  }
+
+  return {
+    currentProject: typeof value.currentProject === "string" ? value.currentProject : null,
+    currentCategory: typeof value.currentCategory === "string" ? value.currentCategory : null,
+    suggestedProject: typeof value.suggestedProject === "string" ? value.suggestedProject : null,
+    suggestedCategory: typeof value.suggestedCategory === "string" ? value.suggestedCategory : null,
+    reason: value.reason,
+    confidence: value.confidence,
+    basedOnTopics: value.basedOnTopics.filter((topic): topic is string => typeof topic === "string"),
+    supportingNotes: value.supportingNotes.filter((note): note is ClusterNotePreview => {
+      if (!note || typeof note !== "object" || Array.isArray(note)) {
+        return false;
+      }
+
+      const preview = note as Record<string, unknown>;
+      return (
+        typeof preview.id === "string" &&
+        (typeof preview.title === "string" || preview.title === null) &&
+        (typeof preview.summary === "string" || preview.summary === null) &&
+        (typeof preview.category === "string" || preview.category === null) &&
+        (typeof preview.suggestedProject === "string" || preview.suggestedProject === null) &&
+        typeof preview.createdAt === "string"
+      );
+    }),
+    changedByNewerContext: value.changedByNewerContext,
+    clarificationTurns: value.clarificationTurns,
+    queuedAt: value.queuedAt,
+  };
+}
+
+/** Compare persisted and computed suggestions without treating queuedAt changes as meaningful. */
+function isSameReclassificationSuggestion(
+  existing: PersistedReclassificationSuggestion | null,
+  candidate: ReclassificationCandidate | null
+): boolean {
+  if (!existing && !candidate) {
+    return true;
+  }
+
+  if (!existing || !candidate) {
+    return false;
+  }
+
+  return JSON.stringify({
+    currentProject: existing.currentProject,
+    currentCategory: existing.currentCategory,
+    suggestedProject: existing.suggestedProject,
+    suggestedCategory: existing.suggestedCategory,
+    reason: existing.reason,
+    confidence: existing.confidence,
+    basedOnTopics: existing.basedOnTopics,
+    supportingNotes: existing.supportingNotes,
+    changedByNewerContext: existing.changedByNewerContext,
+    clarificationTurns: existing.clarificationTurns,
+  }) === JSON.stringify({
+    currentProject: candidate.currentProject,
+    currentCategory: candidate.currentCategory,
+    suggestedProject: candidate.suggestedProject,
+    suggestedCategory: candidate.suggestedCategory,
+    reason: candidate.reason,
+    confidence: candidate.confidence,
+    basedOnTopics: candidate.basedOnTopics,
+    supportingNotes: candidate.supportingNotes,
+    changedByNewerContext: candidate.changedByNewerContext,
+    clarificationTurns: candidate.clarificationTurns,
+  });
 }
 
 /** Collect project signals from a note. */
@@ -452,6 +582,51 @@ export function inferReclassificationCandidatesFromNotes(
     });
 }
 
+/** Read persisted reclassification snapshots from note aiMeta without recomputing the full graph. */
+export function getPersistedReclassificationCandidatesFromNotes(
+  notes: KnowledgeNote[],
+  limit = 8
+): ReclassificationCandidate[] {
+  return notes
+    .map((note) => {
+      const aiMeta = getAiMetaRecord(note.aiMeta);
+      const persisted = parsePersistedReclassificationSuggestion(aiMeta.reclassificationSuggestion);
+      if (!persisted) {
+        return null;
+      }
+
+      return {
+        note: toClusterNotePreview(note),
+        currentProject: persisted.currentProject,
+        currentCategory: persisted.currentCategory,
+        suggestedProject: persisted.suggestedProject,
+        suggestedCategory: persisted.suggestedCategory,
+        reason: persisted.reason,
+        confidence: persisted.confidence,
+        basedOnTopics: persisted.basedOnTopics,
+        supportingNotes: persisted.supportingNotes,
+        changedByNewerContext: persisted.changedByNewerContext,
+        clarificationTurns: persisted.clarificationTurns,
+        queuedAt: persisted.queuedAt,
+      };
+    })
+    .filter((candidate): candidate is ReclassificationCandidate & { queuedAt: string } => Boolean(candidate))
+    .sort((left, right) => {
+      const scoreDelta = right.confidence - left.confidence;
+      if (scoreDelta !== 0) {
+        return scoreDelta;
+      }
+
+      return new Date(right.queuedAt).getTime() - new Date(left.queuedAt).getTime();
+    })
+    .slice(0, limit)
+    .map((candidateWithQueuedAt) => {
+      const candidate = { ...candidateWithQueuedAt } as ReclassificationCandidate & { queuedAt?: string };
+      delete candidate.queuedAt;
+      return candidate as ReclassificationCandidate;
+    });
+}
+
 /**
  * Infer browsable knowledge clusters from existing notes, entities, and project signals.
  */
@@ -479,5 +654,46 @@ export async function getUserReclassificationCandidates(
   limit = 8
 ): Promise<ReclassificationCandidate[]> {
   const notes = await loadKnowledgeNotes(userId);
+  const persisted = getPersistedReclassificationCandidatesFromNotes(notes, limit);
+  if (persisted.length > 0) {
+    return persisted;
+  }
+
   return inferReclassificationCandidatesFromNotes(notes, limit);
+}
+
+/**
+ * Recompute and persist changed-meaning suggestions after enrichment or major note reorganization.
+ * Uses raw SQL for aiMeta writes so note updatedAt does not change purely from queue bookkeeping.
+ */
+export async function rescoreUserReclassificationQueue(userId: string): Promise<void> {
+  const notes = await loadKnowledgeNotes(userId);
+  const candidates = inferReclassificationCandidatesFromNotes(notes, notes.length);
+  const candidateMap = new Map(candidates.map((candidate) => [candidate.note.id, candidate]));
+  const now = new Date().toISOString();
+
+  for (const note of notes) {
+    const existingAiMeta = getAiMetaRecord(note.aiMeta);
+    const existingSuggestion = parsePersistedReclassificationSuggestion(existingAiMeta.reclassificationSuggestion);
+    const candidate = candidateMap.get(note.id) || null;
+
+    if (isSameReclassificationSuggestion(existingSuggestion, candidate)) {
+      continue;
+    }
+
+    const nextAiMeta = { ...existingAiMeta } as Record<string, unknown>;
+
+    if (!candidate) {
+      delete nextAiMeta.reclassificationSuggestion;
+    } else {
+      nextAiMeta.reclassificationSuggestion = toPersistedReclassificationSuggestion(
+        candidate,
+        existingSuggestion?.queuedAt || now
+      );
+    }
+
+    await prisma.$executeRaw(
+      Prisma.sql`UPDATE "Note" SET "aiMeta" = ${JSON.stringify(nextAiMeta)}::jsonb WHERE "id" = ${note.id}`
+    );
+  }
 }

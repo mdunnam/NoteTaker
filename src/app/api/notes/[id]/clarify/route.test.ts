@@ -13,6 +13,10 @@ vi.mock("@/lib/rateLimit", () => ({
   checkRateLimit: vi.fn(),
 }));
 
+vi.mock("@/lib/clusters", () => ({
+  rescoreUserReclassificationQueue: vi.fn(),
+}));
+
 vi.mock("@/lib/userMemory", () => ({
   getThinkingMemory: vi.fn(),
   buildThinkingMemoryPrompt: vi.fn(),
@@ -31,6 +35,7 @@ vi.mock("@/lib/db", () => ({
 
 import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
+import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { buildThinkingMemoryPrompt, getThinkingMemory, recordHintUsage, updateThinkingMemory } from "@/lib/userMemory";
@@ -45,6 +50,7 @@ const mockedGetThinkingMemory = vi.mocked(getThinkingMemory);
 const mockedBuildThinkingMemoryPrompt = vi.mocked(buildThinkingMemoryPrompt);
 const mockedUpdateThinkingMemory = vi.mocked(updateThinkingMemory);
 const mockedRecordHintUsage = vi.mocked(recordHintUsage);
+const mockedRescoreUserReclassificationQueue = vi.mocked(rescoreUserReclassificationQueue);
 
 function makeRequest(body: unknown) {
   return new NextRequest("http://localhost/api/notes/n1/clarify", {
@@ -68,6 +74,7 @@ describe("/api/notes/[id]/clarify POST", () => {
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);
     mockedRecordHintUsage.mockResolvedValue(undefined);
+    mockedRescoreUserReclassificationQueue.mockResolvedValue(undefined);
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -159,6 +166,7 @@ describe("/api/notes/[id]/clarify POST", () => {
         }),
       })
     );
+    expect(mockedRescoreUserReclassificationQueue).toHaveBeenCalledWith("u1");
   });
 
   it("records project hint usage when a project chip is selected", async () => {

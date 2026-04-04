@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { organizeNote } from "@/lib/ai";
+import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { Prisma } from "@prisma/client";
 import {
   appendClarificationTurn,
@@ -176,6 +177,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     if (body.contextHint) {
       await recordHintUsage(session.user.id, body.contextHint, "context", confidenceBefore, confidenceAfter);
+    }
+
+    try {
+      await rescoreUserReclassificationQueue(session.user.id);
+    } catch (reclassificationError) {
+      console.error("Error rescoring changed-meaning queue:", reclassificationError);
     }
 
     return NextResponse.json(updated, { status: 200 });

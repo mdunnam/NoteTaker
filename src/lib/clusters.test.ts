@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getPersistedReclassificationCandidatesFromNotes,
   inferKnowledgeClustersFromNotes,
   inferNoteKnowledgeContextFromNotes,
   inferReclassificationCandidatesFromNotes,
@@ -115,5 +116,45 @@ describe("knowledge cluster inference", () => {
     expect(candidates[0]?.suggestedProject).toBe("Couch Heroes");
     expect(candidates[0]?.changedByNewerContext).toBe(true);
     expect(candidates[0]?.clarificationTurns).toBe(1);
+  });
+
+  it("reads persisted reclassification snapshots from aiMeta without recomputing cluster state", () => {
+    const notes: KnowledgeNoteInput[] = [
+      makeNote({
+        id: "n1",
+        title: "Downtime art direction",
+        aiMeta: {
+          reclassificationSuggestion: {
+            currentProject: null,
+            currentCategory: "Work",
+            suggestedProject: "Couch Heroes",
+            suggestedCategory: "Worldbuilding",
+            reason: "Later notes connect Downtime to Couch Heroes.",
+            confidence: 0.88,
+            basedOnTopics: ["Downtime"],
+            supportingNotes: [
+              {
+                id: "n2",
+                title: "Couch Heroes downtime note",
+                summary: "Links the downtime topic to Couch Heroes.",
+                category: "Worldbuilding",
+                suggestedProject: "Couch Heroes",
+                createdAt: "2026-03-28T00:00:00.000Z",
+              },
+            ],
+            changedByNewerContext: true,
+            clarificationTurns: 2,
+            queuedAt: "2026-04-04T00:00:00.000Z",
+          },
+        },
+      }),
+    ];
+
+    const candidates = getPersistedReclassificationCandidatesFromNotes(notes, 5);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.note.id).toBe("n1");
+    expect(candidates[0]?.suggestedProject).toBe("Couch Heroes");
+    expect(candidates[0]?.clarificationTurns).toBe(2);
   });
 });

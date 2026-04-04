@@ -26,6 +26,10 @@ vi.mock("@/lib/userMemory", () => ({
   updateThinkingMemory: vi.fn(),
 }));
 
+vi.mock("@/lib/clusters", () => ({
+  rescoreUserReclassificationQueue: vi.fn(),
+}));
+
 vi.mock("@/lib/ai", () => ({
   organizeNote: vi.fn(),
   embedNote: vi.fn(),
@@ -33,6 +37,7 @@ vi.mock("@/lib/ai", () => ({
 }));
 
 import { embedNote, organizeNote, cosineSimilarity } from "@/lib/ai";
+import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory } from "@/lib/userMemory";
 import { enrichNote } from "./enrichNote";
@@ -50,6 +55,7 @@ const mockedExecuteRaw = vi.mocked(prisma.$executeRaw);
 const mockedGetThinkingMemory = vi.mocked(getThinkingMemory);
 const mockedBuildThinkingMemoryPrompt = vi.mocked(buildThinkingMemoryPrompt);
 const mockedUpdateThinkingMemory = vi.mocked(updateThinkingMemory);
+const mockedRescoreUserReclassificationQueue = vi.mocked(rescoreUserReclassificationQueue);
 
 describe("enrichNote", () => {
   beforeEach(() => {
@@ -81,9 +87,11 @@ describe("enrichNote", () => {
       knownContexts: [],
       knownPeople: [],
       knownTopics: [],
+      hintStats: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);
+    mockedRescoreUserReclassificationQueue.mockResolvedValue(undefined);
   });
 
   it("persists the computed embedding when enrichment succeeds", async () => {
@@ -98,6 +106,7 @@ describe("enrichNote", () => {
 
     expect(mockedUpdate).toHaveBeenCalled();
     expect(mockedExecuteRaw).toHaveBeenCalledTimes(1);
+    expect(mockedRescoreUserReclassificationQueue).toHaveBeenCalledWith("u1");
   });
 
   it("falls back gracefully when embedding generation fails", async () => {

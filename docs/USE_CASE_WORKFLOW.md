@@ -89,6 +89,7 @@ Expected behavior:
 
 When later notes reveal stronger context for older notes:
 
+- background enrichment re-scores the changed-meaning queue,
 - inbox surfaces a reclassification queue,
 - right panel surfaces top changed-meaning notes,
 - user can apply one or many suggested regroupings,

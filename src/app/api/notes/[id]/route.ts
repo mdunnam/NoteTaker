@@ -5,6 +5,7 @@
  */
 
 import { auth } from "@/auth";
+import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -71,6 +72,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const { id } = params;
     const body = await request.json();
+    const shouldRescoreQueue = [
+      body.rawContent !== undefined,
+      body.summary !== undefined,
+      body.category !== undefined,
+      body.type !== undefined,
+      body.tags !== undefined,
+      body.suggestedProject !== undefined,
+      body.aiMeta !== undefined,
+      body.isArchived !== undefined,
+    ].some(Boolean);
 
     // Verify ownership
     const note = await prisma.note.findFirst({
@@ -110,6 +121,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         },
       },
     });
+
+    if (shouldRescoreQueue) {
+      try {
+        await rescoreUserReclassificationQueue(session.user.id);
+      } catch (reclassificationError) {
+        console.error("Error rescoring changed-meaning queue:", reclassificationError);
+      }
+    }
 
     return NextResponse.json(updatedNote);
   } catch (error) {

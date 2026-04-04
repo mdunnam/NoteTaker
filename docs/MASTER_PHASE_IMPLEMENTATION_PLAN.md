@@ -48,7 +48,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Projects and Topics pages backed by inferred knowledge clusters
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
-- Reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
+- Background-rescored reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
 - Related note relation links
 - Contextual right panel on note detail routes
 - Durable enrichment queue (`NoteJob`) with worker retry loop
@@ -117,6 +117,7 @@ For batches of related notes:
 **Step 4.5 — Reclassification Queue When Context Changes**
 
 When newer notes clarify older work:
+- enrichment re-scores and persists changed-meaning suggestions in the background
 - QNote ranks notes whose project/category likely changed
 - inbox and right panel surface those candidates automatically
 - user can apply one or many regrouping suggestions
@@ -786,6 +787,7 @@ Shipped behavior:
 - Projects page shows project cluster browsers
 - Topics page shows topic cluster browsers
 - Note detail surfaces cluster context and reorganization suggestions
+- Enrichment persists changed-meaning suggestions in the background
 - Inbox and right panel surface a changed-meaning reclassification queue
 
 **What is still missing**

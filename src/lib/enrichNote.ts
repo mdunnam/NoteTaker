@@ -4,6 +4,7 @@
  */
 
 import { Prisma } from "@prisma/client";
+import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import { cosineSimilarity, embedNote, organizeNote } from "@/lib/ai";
 import { toPgVectorLiteral } from "@/lib/pgvector";
@@ -46,10 +47,14 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
     const [currentNoteHints, thinkingMemory] = await Promise.all([
       prisma.note.findUnique({
         where: { id: noteId },
-        select: { suggestedProject: true, category: true },
+        select: { suggestedProject: true, category: true, aiMeta: true },
       }),
       getThinkingMemory(userId),
     ]);
+
+    const existingAiMeta = currentNoteHints?.aiMeta && typeof currentNoteHints.aiMeta === "object" && !Array.isArray(currentNoteHints.aiMeta)
+      ? currentNoteHints.aiMeta as Record<string, unknown>
+      : {};
 
     const organized = await organizeNote(rawContent, {
       explicitProject: currentNoteHints?.suggestedProject || undefined,
@@ -72,10 +77,11 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
         confidenceScore: organized.confidenceScore,
         priority: organized.priority || "medium",
         aiMeta: {
+          ...existingAiMeta,
           intent: organized.intent || null,
           nextAction: organized.nextAction || null,
           clarificationQuestions: organized.clarificationQuestions || [],
-        },
+        } as unknown as Prisma.InputJsonValue,
         status: "PROCESSED",
       },
     });
@@ -161,6 +167,12 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
       }
     } catch (relationError) {
       console.error("Error creating related-note links:", relationError);
+    }
+
+    try {
+      await rescoreUserReclassificationQueue(userId);
+    } catch (reclassificationError) {
+      console.error("Error rescoring changed-meaning queue:", reclassificationError);
     }
   } catch (aiError) {
     console.error("Error organizing note:", aiError);
