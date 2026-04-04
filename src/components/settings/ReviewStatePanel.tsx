@@ -1,4 +1,5 @@
 import ReviewSuppressionActions from "@/components/review/ReviewSuppressionActions";
+import { getReviewNoiseAssessment } from "@/lib/resurfacing";
 import type { ReviewActionStat, ReviewState } from "@/lib/userMemory";
 import Link from "next/link";
 
@@ -38,6 +39,7 @@ function buildActiveSuppressions(reviewState: ReviewState): ActiveSuppressionIte
  */
 export default function ReviewStatePanel({ reviewState, actionStats }: ReviewStatePanelProps) {
   const activeSuppressions = buildActiveSuppressions(reviewState);
+  const noisySignals = actionStats.filter((stat) => getReviewNoiseAssessment(stat).level !== "normal");
 
   if (activeSuppressions.length === 0 && actionStats.length === 0) {
     return (
@@ -49,7 +51,7 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <p className="text-xs uppercase tracking-wide text-gray-500">Active suppressions</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">{activeSuppressions.length}</p>
@@ -63,6 +65,11 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
         <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
           <p className="text-xs uppercase tracking-wide text-purple-700">Patterns hidden</p>
           <p className="mt-1 text-2xl font-bold text-purple-900">{reviewState.patterns.length}</p>
+        </div>
+
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-xs uppercase tracking-wide text-amber-700">Auto down-ranked</p>
+          <p className="mt-1 text-2xl font-bold text-amber-900">{noisySignals.length}</p>
         </div>
       </div>
 
@@ -108,12 +115,18 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
       )}
 
       {actionStats.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-gray-200">
+        <div>
+          <p className="mb-3 text-sm text-gray-600">
+            Repeated dismisses and snoozes now reduce how aggressively resurfacing brings a signal back. Restores offset some of that noise so useful signals can recover.
+          </p>
+
+          <div className="overflow-hidden rounded-lg border border-gray-200">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-2">Signal</th>
                 <th className="px-4 py-2">Kind</th>
+                <th className="px-4 py-2">Heuristic</th>
                 <th className="px-3 py-2 text-center">Snoozes</th>
                 <th className="px-3 py-2 text-center">Dismisses</th>
                 <th className="px-3 py-2 text-center">Restores</th>
@@ -131,6 +144,27 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
                       {stat.kind === "forgotten-note" ? "forgotten note" : "pattern"}
                     </span>
                   </td>
+                  <td className="px-4 py-2.5">
+                    {(() => {
+                      const assessment = getReviewNoiseAssessment(stat);
+                      const className = assessment.level === "suppressed"
+                        ? "bg-red-100 text-red-700"
+                        : assessment.level === "downranked"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-green-100 text-green-700";
+                      const label = assessment.level === "suppressed"
+                        ? `suppressed (${assessment.noiseScore})`
+                        : assessment.level === "downranked"
+                          ? `downranked (${assessment.noiseScore})`
+                          : "normal";
+
+                      return (
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}>
+                          {label}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="px-3 py-2.5 text-center text-gray-700">{stat.snoozes}</td>
                   <td className="px-3 py-2.5 text-center text-gray-700">{stat.dismisses}</td>
                   <td className="px-3 py-2.5 text-center text-gray-700">{stat.restores}</td>
@@ -144,6 +178,7 @@ export default function ReviewStatePanel({ reviewState, actionStats }: ReviewSta
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
     </div>

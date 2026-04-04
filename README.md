@@ -43,6 +43,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
 - **Suppressed review recovery**: Review shows suppressed-item counts and lets you restore snoozed or dismissed resurfacing items immediately
 - **Review telemetry in Settings**: Settings now shows active suppressions plus snooze/dismiss/restore history so resurfacing noise is visible and manageable
+- **Feedback-aware resurfacing**: Repeated dismisses and snoozes now automatically down-rank or suppress noisy forgotten-note and pattern signals
 
 ### Phase 4 🚧 (Knowledge browsing foundation shipped)
 - Search, Projects, and Topics now have real cluster/search behavior
@@ -251,6 +252,7 @@ src/
 - [x] Snooze/dismiss review-state persistence for resurfacing items
 - [x] Suppressed-item counts and restore actions in Review
 - [x] Settings visibility for active suppressions and review action history
+- [x] Automatic downranking and suppression of noisy resurfacing signals from review feedback
 - [ ] Note health widget
 - [ ] Recurring idea detection beyond review heuristics
 - [ ] Broader resurfacing across inbox, right panel, and notifications
