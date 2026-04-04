@@ -16,11 +16,23 @@ interface HintStat {
 }
 
 export type ReviewSuppressionKind = "forgotten-note" | "pattern";
+export type ReviewActionType = "snooze" | "dismiss" | "restore";
 
 interface ReviewSuppression {
   id: string;
   until: string;
   label?: string;
+}
+
+export interface ReviewActionStat {
+  id: string;
+  kind: ReviewSuppressionKind;
+  label?: string;
+  snoozes: number;
+  dismisses: number;
+  restores: number;
+  lastAction: ReviewActionType;
+  lastActionAt: string;
 }
 
 export interface ReviewState {
@@ -35,6 +47,7 @@ interface ThinkingMemory {
   knownTopics: MemoryItem[];
   hintStats: HintStat[];
   reviewState: ReviewState;
+  reviewActionStats: ReviewActionStat[];
 }
 
 export type { HintStat };
@@ -57,6 +70,7 @@ interface UpdateThinkingMemoryOptions {
 
 const MAX_ITEMS_PER_BUCKET = 20;
 const MAX_REVIEW_SUPPRESSIONS_PER_KIND = 100;
+const MAX_REVIEW_ACTION_STATS = 200;
 
 function normalizeName(value: string): string {
   return value.trim().replace(/\s+/g, " ");
@@ -109,6 +123,7 @@ function emptyMemory(): ThinkingMemory {
       forgottenNotes: [],
       patterns: [],
     },
+    reviewActionStats: [],
   };
 }
 
@@ -162,6 +177,32 @@ function parseReviewState(value: unknown): ReviewState {
   };
 }
 
+function parseReviewActionStats(value: unknown): ReviewActionStat[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is ReviewActionStat => {
+      if (!isRecord(item)) {
+        return false;
+      }
+
+      return (
+        typeof item.id === "string" &&
+        item.id.trim().length > 0 &&
+        (item.kind === "forgotten-note" || item.kind === "pattern") &&
+        (item.label === undefined || typeof item.label === "string") &&
+        typeof item.snoozes === "number" &&
+        typeof item.dismisses === "number" &&
+        typeof item.restores === "number" &&
+        (item.lastAction === "snooze" || item.lastAction === "dismiss" || item.lastAction === "restore") &&
+        typeof item.lastActionAt === "string"
+      );
+    })
+    .slice(0, MAX_REVIEW_ACTION_STATS);
+}
+
 function pruneReviewSuppressions(items: ReviewSuppression[], now = new Date()): ReviewSuppression[] {
   return items
     .filter((item) => {
@@ -178,8 +219,60 @@ function pruneReviewState(reviewState: ReviewState, now = new Date()): ReviewSta
   };
 }
 
+function sortReviewActionStats(stats: ReviewActionStat[]): ReviewActionStat[] {
+  return [...stats]
+    .sort((left, right) => {
+      const rightScore = right.dismisses * 3 + right.snoozes * 2 + right.restores;
+      const leftScore = left.dismisses * 3 + left.snoozes * 2 + left.restores;
+      return rightScore - leftScore || new Date(right.lastActionAt).getTime() - new Date(left.lastActionAt).getTime();
+    })
+    .slice(0, MAX_REVIEW_ACTION_STATS);
+}
+
+function upsertReviewActionStat(
+  stats: ReviewActionStat[],
+  kind: ReviewSuppressionKind,
+  id: string,
+  action: ReviewActionType,
+  label?: string
+): ReviewActionStat[] {
+  const now = new Date().toISOString();
+  const existingIndex = stats.findIndex((item) => item.kind === kind && item.id === id);
+
+  if (existingIndex === -1) {
+    return sortReviewActionStats([
+      ...stats,
+      {
+        id,
+        kind,
+        ...(label ? { label } : {}),
+        snoozes: action === "snooze" ? 1 : 0,
+        dismisses: action === "dismiss" ? 1 : 0,
+        restores: action === "restore" ? 1 : 0,
+        lastAction: action,
+        lastActionAt: now,
+      },
+    ]);
+  }
+
+  const next = [...stats];
+  const existing = next[existingIndex];
+  next[existingIndex] = {
+    ...existing,
+    ...(label ? { label } : {}),
+    snoozes: existing.snoozes + (action === "snooze" ? 1 : 0),
+    dismisses: existing.dismisses + (action === "dismiss" ? 1 : 0),
+    restores: existing.restores + (action === "restore" ? 1 : 0),
+    lastAction: action,
+    lastActionAt: now,
+  };
+
+  return sortReviewActionStats(next);
+}
+
 async function persistThinkingMemory(userId: string, memory: ThinkingMemory): Promise<void> {
   const reviewState = pruneReviewState(memory.reviewState);
+  const reviewActionStats = sortReviewActionStats(memory.reviewActionStats);
 
   await prisma.userPreferences.upsert({
     where: { userId },
@@ -192,6 +285,7 @@ async function persistThinkingMemory(userId: string, memory: ThinkingMemory): Pr
         knownTopics: memory.knownTopics,
         hintStats: memory.hintStats,
         reviewState,
+        reviewActionStats,
       } as unknown as Prisma.InputJsonValue,
     },
     update: {
@@ -202,6 +296,7 @@ async function persistThinkingMemory(userId: string, memory: ThinkingMemory): Pr
         knownTopics: memory.knownTopics,
         hintStats: memory.hintStats,
         reviewState,
+        reviewActionStats,
       } as unknown as Prisma.InputJsonValue,
     },
   });
@@ -228,6 +323,7 @@ export async function getThinkingMemory(userId: string): Promise<ThinkingMemory>
     knownTopics: parseMemoryBucket(raw.knownTopics),
     hintStats: parseHintStats(raw.hintStats),
     reviewState: pruneReviewState(parseReviewState(raw.reviewState)),
+    reviewActionStats: sortReviewActionStats(parseReviewActionStats(raw.reviewActionStats)),
   };
 }
 
@@ -347,6 +443,7 @@ export async function updateThinkingMemory(
     knownTopics,
     hintStats,
     reviewState: current.reviewState,
+    reviewActionStats: current.reviewActionStats,
   });
 }
 
@@ -401,6 +498,13 @@ export async function getHintStats(userId: string): Promise<HintStat[]> {
     .sort((a, b) => b.uses - a.uses);
 }
 
+/** Return sorted review-action telemetry for settings and future ranking work. */
+export async function getReviewActionStats(userId: string): Promise<ReviewActionStat[]> {
+  const memory = await getThinkingMemory(userId);
+  return sortReviewActionStats(memory.reviewActionStats)
+    .filter((stat) => stat.snoozes > 0 || stat.dismisses > 0 || stat.restores > 0);
+}
+
 /** Return whether a review item is currently suppressed. */
 export function isReviewItemSuppressed(
   reviewState: ReviewState,
@@ -427,12 +531,14 @@ export async function suppressReviewItem(
   userId: string,
   kind: ReviewSuppressionKind,
   id: string,
+  action: Extract<ReviewActionType, "snooze" | "dismiss">,
   durationDays: number,
   label?: string
 ): Promise<string> {
   const current = await getThinkingMemory(userId);
   const until = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
   const reviewState = pruneReviewState(current.reviewState);
+  const reviewActionStats = upsertReviewActionStat(current.reviewActionStats, kind, id, action, label);
   const key = kind === "forgotten-note" ? "forgottenNotes" : "patterns";
   const nextItems = reviewState[key]
     .filter((item) => item.id !== id)
@@ -445,6 +551,7 @@ export async function suppressReviewItem(
       ...reviewState,
       [key]: nextItems,
     },
+    reviewActionStats,
   });
 
   return until;
@@ -459,6 +566,8 @@ export async function restoreReviewItem(
   const current = await getThinkingMemory(userId);
   const reviewState = pruneReviewState(current.reviewState);
   const key = kind === "forgotten-note" ? "forgottenNotes" : "patterns";
+  const existingLabel = reviewState[key].find((item) => item.id === id)?.label;
+  const reviewActionStats = upsertReviewActionStat(current.reviewActionStats, kind, id, "restore", existingLabel);
 
   await persistThinkingMemory(userId, {
     ...current,
@@ -466,5 +575,6 @@ export async function restoreReviewItem(
       ...reviewState,
       [key]: reviewState[key].filter((item) => item.id !== id),
     },
+    reviewActionStats,
   });
 }

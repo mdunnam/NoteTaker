@@ -64,7 +64,7 @@ describe("/api/review/state POST", () => {
 
     expect(response.status).toBe(200);
     expect(payload.action).toBe("snooze");
-    expect(mockedSuppressReviewItem).toHaveBeenCalledWith("u1", "forgotten-note", "n1", 7, "Old task note");
+    expect(mockedSuppressReviewItem).toHaveBeenCalledWith("u1", "forgotten-note", "n1", "snooze", 7, "Old task note");
   });
 
   it("persists dismiss windows for pattern review items", async () => {
@@ -73,7 +73,7 @@ describe("/api/review/state POST", () => {
     const response = await POST(makeRequest({ kind: "pattern", targetId: "topic:downtime", action: "dismiss" }));
 
     expect(response.status).toBe(200);
-    expect(mockedSuppressReviewItem).toHaveBeenCalledWith("u1", "pattern", "topic:downtime", 30, undefined);
+    expect(mockedSuppressReviewItem).toHaveBeenCalledWith("u1", "pattern", "topic:downtime", "dismiss", 30, undefined);
   });
 
   it("restores previously suppressed review items", async () => {

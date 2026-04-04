@@ -80,6 +80,7 @@ describe("/api/notes/[id]/summary POST", () => {
         forgottenNotes: [],
         patterns: [],
       },
+      reviewActionStats: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);

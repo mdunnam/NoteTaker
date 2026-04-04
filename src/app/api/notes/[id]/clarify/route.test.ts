@@ -74,6 +74,7 @@ describe("/api/notes/[id]/clarify POST", () => {
         forgottenNotes: [],
         patterns: [],
       },
+      reviewActionStats: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);

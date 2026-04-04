@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
       session.user.id,
       parsedBody.data.kind,
       parsedBody.data.targetId,
+      parsedBody.data.action,
       durationDays,
       parsedBody.data.label
     );

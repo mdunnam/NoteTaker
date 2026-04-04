@@ -54,6 +54,7 @@ describe("/api/notes/analyze-dump POST", () => {
         forgottenNotes: [],
         patterns: [],
       },
+      reviewActionStats: [],
     } as never);
     mockedBuildPrompt.mockReturnValue("Known projects: (none)");
   });
