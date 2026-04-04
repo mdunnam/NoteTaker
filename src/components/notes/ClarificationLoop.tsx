@@ -11,6 +11,11 @@ interface ClarificationResult {
   aiMeta: unknown;
 }
 
+interface ClarificationFeedbackResult {
+  id: string;
+  aiMeta: unknown;
+}
+
 interface ClarificationLoopProps {
   noteId: string;
   aiMeta: unknown;
@@ -40,6 +45,7 @@ export default function ClarificationLoop({
   const [selectedQuestion, setSelectedQuestion] = useState(parsedMeta.clarificationQuestions[0] || "");
   const [answer, setAnswer] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDismissingQuestion, setIsDismissingQuestion] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +109,43 @@ export default function ClarificationLoop({
     }
   };
 
+  /** Dismiss one clarification question as not useful and refresh the note-local question list. */
+  const dismissQuestion = async (question: string) => {
+    setIsDismissingQuestion(question);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const response = await fetch(`/api/notes/${noteId}/clarify-feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, action: "dismiss" }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to record clarification feedback");
+      }
+
+      const data = (await response.json()) as ClarificationFeedbackResult;
+      const nextMeta = parseNoteAiMeta(data.aiMeta);
+      setParsedMeta(nextMeta);
+      setSelectedQuestion((current) => {
+        if (current && current !== question && nextMeta.clarificationQuestions.includes(current)) {
+          return current;
+        }
+
+        return nextMeta.clarificationQuestions[0] || "";
+      });
+      setMessage("Marked that question as not useful.");
+      router.refresh();
+    } catch (dismissError) {
+      console.error("Error dismissing clarification question:", dismissError);
+      setError("Could not dismiss this clarification question.");
+    } finally {
+      setIsDismissingQuestion(null);
+    }
+  };
+
   /** Submit the current freeform answer into the clarification conversation. */
   const handleSubmitAnswer = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -127,8 +170,18 @@ export default function ClarificationLoop({
       {parsedMeta.clarificationQuestions.length > 0 ? (
         <ul className="mt-2 space-y-1">
           {parsedMeta.clarificationQuestions.map((question) => (
-            <li key={question} className={`${compact ? "text-xs" : "text-sm"} text-amber-900`}>
-              • {question}
+            <li key={question} className="flex items-start justify-between gap-3">
+              <span className={`${compact ? "text-xs" : "text-sm"} text-amber-900`}>
+                • {question}
+              </span>
+              <button
+                type="button"
+                disabled={isSubmitting || isDismissingQuestion !== null}
+                onClick={() => void dismissQuestion(question)}
+                className="shrink-0 rounded-md border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+              >
+                {isDismissingQuestion === question ? "Saving..." : "Not useful"}
+              </button>
             </li>
           ))}
         </ul>
@@ -157,7 +210,7 @@ export default function ClarificationLoop({
               <button
                 key={`clarify-project-${project}`}
                 type="button"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isDismissingQuestion !== null}
                 onClick={() => void submitClarification({ projectHint: project }, `Applied project hint: ${project}`)}
                 className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
               >
@@ -176,7 +229,7 @@ export default function ClarificationLoop({
               <button
                 key={`clarify-context-${context}`}
                 type="button"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isDismissingQuestion !== null}
                 onClick={() => void submitClarification({ contextHint: context }, `Applied context hint: ${context}`)}
                 className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[11px] text-amber-900 hover:bg-amber-100 disabled:opacity-60"
               >
@@ -192,6 +245,7 @@ export default function ClarificationLoop({
           <select
             value={selectedQuestion}
             onChange={(event) => setSelectedQuestion(event.target.value)}
+            disabled={isDismissingQuestion !== null}
             className="w-full rounded-md border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900"
           >
             {parsedMeta.clarificationQuestions.map((question) => (
@@ -203,6 +257,7 @@ export default function ClarificationLoop({
         <textarea
           value={answer}
           onChange={(event) => setAnswer(event.target.value)}
+          disabled={isDismissingQuestion !== null}
           rows={compact ? 2 : 3}
           placeholder={selectedQuestion || "Add more context to help QNote re-organize this note..."}
           className="w-full resize-y rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -214,7 +269,7 @@ export default function ClarificationLoop({
           </p>
           <button
             type="submit"
-            disabled={isSubmitting || !answer.trim()}
+            disabled={isSubmitting || isDismissingQuestion !== null || !answer.trim()}
             className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-60"
           >
             {isSubmitting ? "Saving..." : "Send answer"}

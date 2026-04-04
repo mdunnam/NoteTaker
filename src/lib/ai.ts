@@ -1,5 +1,10 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import {
+  filterClarificationQuestionsByFeedback,
+  getClarificationQuestionNoiseAssessment,
+  type ClarificationQuestionStat,
+} from "@/lib/clarification";
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -230,6 +235,35 @@ interface OrganizeNoteOptions {
   explicitProject?: string;
   explicitContext?: string;
   clarificationContext?: string;
+  clarificationQuestionStats?: ClarificationQuestionStat[];
+}
+
+/** Build compact guidance so the model avoids question styles the user repeatedly dismisses. */
+function buildClarificationFeedbackHints(stats?: ClarificationQuestionStat[]): string[] {
+  if (!stats || stats.length === 0) {
+    return [];
+  }
+
+  const dismissed = stats
+    .filter((stat) => getClarificationQuestionNoiseAssessment(stat).level !== "normal")
+    .slice(0, 3)
+    .map((stat) => `${stat.label} (${stat.dismisses} dismisses, ${stat.answers} answers)`);
+  const answered = stats
+    .filter((stat) => stat.answers > stat.dismisses)
+    .slice(0, 3)
+    .map((stat) => `${stat.label} (${stat.answers} answers)`);
+
+  const hints: string[] = [];
+
+  if (dismissed.length > 0) {
+    hints.push(`Avoid repeating these low-value clarification styles unless they are truly necessary: ${dismissed.join("; ")}`);
+  }
+
+  if (answered.length > 0) {
+    hints.push(`These clarification styles have historically been useful: ${answered.join("; ")}`);
+  }
+
+  return hints;
 }
 
 /**
@@ -257,6 +291,12 @@ function buildOrganizationHints(options?: OrganizeNoteOptions): string {
 
   if (options.clarificationContext?.trim()) {
     hints.push(options.clarificationContext.trim());
+  }
+
+  const clarificationFeedbackHints = buildClarificationFeedbackHints(options.clarificationQuestionStats);
+  if (clarificationFeedbackHints.length > 0) {
+    hints.push("Clarification feedback profile:");
+    hints.push(...clarificationFeedbackHints);
   }
 
   if (hints.length === 0) {
@@ -315,10 +355,15 @@ export async function organizeNote(rawContent: string, options?: OrganizeNoteOpt
     const raw = completion.choices[0]?.message?.content || "{}";
     const parsed = OrganizedNoteSchema.parse(JSON.parse(raw));
     const improvedSummary = await improveSummaryIfNeeded(rawContent, parsed);
+    const filteredClarificationQuestions = filterClarificationQuestionsByFeedback(
+      parsed.clarificationQuestions,
+      options?.clarificationQuestionStats || []
+    );
 
     return {
       ...parsed,
       summary: improvedSummary,
+      clarificationQuestions: filteredClarificationQuestions,
     };
   } catch (error) {
     console.error("Error organizing note:", error);

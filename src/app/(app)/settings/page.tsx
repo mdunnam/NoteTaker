@@ -1,12 +1,18 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { getHintStats, getReviewActionStats, getThinkingMemory } from "@/lib/userMemory";
+import {
+  getClarificationQuestionStats,
+  getHintStats,
+  getReviewActionStats,
+  getThinkingMemory,
+} from "@/lib/userMemory";
 import { getUserStats } from "@/lib/userStats";
 import SettingsClient from "@/components/settings/SettingsClient";
 import HintEffectivenessPanel from "@/components/settings/HintEffectivenessPanel";
 import AIPerformancePanel from "@/components/settings/AIPerformancePanel";
 import ReviewStatePanel from "@/components/settings/ReviewStatePanel";
+import ClarificationFeedbackPanel from "@/components/settings/ClarificationFeedbackPanel";
 
 /**
  * User settings page.
@@ -18,7 +24,7 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
-  const [user, hintStats, userStats, thinkingMemory, reviewActionStats] = await Promise.all([
+  const [user, hintStats, userStats, thinkingMemory, reviewActionStats, clarificationQuestionStats] = await Promise.all([
     prisma.user.findUnique({
       where: { id: session.user.id },
       select: { name: true, email: true },
@@ -27,6 +33,7 @@ export default async function SettingsPage() {
     getUserStats(session.user.id),
     getThinkingMemory(session.user.id),
     getReviewActionStats(session.user.id),
+    getClarificationQuestionStats(session.user.id),
   ]);
 
   if (!user) {
@@ -54,6 +61,14 @@ export default async function SettingsPage() {
           Use this to see which projects and contexts are most useful for teaching QNote.
         </p>
         <HintEffectivenessPanel stats={hintStats} />
+      </div>
+
+      <div className="mt-10 max-w-5xl">
+        <h2 className="mb-1 text-xl font-bold text-gray-900">Clarification Feedback</h2>
+        <p className="mb-4 text-sm text-gray-600">
+          Track which clarification question styles you answer, dismiss, or implicitly train away so QNote can ask tighter follow-up questions over time.
+        </p>
+        <ClarificationFeedbackPanel stats={clarificationQuestionStats} />
       </div>
 
       <div className="mt-10 max-w-5xl">

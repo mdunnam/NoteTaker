@@ -10,7 +10,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { prisma } from "@/lib/db";
-import { restoreReviewItem, suppressReviewItem } from "@/lib/userMemory";
+import { recordClarificationQuestionFeedback, restoreReviewItem, suppressReviewItem } from "@/lib/userMemory";
 
 const mockedFindUnique = vi.mocked(prisma.userPreferences.findUnique);
 const mockedUpsert = vi.mocked(prisma.userPreferences.upsert);
@@ -110,6 +110,44 @@ describe("userMemory review state", () => {
                 restores: 1,
                 snoozes: 1,
                 lastAction: "restore",
+              }),
+            ]),
+          }),
+        }),
+      })
+    );
+  });
+
+  it("records answered clarification feedback by question style", async () => {
+    mockedFindUnique.mockResolvedValue({
+      thinkingMemory: {
+        knownProjects: [],
+        knownContexts: [],
+        knownPeople: [],
+        knownTopics: [],
+        hintStats: [],
+        reviewState: {
+          forgottenNotes: [],
+          patterns: [],
+          reclassifications: [],
+        },
+        reviewActionStats: [],
+        clarificationQuestionStats: [],
+      },
+    } as never);
+
+    await recordClarificationQuestionFeedback("u1", "Which project is this for?", "answered");
+
+    expect(mockedUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          thinkingMemory: expect.objectContaining({
+            clarificationQuestionStats: expect.arrayContaining([
+              expect.objectContaining({
+                key: "project",
+                answers: 1,
+                dismisses: 0,
+                lastAction: "answered",
               }),
             ]),
           }),

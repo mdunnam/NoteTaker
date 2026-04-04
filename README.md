@@ -32,6 +32,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Summary refresh**: Regenerate weak summaries from detail and inbox cards
 - **Semantic search**: Uses stored pgvector embeddings with on-the-fly fallback
 - **Clarification loop**: Conversational follow-up answers plus quick project/context hints in inbox and note detail
+- **Clarification feedback**: Low-value clarification prompts can be marked `Not useful`, tracked in Settings, and filtered from future follow-up question sets
 - **Bulk clarify**: Apply project/context hints to selected notes and regenerate
 - **Contextual RightPanel**: Intent, next action, contextual tasks, related notes on note detail routes
 - **Hint effectiveness analytics**: Settings view tracks per-hint usage and average confidence lift
@@ -129,6 +130,7 @@ src/
       notes/route.ts        # CRUD endpoints for notes
       notes/[id]/route.ts   # Single note operations
       notes/[id]/clarify/route.ts  # Conversational clarification for one note
+      notes/[id]/clarify-feedback/route.ts  # Dismiss low-value clarification prompts
       notes/[id]/insights/route.ts # Related/contextual note intelligence
       notes/[id]/split/route.ts    # Split single note into multiple cards
       notes/[id]/summary/route.ts  # Regenerate AI summary for a note
@@ -162,13 +164,14 @@ src/
       SettingsClient.tsx    # Settings page client shell
       HintEffectivenessPanel.tsx # Per-hint lift table
       AIPerformancePanel.tsx  # AI instrumentation dashboard cards
+      ClarificationFeedbackPanel.tsx  # Clarification question feedback telemetry
 
   lib/
     db.ts                   # Prisma client singleton
     ai.ts                   # AI utilities (organize, embed, split)
-    clarification.ts        # aiMeta clarification parsing + transcript helpers
+    clarification.ts        # aiMeta clarification parsing + feedback-aware question filtering
     clusters.ts             # Project/topic clustering + reclassification ranking
-    userMemory.ts           # Per-user memory profile and hint telemetry
+    userMemory.ts           # Per-user memory profile, review telemetry, and clarification feedback stats
     searchRanking.ts        # Keyword/semantic ranking helpers
     userStats.ts            # AI performance metrics + snapshot history
 
@@ -227,6 +230,7 @@ src/
 - [x] Confidence state badges in note UI
 - [x] User-memory-aware organization hints
 - [x] Conversational clarification loop in inbox and note detail
+- [x] Clarification question feedback with `Not useful` dismissal + settings telemetry
 - [x] Bulk clarify + regenerate actions
 - [x] Right panel contextual insights for note detail
 - [x] Hint effectiveness analytics in settings

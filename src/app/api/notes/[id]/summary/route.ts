@@ -5,7 +5,13 @@ import { appendClarificationTurn, buildClarificationContext, parseNoteAiMeta } f
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory, recordHintUsage } from "@/lib/userMemory";
+import {
+  buildThinkingMemoryPrompt,
+  getThinkingMemory,
+  recordClarificationQuestionFeedback,
+  updateThinkingMemory,
+  recordHintUsage,
+} from "@/lib/userMemory";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -100,6 +106,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       explicitContext: parsedHints.contextHint || note.category || undefined,
       userContext: buildThinkingMemoryPrompt(memory),
       clarificationContext: buildClarificationContext(clarificationHistory),
+      clarificationQuestionStats: memory.clarificationQuestionStats,
     });
 
     const updated = await prisma.note.update({
@@ -150,6 +157,26 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Record confidence lift when the user clicked a specific hint chip.
     const confidenceBefore = note.confidenceScore ?? 0;
     const confidenceAfter = updated.confidenceScore ?? 0;
+    const answeredQuestions = new Set<string>();
+    if (parsedHints.projectHint) {
+      const matchedProjectQuestion = currentAiMeta.clarificationQuestions.find((question) => question.toLowerCase().includes("project"));
+      if (matchedProjectQuestion) {
+        answeredQuestions.add(matchedProjectQuestion);
+      }
+    }
+    if (parsedHints.contextHint) {
+      const matchedContextQuestion = currentAiMeta.clarificationQuestions.find(
+        (question) => question.toLowerCase().includes("context") || question.toLowerCase().includes("category")
+      );
+      if (matchedContextQuestion) {
+        answeredQuestions.add(matchedContextQuestion);
+      }
+    }
+
+    for (const question of answeredQuestions) {
+      await recordClarificationQuestionFeedback(session.user.id, question, "answered");
+    }
+
     if (parsedHints.projectHint) {
       await recordHintUsage(session.user.id, parsedHints.projectHint, "project", confidenceBefore, confidenceAfter);
     }

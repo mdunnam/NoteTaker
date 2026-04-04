@@ -60,6 +60,7 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
       explicitProject: currentNoteHints?.suggestedProject || undefined,
       explicitContext: currentNoteHints?.category || undefined,
       userContext: buildThinkingMemoryPrompt(thinkingMemory),
+      clarificationQuestionStats: thinkingMemory.clarificationQuestionStats,
     });
 
     await prisma.note.update({

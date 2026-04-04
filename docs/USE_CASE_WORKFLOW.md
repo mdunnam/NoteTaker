@@ -61,6 +61,7 @@ If confidence is low:
 - quick project/context chips appear,
 - user can answer the question directly in natural language,
 - user can click one hint,
+- user can mark a low-value clarification question as not useful,
 - note is regenerated immediately using the selected hint or answer,
 - follow-up questions narrow based on the conversation so far.
 
@@ -69,6 +70,7 @@ Expected behavior:
 - confidence should increase,
 - intent/next action should sharpen,
 - category/project assignment should improve,
+- dismissed clarification styles should become less likely to appear again,
 - the same clarification should not need to be asked repeatedly once it has been answered.
 
 ### Step 4: Bulk Clarify During Triage
@@ -112,11 +114,14 @@ When the user wants one place to process system-generated work:
 - clarification can happen directly from the review page,
 - regrouping suggestions can be applied in batches,
 - regrouping suggestions can also be dismissed as not useful,
+- low-value clarification questions can be dismissed as not useful,
 - forgotten-note and pattern cards can be snoozed or dismissed for a time window,
 - suppressed review items remain visible as a recoverable count and can be restored directly from Review,
 - Settings shows active suppressions and the snooze/dismiss/restore history for review items,
+- Settings also shows clarification question styles that are being answered, down-ranked, or suppressed,
 - repeated dismisses and snoozes automatically make resurfacing less aggressive for the same signals,
 - repeated dismissal of the same regrouping suggestion also makes reclassification less aggressive for that exact suggestion,
+- repeated dismissal of the same clarification style makes future follow-up questioning less aggressive too,
 - this becomes the foundation for deeper resurfacing and synthesis.
 
 ### Step 5: Contextual Review in Note Detail + RightPanel

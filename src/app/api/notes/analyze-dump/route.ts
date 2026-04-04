@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
       chunks.map(async (content) => {
         const organized = await organizeNote(content, {
           userContext: buildThinkingMemoryPrompt(memory),
+          clarificationQuestionStats: memory.clarificationQuestionStats,
         });
 
         return {

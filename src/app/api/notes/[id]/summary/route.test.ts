@@ -22,6 +22,7 @@ vi.mock("@/lib/userMemory", () => ({
   buildThinkingMemoryPrompt: vi.fn(),
   updateThinkingMemory: vi.fn(),
   recordHintUsage: vi.fn(),
+  recordClarificationQuestionFeedback: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -38,7 +39,13 @@ import { organizeNote } from "@/lib/ai";
 import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { buildThinkingMemoryPrompt, getThinkingMemory, updateThinkingMemory, recordHintUsage } from "@/lib/userMemory";
+import {
+  buildThinkingMemoryPrompt,
+  getThinkingMemory,
+  updateThinkingMemory,
+  recordHintUsage,
+  recordClarificationQuestionFeedback,
+} from "@/lib/userMemory";
 import { POST } from "./route";
 
 const mockedAuth = vi.mocked(auth);
@@ -50,6 +57,7 @@ const mockedGetThinkingMemory = vi.mocked(getThinkingMemory);
 const mockedBuildThinkingMemoryPrompt = vi.mocked(buildThinkingMemoryPrompt);
 const mockedUpdateThinkingMemory = vi.mocked(updateThinkingMemory);
 const mockedRecordHintUsage = vi.mocked(recordHintUsage);
+const mockedRecordClarificationQuestionFeedback = vi.mocked(recordClarificationQuestionFeedback);
 const mockedRescoreUserReclassificationQueue = vi.mocked(rescoreUserReclassificationQueue);
 
 function makeRequest() {
@@ -82,10 +90,12 @@ describe("/api/notes/[id]/summary POST", () => {
         reclassifications: [],
       },
       reviewActionStats: [],
+      clarificationQuestionStats: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);
     mockedRecordHintUsage.mockResolvedValue(undefined);
+    mockedRecordClarificationQuestionFeedback.mockResolvedValue(undefined);
     mockedRescoreUserReclassificationQueue.mockResolvedValue(undefined);
   });
 
@@ -208,5 +218,6 @@ describe("/api/notes/[id]/summary POST", () => {
         }),
       })
     );
+    expect(mockedRecordClarificationQuestionFeedback).toHaveBeenCalledWith("u1", "Which project is this for?", "answered");
   });
 });

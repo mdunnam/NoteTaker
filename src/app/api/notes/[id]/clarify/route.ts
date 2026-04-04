@@ -12,6 +12,7 @@ import { checkRateLimit } from "@/lib/rateLimit";
 import {
   buildThinkingMemoryPrompt,
   getThinkingMemory,
+  recordClarificationQuestionFeedback,
   recordHintUsage,
   updateThinkingMemory,
 } from "@/lib/userMemory";
@@ -124,6 +125,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       explicitContext: body.contextHint || note.category || undefined,
       userContext: buildThinkingMemoryPrompt(memory),
       clarificationContext: buildClarificationContext(clarificationHistory),
+      clarificationQuestionStats: memory.clarificationQuestionStats,
     });
 
     const updated = await prisma.note.update({
@@ -172,6 +174,9 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const confidenceBefore = note.confidenceScore ?? 0;
     const confidenceAfter = updated.confidenceScore ?? 0;
+    if ((body.answer?.trim() || body.projectHint?.trim() || body.contextHint?.trim()) && baseQuestion) {
+      await recordClarificationQuestionFeedback(session.user.id, baseQuestion, "answered");
+    }
     if (body.projectHint) {
       await recordHintUsage(session.user.id, body.projectHint, "project", confidenceBefore, confidenceAfter);
     }

@@ -36,6 +36,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Per-user memory profile: projects, contexts, people, topics
 - Organization prompts conditioned on per-user memory
 - Conversational clarification loop with persisted Q/A history per note
+- Clarification question feedback with `Not useful` dismissal, per-style telemetry, and feedback-aware filtering
 - Chip-click confidence lift tracking
 - Hint effectiveness analytics in settings
 - AI performance dashboard in settings
@@ -74,6 +75,7 @@ Shipped:
 - feedback-aware resurfacing that uses review telemetry to down-rank noisy signals
 - note-level reorganization suggestions and changed-meaning queues
 - reclassification queue feedback that down-ranks repeated false positives
+- clarification feedback that down-ranks or suppresses noisy question styles
 - AI performance visibility and learn-from-hint interactions
 
 Not yet shipped:
@@ -114,8 +116,10 @@ When confidence is low:
 - inbox cards and note detail show the AI's clarification questions
 - quick project/context chip buttons appear
 - user can click one hint or answer directly in natural language
+- user can mark low-value clarification questions as not useful
 - note regenerates immediately with updated context
 - follow-up questions narrow based on prior clarification answers
+- repeated dismissed question styles are filtered or pushed later in future follow-ups
 - confidence, intent, and category all improve from the re-run
 
 **Step 4 — Bulk Clarify During Triage**
@@ -245,6 +249,7 @@ src/
       notes/route.ts                 # GET, POST notes
       notes/[id]/route.ts            # PATCH, DELETE single note
       notes/[id]/clarify/route.ts    # POST continue clarification conversation for a note
+      notes/[id]/clarify-feedback/route.ts # POST dismiss low-value clarification question
       notes/[id]/split/route.ts      # POST preview/create split
       notes/[id]/summary/route.ts    # POST regenerate AI summary
       notes/analyze-dump/route.ts    # POST analyze raw dump into note previews
@@ -285,6 +290,7 @@ src/
       SettingsClient.tsx
       HintEffectivenessPanel.tsx
       AIPerformancePanel.tsx
+      ClarificationFeedbackPanel.tsx
     collections/
       CollectionsClient.tsx
     landing/
@@ -295,8 +301,8 @@ src/
     clusters.ts                      # cluster inference + reclassification ranking
     enrichNote.ts                    # full enrichment pipeline
     db.ts                            # Prisma client singleton
-    userMemory.ts                    # memory CRUD + hint stats
-    clarification.ts                 # clarification history parsing + transcript helpers
+    userMemory.ts                    # memory CRUD + hint stats + clarification feedback stats
+    clarification.ts                 # clarification history parsing + feedback-aware question filtering
     userStats.ts                     # AI performance metrics + snapshot history
     searchRanking.ts                 # semantic + keyword blending
     rateLimit.ts                     # per-user API rate limiting
@@ -336,6 +342,7 @@ DELETE /api/notes/[id]               Delete note
 ### AI Operations
 ```
 POST   /api/notes/[id]/clarify       Continue note clarification conversation
+POST   /api/notes/[id]/clarify-feedback Record lightweight feedback for one clarification question
 POST   /api/notes/[id]/split         Preview or create split cards
 POST   /api/notes/[id]/summary       Regenerate AI organization and confidence
 POST   /api/notes/analyze-dump       Analyze raw dump into organized previews
