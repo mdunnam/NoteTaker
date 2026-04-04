@@ -243,12 +243,17 @@ src/
 - [ ] Recurring idea detection
 - [ ] Forgotten-note resurfacing and pattern surfacing
 
-### Phase 6: Desktop (Tauri) 📋
+### Phase 6: Synthesis & Planning 📋
+- [ ] Multi-note synthesis
+- [ ] Planning outputs
+- [ ] Review workflows
+
+### Phase 7: Desktop (Tauri) 📋
 - [ ] Tauri integration
 - [ ] Global hotkey
 - [ ] System tray
 
-### Phase 7: iOS (Capacitor) 📋
+### Phase 8: iOS (Capacitor) 📋
 - [ ] Capacitor setup
 - [ ] Share extension
 

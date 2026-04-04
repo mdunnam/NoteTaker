@@ -307,7 +307,7 @@ POST   /api/notes/[id]/split         Preview or create split cards
 POST   /api/notes/[id]/summary       Regenerate AI organization and confidence
 POST   /api/notes/analyze-dump       Analyze raw dump into organized previews
 POST   /api/notes/analyze-dump/confirm Create selected dump notes
-GET    /api/notes/[id]/insights      Get related notes, tasks, entities for detail view
+GET    /api/notes/[id]/insights      Get related notes, tasks, cluster context, and reorganization suggestions for detail view
 ```
 
 ### Search
@@ -321,6 +321,20 @@ POST   /api/search/ask               Conversational question against note corpus
 PATCH  /api/user                     Update profile (name)
 GET    /api/user/hint-stats          Get per-hint usage and confidence lift stats
 GET    /api/user/stats               Get AI performance dashboard metrics, trends, and history
+```
+
+### Collections
+```
+GET    /api/collections              List collections for the current user
+POST   /api/collections              Create a collection
+GET    /api/collections/[id]         Get one collection with notes
+PATCH  /api/collections/[id]         Update a collection
+DELETE /api/collections/[id]         Delete a collection
+```
+
+### Billing
+```
+POST   /api/billing/checkout         Create Stripe Checkout session for subscription purchase
 ```
 
 ### Auth
