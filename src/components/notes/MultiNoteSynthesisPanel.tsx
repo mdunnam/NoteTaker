@@ -34,6 +34,7 @@ interface MultiNoteSynthesisPanelProps {
   title?: string;
   description?: string;
   compact?: boolean;
+  planningGoalPlaceholder?: string;
 }
 
 /** Trigger and display a lightweight synthesis across multiple selected notes. */
@@ -42,6 +43,7 @@ export default function MultiNoteSynthesisPanel({
   title = "Multi-note synthesis",
   description = "Combine selected notes into one synthesis, themes, and next actions.",
   compact = false,
+  planningGoalPlaceholder = "Optional planning lens: ship this week, prep client meeting, unblock launch...",
 }: MultiNoteSynthesisPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +112,7 @@ export default function MultiNoteSynthesisPanel({
         type="text"
         value={planningGoal}
         onChange={(event) => setPlanningGoal(event.target.value)}
-        placeholder="Optional planning lens: ship this week, prep client meeting, unblock launch..."
+        placeholder={planningGoalPlaceholder}
         className={`mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 ${compact ? "text-xs" : "text-sm"}`}
       />
 

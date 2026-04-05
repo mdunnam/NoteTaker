@@ -84,11 +84,11 @@ Shipped:
 - clarification feedback that down-ranks or suppresses noisy question styles, with restore controls in Settings
 - multi-note synthesis across selected notes and contextual clusters
 - planning outputs layered onto the synthesis route with objective, first move, steps, risks, and success signal
+- project/topic cluster planning directly from the Projects and Topics surfaces
 - AI performance visibility and learn-from-hint interactions
 - AI performance visibility for clarification-noise trends and learn-from-hint interactions
 
 Not yet shipped:
-- Deeper synthesis layers on top of Projects and Topics views
 - Capture from outside the app
 
 ---
@@ -243,8 +243,8 @@ src/
       notes/[id]/page.tsx            # Note detail
       review/page.tsx                # Dedicated review workflow
       cards/page.tsx                 # Card grid with health, selection, and synthesis
-      projects/page.tsx              # Project cluster browser
-      topics/page.tsx                # Topic cluster browser
+      projects/page.tsx              # Project cluster browser with planning
+      topics/page.tsx                # Topic cluster browser with planning
       timeline/page.tsx              # Timeline with health filters, bucket selection, and synthesis
       search/page.tsx                # Search & Ask experience
       favorites/page.tsx             # Favorites with health, selection, and synthesis
@@ -285,6 +285,7 @@ src/
       RightPanelContextual.tsx
     notes/
       CardsClient.tsx
+      KnowledgeClustersClient.tsx
       ReclassificationQueue.tsx
       NoteCard.tsx
       SavedNotesClient.tsx
@@ -1280,7 +1281,7 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 1. Resurfacing engine (forgotten + pattern)
 2. Multi-note synthesis
 3. RightPanel depth upgrades tied to clustering and synthesis
-4. Deeper project/topic planning layers
+4. Deeper review planning workflows
 5. Capture-from-anywhere surfaces
 
 ### Should Have

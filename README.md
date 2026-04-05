@@ -43,6 +43,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Note health**: Notes now carry a health score based on confidence, staleness, missing structure, and unresolved clarification pressure
 - **Multi-note synthesis**: Selected cards, timeline notes, and contextual note clusters can be synthesized into one shared summary, themes, and next actions
 - **Planning outputs**: Synthesis now also returns a concrete plan with objective, first move, ordered steps, risks, and a success signal
+- **Project/topic planning**: Projects and Topics now let you synthesize a cluster directly into a brief and execution plan from the cluster page itself
 - **Broader resurfacing**: Forgotten-note and recurring-pattern signals now surface in Inbox and the shared RightPanel, not only in Review
 - **Recurring idea detection**: Repeated language across recent notes now forms recurring idea threads even without explicit entities or tags
 - **Cards and Timeline depth**: Both views now support health-aware filtering, selection, and synthesis workflows
@@ -56,15 +57,15 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Feedback-aware regrouping**: Reclassification suggestions now support lightweight `Not useful` feedback and repeated dismisses down-rank or suppress the same regrouping suggestion later
 
 ### Phase 4 🚧 (Knowledge browsing foundation shipped)
-- Search, Projects, and Topics now have real cluster/search behavior
+- Search, Projects, and Topics now have real cluster/search/planning behavior
 - Semantic search UX with filters, snippets, and typeahead
-- Project/topic clustering with browsable grouped notes and reorganization suggestions
+- Project/topic clustering with browsable grouped notes, cluster planning, and reorganization suggestions
 - Reclassification queue for changed-meaning notes in inbox and right panel
 - Cards, Timeline, Favorites, and Archive now support deeper health-aware browsing and synthesis workflows
 
 ### Phase 5+ 📋
 - Resurface old notes
-- Deeper synthesis and planning layers
+- Deeper review planning workflows
 - Review and resurfacing workflows
 - Desktop (Tauri) and iOS (Capacitor) wrappers
 
@@ -129,9 +130,9 @@ src/
       layout.tsx            # App shell (sidebar, capture bar, right panel)
       inbox/page.tsx        # Main inbox view
       cards/page.tsx        # Card grid with health, selection, and synthesis
-      projects/page.tsx     # Project cluster browser
+      projects/page.tsx     # Project cluster browser with planning
       review/page.tsx       # Dedicated review workflow
-      topics/page.tsx       # Topic cluster browser
+      topics/page.tsx       # Topic cluster browser with planning
       search/page.tsx       # Search & Ask experience
       ... (other views)
     api/
@@ -165,6 +166,7 @@ src/
       RightPanelContextual.tsx # Note-detail context widgets
     notes/
       CardsClient.tsx      # Cards filters, selection, synthesis
+      KnowledgeClustersClient.tsx # Shared Projects and Topics planning surface
       NoteCard.tsx          # Individual note display
       InboxStream.tsx       # Note list view
       ClarificationLoop.tsx # Shared conversational clarification UI
@@ -285,6 +287,7 @@ src/
 ### Phase 6: Synthesis & Planning 📋
 - [x] Multi-note synthesis
 - [x] Planning outputs
+- [x] Projects and Topics planning surfaces
 - [ ] Review workflows
 
 ### Phase 7: Desktop (Tauri) 📋

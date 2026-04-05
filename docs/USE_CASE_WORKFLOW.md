@@ -196,6 +196,7 @@ Execution:
 - user opens high-priority notes,
 - follows next-action guidance,
 - browses project/topic clusters when trying to reconnect fragmented conversations,
+- can synthesize a project or topic cluster directly into a plan without leaving the cluster page,
 - works through extracted tasks.
 
 Reflection:
