@@ -37,6 +37,10 @@ describe("/api/user/stats GET", () => {
       lowConfidenceCount: 2,
       clarificationRate: 0.25,
       clarificationConversionRate: 0.5,
+      clarificationDismissRate: 0.33,
+      clarificationFeedbackCount: 9,
+      clarificationDownrankedStyles: 2,
+      clarificationSuppressedStyles: 1,
       avgConfidence: 0.72,
       avgHintLift: 0.11,
       hintUses: 6,
@@ -45,6 +49,7 @@ describe("/api/user/stats GET", () => {
       trends: {
         confidence: { last7: 0.75, last30: 0.7, delta: 0.05, direction: "up", betterWhen: "higher" },
         clarificationRate: { last7: 0.2, last30: 0.3, delta: -0.1, direction: "down", betterWhen: "lower" },
+        clarificationDismissRate: { last7: 0.2, last30: 0.33, delta: -0.13, direction: "down", betterWhen: "lower" },
         resolutionTimeMs: { last7: 1500, last30: 1800, delta: -300, direction: "down", betterWhen: "lower" },
       },
       history: {
@@ -55,6 +60,10 @@ describe("/api/user/stats GET", () => {
         clarificationRate: [
           { date: "2026-03-01T00:00:00.000Z", value: 0.4 },
           { date: "2026-03-31T00:00:00.000Z", value: 0.25 },
+        ],
+        clarificationDismissRate: [
+          { date: "2026-03-01T00:00:00.000Z", value: 0.5 },
+          { date: "2026-03-31T00:00:00.000Z", value: 0.33 },
         ],
         resolutionTimeMs: [
           { date: "2026-03-01T00:00:00.000Z", value: 2100 },

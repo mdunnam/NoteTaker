@@ -35,6 +35,8 @@ describe("userMemory review state", () => {
           reclassifications: [],
         },
         reviewActionStats: [],
+        clarificationQuestionStats: [],
+        clarificationQuestionEvents: [],
       },
     } as never);
 
@@ -90,6 +92,8 @@ describe("userMemory review state", () => {
             lastActionAt: "2026-04-01T00:00:00.000Z",
           },
         ],
+        clarificationQuestionStats: [],
+        clarificationQuestionEvents: [],
       },
     } as never);
 
@@ -133,6 +137,7 @@ describe("userMemory review state", () => {
         },
         reviewActionStats: [],
         clarificationQuestionStats: [],
+        clarificationQuestionEvents: [],
       },
     } as never);
 

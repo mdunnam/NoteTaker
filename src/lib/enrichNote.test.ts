@@ -95,6 +95,7 @@ describe("enrichNote", () => {
       },
       reviewActionStats: [],
       clarificationQuestionStats: [],
+      clarificationQuestionEvents: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);

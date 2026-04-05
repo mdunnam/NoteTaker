@@ -91,6 +91,7 @@ describe("/api/notes/[id]/summary POST", () => {
       },
       reviewActionStats: [],
       clarificationQuestionStats: [],
+      clarificationQuestionEvents: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);

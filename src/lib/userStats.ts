@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { getHintStats } from "@/lib/userMemory";
+import { getClarificationQuestionNoiseAssessment } from "@/lib/clarification";
+import { getThinkingMemory } from "@/lib/userMemory";
 
 export interface MetricTrend {
   last7: number;
@@ -17,12 +18,14 @@ export interface MetricSeriesPoint {
 interface UserStatsTrends {
   confidence: MetricTrend;
   clarificationRate: MetricTrend;
+  clarificationDismissRate: MetricTrend;
   resolutionTimeMs: MetricTrend;
 }
 
 interface UserStatsHistory {
   confidence: MetricSeriesPoint[];
   clarificationRate: MetricSeriesPoint[];
+  clarificationDismissRate: MetricSeriesPoint[];
   resolutionTimeMs: MetricSeriesPoint[];
 }
 
@@ -47,6 +50,10 @@ export interface UserStats {
   lowConfidenceCount: number;
   clarificationRate: number;
   clarificationConversionRate: number;
+  clarificationDismissRate: number;
+  clarificationFeedbackCount: number;
+  clarificationDownrankedStyles: number;
+  clarificationSuppressedStyles: number;
   avgConfidence: number;
   avgHintLift: number;
   hintUses: number;
@@ -80,6 +87,42 @@ function startOfDay(value: Date): Date {
 function endOfDay(value: Date): Date {
   const day = startOfDay(value);
   return new Date(day.getTime() + 24 * 60 * 60 * 1000 - 1);
+}
+
+function buildClarificationDismissRateHistory(
+  events: Array<{ createdAt: string; action: "answered" | "dismissed" }>,
+  now: Date,
+  days = 30
+): MetricSeriesPoint[] {
+  const today = startOfDay(now);
+  const firstDay = startOfDay(new Date(today.getTime() - (days - 1) * 24 * 60 * 60 * 1000));
+
+  return Array.from({ length: days }, (_, index) => {
+    const day = startOfDay(new Date(firstDay.getTime() + index * 24 * 60 * 60 * 1000));
+    const nextDay = new Date(day.getTime() + 24 * 60 * 60 * 1000);
+    const dayEvents = events.filter((event) => {
+      const createdAt = new Date(event.createdAt);
+      return createdAt >= day && createdAt < nextDay;
+    });
+    const dismisses = dayEvents.filter((event) => event.action === "dismissed").length;
+
+    return {
+      date: day.toISOString(),
+      value: dayEvents.length > 0 ? dismisses / dayEvents.length : 0,
+    };
+  });
+}
+
+function buildClarificationDismissRate(
+  events: Array<{ createdAt: string; action: "answered" | "dismissed" }>,
+  windowStart?: Date
+): number {
+  const filteredEvents = windowStart
+    ? events.filter((event) => new Date(event.createdAt) >= windowStart)
+    : events;
+  const dismisses = filteredEvents.filter((event) => event.action === "dismissed").length;
+
+  return filteredEvents.length > 0 ? dismisses / filteredEvents.length : 0;
 }
 
 async function buildSnapshotValuesForDate(userId: string, snapshotDate: Date): Promise<SnapshotRow> {
@@ -257,7 +300,7 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     doneJobs,
     trendNotes,
     trendJobs,
-    hintStats,
+    thinkingMemory,
   ] = await Promise.all([
     prisma.note.count({ where: { userId, isArchived: false } }),
     prisma.note.count({ where: { userId, isArchived: false, status: "PROCESSED" } }),
@@ -341,8 +384,15 @@ export async function getUserStats(userId: string): Promise<UserStats> {
         processedAt: "desc",
       },
     }),
-    getHintStats(userId),
+    getThinkingMemory(userId),
   ]);
+
+  const hintStats = thinkingMemory.hintStats
+    .filter((stat) => stat.uses > 0)
+    .sort((left, right) => right.uses - left.uses);
+  const clarificationEvents = thinkingMemory.clarificationQuestionEvents;
+  const clarificationQuestionStats = thinkingMemory.clarificationQuestionStats
+    .filter((stat) => stat.answers > 0 || stat.dismisses > 0);
 
   const clarificationRate = processedNotes > 0 ? lowConfidenceNotes / processedNotes : 0;
 
@@ -358,6 +408,14 @@ export async function getUserStats(userId: string): Promise<UserStats> {
   const avgHintLift = totalHintUses > 0
     ? hintStats.reduce((sum, stat) => sum + stat.totalConfidenceLift, 0) / totalHintUses
     : 0;
+  const clarificationFeedbackCount = clarificationEvents.length;
+  const clarificationDismissRate = buildClarificationDismissRate(clarificationEvents);
+  const clarificationDownrankedStyles = clarificationQuestionStats.filter(
+    (stat) => getClarificationQuestionNoiseAssessment(stat).level === "downranked"
+  ).length;
+  const clarificationSuppressedStyles = clarificationQuestionStats.filter(
+    (stat) => getClarificationQuestionNoiseAssessment(stat).level === "suppressed"
+  ).length;
 
   const resolutionDurations = doneJobs
     .filter((job) => !!job.processedAt)
@@ -383,6 +441,11 @@ export async function getUserStats(userId: string): Promise<UserStats> {
   const clarificationTrend = buildTrend(
     notesLast7.length > 0 ? lowConfLast7 / notesLast7.length : 0,
     notesLast30.length > 0 ? lowConfLast30 / notesLast30.length : 0,
+    "lower"
+  );
+  const clarificationDismissTrend = buildTrend(
+    buildClarificationDismissRate(clarificationEvents, sevenDaysAgo),
+    buildClarificationDismissRate(clarificationEvents, thirtyDaysAgo),
     "lower"
   );
 
@@ -434,6 +497,8 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     console.warn("UserMetricSnapshot unavailable (migration pending?):", snapshotError);
   }
 
+  const clarificationDismissRateHistory = buildClarificationDismissRateHistory(clarificationEvents, now);
+
   return {
     totalNotes,
     processedNotes,
@@ -441,6 +506,10 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     lowConfidenceCount: lowConfidenceNotes,
     clarificationRate,
     clarificationConversionRate,
+    clarificationDismissRate,
+    clarificationFeedbackCount,
+    clarificationDownrankedStyles,
+    clarificationSuppressedStyles,
     avgConfidence,
     avgHintLift,
     hintUses: totalHintUses,
@@ -449,6 +518,7 @@ export async function getUserStats(userId: string): Promise<UserStats> {
     trends: {
       confidence: confidenceTrend,
       clarificationRate: clarificationTrend,
+      clarificationDismissRate: clarificationDismissTrend,
       resolutionTimeMs: resolutionTrend,
     },
     history: {
@@ -460,6 +530,7 @@ export async function getUserStats(userId: string): Promise<UserStats> {
         date: snapshot.snapshotDate.toISOString(),
         value: snapshot.clarificationRate,
       })),
+      clarificationDismissRate: clarificationDismissRateHistory,
       resolutionTimeMs: snapshots.map((snapshot: SnapshotRow) => ({
         date: snapshot.snapshotDate.toISOString(),
         value: snapshot.avgTimeToResolutionMs,

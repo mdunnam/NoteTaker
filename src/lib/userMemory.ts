@@ -40,6 +40,13 @@ export interface ReviewActionStat {
   lastActionAt: string;
 }
 
+export interface ClarificationQuestionEvent {
+  key: string;
+  label: string;
+  action: ClarificationFeedbackAction;
+  createdAt: string;
+}
+
 export interface ReviewState {
   forgottenNotes: ReviewSuppression[];
   patterns: ReviewSuppression[];
@@ -55,6 +62,7 @@ interface ThinkingMemory {
   reviewState: ReviewState;
   reviewActionStats: ReviewActionStat[];
   clarificationQuestionStats: ClarificationQuestionStat[];
+  clarificationQuestionEvents: ClarificationQuestionEvent[];
 }
 
 export type { HintStat };
@@ -79,6 +87,7 @@ const MAX_ITEMS_PER_BUCKET = 20;
 const MAX_REVIEW_SUPPRESSIONS_PER_KIND = 100;
 const MAX_REVIEW_ACTION_STATS = 200;
 const MAX_CLARIFICATION_QUESTION_STATS = 100;
+const MAX_CLARIFICATION_QUESTION_EVENTS = 500;
 
 function normalizeName(value: string): string {
   return value.trim().replace(/\s+/g, " ");
@@ -134,6 +143,7 @@ function emptyMemory(): ThinkingMemory {
     },
     reviewActionStats: [],
     clarificationQuestionStats: [],
+    clarificationQuestionEvents: [],
   };
 }
 
@@ -240,6 +250,29 @@ function parseClarificationQuestionStats(value: unknown): ClarificationQuestionS
     .slice(0, MAX_CLARIFICATION_QUESTION_STATS);
 }
 
+function parseClarificationQuestionEvents(value: unknown): ClarificationQuestionEvent[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter((item): item is ClarificationQuestionEvent => {
+      if (!isRecord(item)) {
+        return false;
+      }
+
+      return (
+        typeof item.key === "string" &&
+        item.key.trim().length > 0 &&
+        typeof item.label === "string" &&
+        item.label.trim().length > 0 &&
+        (item.action === "answered" || item.action === "dismissed") &&
+        typeof item.createdAt === "string"
+      );
+    })
+    .slice(0, MAX_CLARIFICATION_QUESTION_EVENTS);
+}
+
 function pruneReviewSuppressions(items: ReviewSuppression[], now = new Date()): ReviewSuppression[] {
   return items
     .filter((item) => {
@@ -287,6 +320,13 @@ function sortClarificationQuestionStats(stats: ClarificationQuestionStat[]): Cla
       return rightScore - leftScore || new Date(right.lastActionAt).getTime() - new Date(left.lastActionAt).getTime();
     })
     .slice(0, MAX_CLARIFICATION_QUESTION_STATS);
+}
+
+function sortClarificationQuestionEvents(events: ClarificationQuestionEvent[]): ClarificationQuestionEvent[] {
+  return [...events]
+    .filter((event) => !Number.isNaN(new Date(event.createdAt).getTime()))
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, MAX_CLARIFICATION_QUESTION_EVENTS);
 }
 
 function upsertReviewActionStat(
@@ -371,6 +411,7 @@ async function persistThinkingMemory(userId: string, memory: ThinkingMemory): Pr
   const reviewState = pruneReviewState(memory.reviewState);
   const reviewActionStats = sortReviewActionStats(memory.reviewActionStats);
   const clarificationQuestionStats = sortClarificationQuestionStats(memory.clarificationQuestionStats);
+  const clarificationQuestionEvents = sortClarificationQuestionEvents(memory.clarificationQuestionEvents);
 
   await prisma.userPreferences.upsert({
     where: { userId },
@@ -385,6 +426,7 @@ async function persistThinkingMemory(userId: string, memory: ThinkingMemory): Pr
         reviewState,
         reviewActionStats,
         clarificationQuestionStats,
+        clarificationQuestionEvents,
       } as unknown as Prisma.InputJsonValue,
     },
     update: {
@@ -397,6 +439,7 @@ async function persistThinkingMemory(userId: string, memory: ThinkingMemory): Pr
         reviewState,
         reviewActionStats,
         clarificationQuestionStats,
+        clarificationQuestionEvents,
       } as unknown as Prisma.InputJsonValue,
     },
   });
@@ -425,6 +468,7 @@ export async function getThinkingMemory(userId: string): Promise<ThinkingMemory>
     reviewState: pruneReviewState(parseReviewState(raw.reviewState)),
     reviewActionStats: sortReviewActionStats(parseReviewActionStats(raw.reviewActionStats)),
     clarificationQuestionStats: sortClarificationQuestionStats(parseClarificationQuestionStats(raw.clarificationQuestionStats)),
+    clarificationQuestionEvents: sortClarificationQuestionEvents(parseClarificationQuestionEvents(raw.clarificationQuestionEvents)),
   };
 }
 
@@ -546,6 +590,7 @@ export async function updateThinkingMemory(
     reviewState: current.reviewState,
     reviewActionStats: current.reviewActionStats,
     clarificationQuestionStats: current.clarificationQuestionStats,
+    clarificationQuestionEvents: current.clarificationQuestionEvents,
   });
 }
 
@@ -621,15 +666,26 @@ export async function recordClarificationQuestionFeedback(
   action: ClarificationFeedbackAction
 ): Promise<void> {
   const current = await getThinkingMemory(userId);
+  const key = buildClarificationQuestionKey(question);
   const clarificationQuestionStats = upsertClarificationQuestionStat(
     current.clarificationQuestionStats,
     question,
     action
   );
+  const clarificationQuestionEvents = sortClarificationQuestionEvents([
+    {
+      key,
+      label: question,
+      action,
+      createdAt: new Date().toISOString(),
+    },
+    ...current.clarificationQuestionEvents,
+  ]);
 
   await persistThinkingMemory(userId, {
     ...current,
     clarificationQuestionStats,
+    clarificationQuestionEvents,
   });
 }
 

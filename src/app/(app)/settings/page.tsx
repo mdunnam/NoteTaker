@@ -49,7 +49,7 @@ export default async function SettingsPage() {
       <div className="mt-10 max-w-5xl">
         <h2 className="mb-1 text-xl font-bold text-gray-900">AI Performance</h2>
         <p className="mb-4 text-sm text-gray-600">
-          Track clarification conversion, confidence movement, and enrichment speed to verify the AI workflow is improving over time.
+          Track clarification conversion, question-noise pressure, confidence movement, and enrichment speed to verify the AI workflow is improving over time.
         </p>
         <AIPerformancePanel stats={userStats} />
       </div>

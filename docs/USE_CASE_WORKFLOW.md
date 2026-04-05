@@ -143,6 +143,7 @@ Expected behavior:
 In Settings:
 
 - AI Performance cards show current confidence, clarification rate, time-to-resolution, and queue health,
+- AI Performance also shows clarification-noise rate so repeated low-value questions are visible over time,
 - 7d vs 30d trend arrows show whether behavior is improving,
 - 30-day sparkline history shows month-shape movement over time,
 - hint effectiveness table shows per-hint uses,

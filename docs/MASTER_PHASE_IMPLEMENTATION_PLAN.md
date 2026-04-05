@@ -40,6 +40,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Chip-click confidence lift tracking
 - Hint effectiveness analytics in settings
 - AI performance dashboard in settings
+- clarification-noise trend in the AI performance dashboard
 - 7d vs 30d trend deltas on confidence, clarification rate, and time-to-resolution
 - Daily `UserMetricSnapshot` persistence with 30-day sparkline history
 - Snapshot backfill worker route for warming missing daily history
@@ -77,6 +78,7 @@ Shipped:
 - reclassification queue feedback that down-ranks repeated false positives
 - clarification feedback that down-ranks or suppresses noisy question styles
 - AI performance visibility and learn-from-hint interactions
+- AI performance visibility for clarification-noise trends and learn-from-hint interactions
 
 Not yet shipped:
 - Full surface depth for Cards, Timeline, Favorites, Archive

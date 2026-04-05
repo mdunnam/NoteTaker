@@ -57,6 +57,7 @@ describe("/api/notes/analyze-dump POST", () => {
       },
       reviewActionStats: [],
       clarificationQuestionStats: [],
+      clarificationQuestionEvents: [],
     } as never);
     mockedBuildPrompt.mockReturnValue("Known projects: (none)");
   });

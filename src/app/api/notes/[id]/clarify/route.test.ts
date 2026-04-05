@@ -85,6 +85,7 @@ describe("/api/notes/[id]/clarify POST", () => {
       },
       reviewActionStats: [],
       clarificationQuestionStats: [],
+      clarificationQuestionEvents: [],
     });
     mockedBuildThinkingMemoryPrompt.mockReturnValue("Known projects: (none)");
     mockedUpdateThinkingMemory.mockResolvedValue(undefined);

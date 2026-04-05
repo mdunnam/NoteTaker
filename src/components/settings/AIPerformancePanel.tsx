@@ -105,6 +105,20 @@ export default function AIPerformancePanel({ stats }: AIPerformancePanelProps) {
       </div>
 
       <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <p className="text-xs uppercase tracking-wide text-gray-500">Clarification Noise</p>
+        <p className="mt-1 text-2xl font-bold text-gray-900">{formatPercent(stats.clarificationDismissRate)}</p>
+        <TrendDelta
+          delta={stats.trends.clarificationDismissRate.delta}
+          betterWhen={stats.trends.clarificationDismissRate.betterWhen}
+          asPercent
+        />
+        <Sparkline points={stats.history.clarificationDismissRate} />
+        <p className="mt-1 text-xs text-gray-500">
+          {stats.clarificationSuppressedStyles} suppressed and {stats.clarificationDownrankedStyles} down-ranked question style{stats.clarificationDownrankedStyles + stats.clarificationSuppressedStyles === 1 ? "" : "s"} across {stats.clarificationFeedbackCount} clarification feedback event{stats.clarificationFeedbackCount === 1 ? "" : "s"}.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
         <p className="text-xs uppercase tracking-wide text-gray-500">Avg Hint Confidence Lift</p>
         <p className={`mt-1 text-2xl font-bold ${stats.avgHintLift >= 0 ? "text-green-700" : "text-red-600"}`}>
           {stats.avgHintLift >= 0 ? "+" : ""}{formatPercent(stats.avgHintLift)}
