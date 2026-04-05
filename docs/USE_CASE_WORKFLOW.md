@@ -29,6 +29,7 @@ Alternate capture paths:
 - Dump Mode for zero-friction background organization
 - Organize This Dump modal for large pasted brain dumps, meeting notes, or copied text that should be reviewed before creation
 - Browser bookmarklet capture for short web clips, URLs, and selected text outside the main app
+- Installed-browser share target for supported browsers that can send titles, URLs, and text into `/capture`
 
 Expected behavior:
 

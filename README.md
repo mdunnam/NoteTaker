@@ -52,6 +52,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Review page**: Dedicated workflow surface for low-confidence clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
 - **Review planning workflows**: Review can now turn clarification, regrouping, and resurfacing queues into concrete plans without leaving the review page
 - **Capture-from-anywhere foundation**: Settings now generates a browser bookmarklet and `/capture` provides a focused quick-capture landing page for short external clips
+- **Installed-browser share target**: QNote now ships a minimal PWA/share-target foundation so supported browsers can share titles, URLs, and text into the same capture flow
 - **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
 - **Suppressed review recovery**: Review shows suppressed-item counts and lets you restore snoozed or dismissed resurfacing items immediately
 - **Review telemetry in Settings**: Settings now shows active suppressions plus snooze/dismiss/restore history so resurfacing noise is visible and manageable
@@ -131,12 +132,12 @@ src/
       layout.tsx            # App shell (sidebar, capture bar, right panel)
       inbox/page.tsx        # Main inbox view
       cards/page.tsx        # Card grid with health, selection, and synthesis
-      capture/page.tsx      # Focused bookmarklet and external capture landing page
       projects/page.tsx     # Project cluster browser with planning
       review/page.tsx       # Dedicated review workflow
       topics/page.tsx       # Topic cluster browser with planning
       search/page.tsx       # Search & Ask experience
       ... (other views)
+    capture/page.tsx        # Top-level external capture page with auth-preserving redirect
     api/
       notes/route.ts        # CRUD endpoints for notes
       notes/[id]/route.ts   # Single note operations
@@ -162,6 +163,7 @@ src/
 
   components/
     layout/
+      PwaRegistration.tsx   # Minimal service worker registration for installed-browser capture
       Sidebar.tsx           # Navigation sidebar
       CaptureBar.tsx        # Universal capture input
       RightPanel.tsx        # AI insights panel
@@ -196,6 +198,7 @@ src/
     ai.ts                   # AI utilities (organize, embed, split)
     clarification.ts        # aiMeta clarification parsing + feedback-aware question filtering
     clusters.ts             # Project/topic clustering + reclassification ranking
+    externalCapture.ts      # External capture parsing + safe callback helpers
     noteHealth.ts           # Note-health scoring and workspace summaries
     userMemory.ts           # Per-user memory profile, review telemetry, and clarification feedback stats
     searchRanking.ts        # Keyword/semantic ranking helpers

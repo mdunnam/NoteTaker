@@ -245,7 +245,6 @@ src/
       notes/[id]/page.tsx            # Note detail
       review/page.tsx                # Dedicated review workflow
       cards/page.tsx                 # Card grid with health, selection, and synthesis
-      capture/page.tsx               # Focused bookmarklet and external capture landing page
       projects/page.tsx              # Project cluster browser with planning
       topics/page.tsx                # Topic cluster browser with planning
       timeline/page.tsx              # Timeline with health filters, bucket selection, and synthesis
@@ -254,6 +253,7 @@ src/
       archive/page.tsx               # Archive with restore candidates and synthesis
       settings/page.tsx              # Settings + hint analytics
       collections/page.tsx           # Collections view
+    capture/page.tsx                 # Top-level external capture page with auth-preserving redirect
     api/
       notes/route.ts                 # GET, POST notes
       notes/[id]/route.ts            # PATCH, DELETE single note
@@ -282,6 +282,7 @@ src/
 
   components/
     layout/
+      PwaRegistration.tsx
       Sidebar.tsx
       CaptureBar.tsx
       RightPanel.tsx
@@ -322,6 +323,7 @@ src/
   lib/
     ai.ts                            # organizeNote, splitNote, embedNote
     clusters.ts                      # cluster inference + reclassification ranking
+    externalCapture.ts               # external capture parsing + callback helpers
     enrichNote.ts                    # full enrichment pipeline
     db.ts                            # Prisma client singleton
     noteHealth.ts                    # note-health scoring

@@ -33,7 +33,7 @@ export default function CaptureFromAnywherePanel() {
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <h3 className="text-lg font-semibold text-gray-900">Capture From Anywhere</h3>
       <p className="mt-2 text-sm text-gray-600">
-        Save short web clips from outside the app with a bookmarklet. It opens a focused capture page prefilled with the page title, URL, and any selected text.
+        Save short web clips from outside the app with a bookmarklet, or install QNote in a supporting browser and share text and links into the focused capture page.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -59,10 +59,11 @@ export default function CaptureFromAnywherePanel() {
         <li>Drag `QNote Capture` to your bookmarks bar, or copy the bookmarklet manually.</li>
         <li>On any page, select short text if you want to capture a snippet.</li>
         <li>Click the bookmarklet to open QNote’s focused capture page with the clip prefilled.</li>
+        <li>For installed browsers that support web-app sharing, install QNote and use the system share sheet to send a title, URL, or selected text into QNote.</li>
       </ol>
 
       <p className="mt-4 text-xs text-gray-500">
-        This is the browser-based capture foundation. It is designed for short clips and quick thoughts, not full-page scraping.
+        This is the browser capture foundation. It is designed for short clips and quick thoughts, not full-page scraping or native OS-level wrappers.
       </p>
 
       {copyMessage && (

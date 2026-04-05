@@ -5,9 +5,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
+import { sanitizeCallbackPath } from "@/lib/externalCapture";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -15,6 +16,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = sanitizeCallbackPath(searchParams.get("callbackUrl"));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +36,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/inbox");
+      router.push(callbackUrl);
     } catch (err) {
       setError("An error occurred. Please try again.");
       console.error(err);
@@ -111,7 +114,7 @@ export default function LoginPage() {
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-center text-sm text-gray-600">
               Don&apos;t have an account?{" "}
-              <Link href="/signup" className="text-blue-600 hover:underline">
+              <Link href={`/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`} className="text-blue-600 hover:underline">
                 Sign up
               </Link>
             </p>
