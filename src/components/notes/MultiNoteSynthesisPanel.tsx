@@ -7,6 +7,8 @@ export interface SynthesisSelectableNote {
   title: string | null;
 }
 
+const MAX_SYNTHESIS_NOTES = 12;
+
 interface SynthesisResult {
   title: string;
   summary: string;
@@ -50,8 +52,10 @@ export default function MultiNoteSynthesisPanel({
   const [result, setResult] = useState<SynthesisResult | null>(null);
   const [planningGoal, setPlanningGoal] = useState("");
 
-  const selectedIds = notes.map((note) => note.id);
+  const effectiveNotes = notes.slice(0, MAX_SYNTHESIS_NOTES);
+  const selectedIds = effectiveNotes.map((note) => note.id);
   const canSynthesize = selectedIds.length >= 2;
+  const overflowCount = Math.max(0, notes.length - effectiveNotes.length);
 
   /** Submit the selected note set to the synthesis endpoint. */
   const runSynthesis = async () => {
@@ -104,7 +108,7 @@ export default function MultiNoteSynthesisPanel({
 
       {notes.length > 0 && (
         <p className={`mt-2 text-gray-500 ${compact ? "text-[11px]" : "text-xs"}`}>
-          Sources: {notes.slice(0, 4).map((note) => note.title || "Untitled note").join(", ")}{notes.length > 4 ? ` +${notes.length - 4} more` : ""}
+          Sources: {effectiveNotes.slice(0, 4).map((note) => note.title || "Untitled note").join(", ")}{effectiveNotes.length > 4 ? ` +${effectiveNotes.length - 4} more` : ""}{overflowCount > 0 ? ` · using first ${MAX_SYNTHESIS_NOTES} selected notes` : ""}
         </p>
       )}
 

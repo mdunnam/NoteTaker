@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import ClarificationLoop from "@/components/notes/ClarificationLoop";
 import ReviewSuppressionActions from "@/components/review/ReviewSuppressionActions";
 import ReclassificationQueue from "@/components/notes/ReclassificationQueue";
+import ReviewPlanningPanels from "@/components/review/ReviewPlanningPanels";
 import { getUserReclassificationCandidates } from "@/lib/clusters";
 import { getConfidenceBadgeConfig } from "@/lib/confidence";
 import { prisma } from "@/lib/db";
@@ -137,6 +138,25 @@ export default async function ReviewPage() {
         </div>
       ) : (
         <div className="space-y-8">
+          <ReviewPlanningPanels
+            lowConfidenceNotes={lowConfidenceNotes.map((note) => ({ id: note.id, title: note.title }))}
+            reclassificationCandidates={reclassificationCandidates.map((candidate) => ({
+              note: { id: candidate.note.id, title: candidate.note.title },
+              suggestedProject: candidate.suggestedProject,
+              suggestedCategory: candidate.suggestedCategory,
+              supportingNotes: candidate.supportingNotes.map((note) => ({ id: note.id, title: note.title })),
+            }))}
+            forgottenCandidates={visibleForgottenCandidates.map((candidate) => ({
+              note: { id: candidate.note.id, title: candidate.note.title },
+            }))}
+            reviewPatterns={visibleReviewPatterns.map((pattern) => ({
+              id: pattern.id,
+              label: pattern.label,
+              kind: pattern.kind,
+              supportingNotes: pattern.supportingNotes.map((note) => ({ id: note.id, title: note.title })),
+            }))}
+          />
+
           {reclassificationCandidates.length > 0 && (
             <section className="space-y-3">
               <div>
@@ -276,7 +296,7 @@ export default async function ReviewPage() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Repeated Themes</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  Recent notes are clustering around the same project, topic, and idea threads. This is the first layer of recurring-idea review before deeper planning lands.
+                  Recent notes are clustering around the same project, topic, and idea threads. Use the planning panels above when you want to turn these signals into an actual follow-up sequence.
                 </p>
               </div>
 

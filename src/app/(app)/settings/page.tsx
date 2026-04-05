@@ -13,6 +13,7 @@ import HintEffectivenessPanel from "@/components/settings/HintEffectivenessPanel
 import AIPerformancePanel from "@/components/settings/AIPerformancePanel";
 import ReviewStatePanel from "@/components/settings/ReviewStatePanel";
 import ClarificationFeedbackPanel from "@/components/settings/ClarificationFeedbackPanel";
+import CaptureFromAnywherePanel from "@/components/settings/CaptureFromAnywherePanel";
 
 /**
  * User settings page.
@@ -77,6 +78,14 @@ export default async function SettingsPage() {
           Manage suppressed resurfacing items and inspect which review signals are repeatedly snoozed, dismissed, or restored.
         </p>
         <ReviewStatePanel reviewState={thinkingMemory.reviewState} actionStats={reviewActionStats} />
+      </div>
+
+      <div className="mt-10 max-w-4xl">
+        <h2 className="mb-1 text-xl font-bold text-gray-900">Capture From Anywhere</h2>
+        <p className="mb-4 text-sm text-gray-600">
+          Set up the browser bookmarklet so short web clips and external thoughts can land in QNote without opening the full app first.
+        </p>
+        <CaptureFromAnywherePanel />
       </div>
     </div>
   );

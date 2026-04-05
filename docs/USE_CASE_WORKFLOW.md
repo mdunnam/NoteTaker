@@ -28,6 +28,7 @@ Alternate capture paths:
 
 - Dump Mode for zero-friction background organization
 - Organize This Dump modal for large pasted brain dumps, meeting notes, or copied text that should be reviewed before creation
+- Browser bookmarklet capture for short web clips, URLs, and selected text outside the main app
 
 Expected behavior:
 
@@ -120,12 +121,13 @@ When the user wants one place to process system-generated work:
 - over-suppressed clarification styles can be restored from Settings without deleting their history,
 - forgotten-note and pattern cards can be snoozed or dismissed for a time window,
 - suppressed review items remain visible as a recoverable count and can be restored directly from Review,
+- review queues can be synthesized directly into a concrete plan for the current cleanup pass,
 - Settings shows active suppressions and the snooze/dismiss/restore history for review items,
 - Settings also shows clarification question styles that are being answered, down-ranked, or suppressed,
 - repeated dismisses and snoozes automatically make resurfacing less aggressive for the same signals,
 - repeated dismissal of the same regrouping suggestion also makes reclassification less aggressive for that exact suggestion,
 - repeated dismissal of the same clarification style makes future follow-up questioning less aggressive too,
-- this becomes the foundation for deeper resurfacing and synthesis.
+- this now supports deeper resurfacing, synthesis, and queue-level planning.
 
 ### Step 4.9: Resurfacing Outside Review
 

@@ -50,6 +50,8 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Favorites and Archive depth**: Saved-note views now support health-aware filtering, selection, synthesis, and revisit or restore candidates
 - **Reclassification queue**: Background-rescored after enrichment, surfaces notes whose project/category meaning changed based on newer linked context, and lets you apply suggestions in batches
 - **Review page**: Dedicated workflow surface for low-confidence clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
+- **Review planning workflows**: Review can now turn clarification, regrouping, and resurfacing queues into concrete plans without leaving the review page
+- **Capture-from-anywhere foundation**: Settings now generates a browser bookmarklet and `/capture` provides a focused quick-capture landing page for short external clips
 - **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
 - **Suppressed review recovery**: Review shows suppressed-item counts and lets you restore snoozed or dismissed resurfacing items immediately
 - **Review telemetry in Settings**: Settings now shows active suppressions plus snooze/dismiss/restore history so resurfacing noise is visible and manageable
@@ -65,9 +67,8 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 
 ### Phase 5+ 📋
 - Resurface old notes
-- Deeper review planning workflows
 - Review and resurfacing workflows
-- Desktop (Tauri) and iOS (Capacitor) wrappers
+- Native desktop and mobile capture wrappers
 
 ## Quick Start
 
@@ -130,6 +131,7 @@ src/
       layout.tsx            # App shell (sidebar, capture bar, right panel)
       inbox/page.tsx        # Main inbox view
       cards/page.tsx        # Card grid with health, selection, and synthesis
+      capture/page.tsx      # Focused bookmarklet and external capture landing page
       projects/page.tsx     # Project cluster browser with planning
       review/page.tsx       # Dedicated review workflow
       topics/page.tsx       # Topic cluster browser with planning
@@ -166,6 +168,7 @@ src/
       RightPanelContextual.tsx # Note-detail context widgets
     notes/
       CardsClient.tsx      # Cards filters, selection, synthesis
+      ExternalCaptureClient.tsx # Focused quick-capture form for external clips
       KnowledgeClustersClient.tsx # Shared Projects and Topics planning surface
       NoteCard.tsx          # Individual note display
       InboxStream.tsx       # Note list view
@@ -179,7 +182,10 @@ src/
       SplitNoteModal.tsx    # Split preview/create modal
       TimelineClient.tsx   # Timeline filters, selection, synthesis
       DumpModal.tsx         # Organize This Dump modal
+    review/
+      ReviewPlanningPanels.tsx # Queue-level planning surfaces for Review
     settings/
+      CaptureFromAnywherePanel.tsx # Bookmarklet and external capture setup
       SettingsClient.tsx    # Settings page client shell
       HintEffectivenessPanel.tsx # Per-hint lift table
       AIPerformancePanel.tsx  # AI instrumentation dashboard cards
@@ -288,7 +294,11 @@ src/
 - [x] Multi-note synthesis
 - [x] Planning outputs
 - [x] Projects and Topics planning surfaces
-- [ ] Review workflows
+- [x] Review workflows
+
+### Phase 7: Capture From Anywhere 📋
+- [x] Browser bookmarklet capture foundation
+- [ ] Native desktop and mobile capture wrappers
 
 ### Phase 7: Desktop (Tauri) 📋
 - [ ] Tauri integration
