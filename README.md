@@ -44,6 +44,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Multi-note synthesis**: Selected cards, timeline notes, and contextual note clusters can be synthesized into one shared summary, themes, and next actions
 - **Broader resurfacing**: Forgotten-note and recurring-pattern signals now surface in Inbox and the shared RightPanel, not only in Review
 - **Cards and Timeline depth**: Both views now support health-aware filtering, selection, and synthesis workflows
+- **Favorites and Archive depth**: Saved-note views now support health-aware filtering, selection, synthesis, and revisit or restore candidates
 - **Reclassification queue**: Background-rescored after enrichment, surfaces notes whose project/category meaning changed based on newer linked context, and lets you apply suggestions in batches
 - **Review page**: Dedicated workflow surface for low-confidence clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
 - **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
@@ -168,6 +169,7 @@ src/
       MultiNoteSynthesisPanel.tsx # Shared synthesis UI for selected notes
       NoteHealthBadge.tsx  # Compact note health state badge
       NoteHealthPanel.tsx  # Detailed note health widget
+      SavedNotesClient.tsx # Shared Favorites and Archive deep-list surface
       ReclassificationQueue.tsx # Batch apply changed-meaning regrouping
       ResurfacingRail.tsx  # Forgotten-note and recurring-pattern surface
       SplitNoteModal.tsx    # Split preview/create modal
@@ -254,7 +256,7 @@ src/
 - [x] Clarification-noise trend in AI performance dashboard
 - [x] Daily metric snapshots + snapshot backfill worker
 
-### Phase 4: Knowledge Browsing & Search 🚧
+### Phase 4: Knowledge Browsing & Search ✅
 - [x] Semantic search UX with filters, snippets, and typeahead
 - [x] Projects view backed by inferred project clusters
 - [x] Topics view backed by inferred topic clusters
@@ -264,7 +266,7 @@ src/
 - [x] Background-rescored reclassification queue with batch apply for changed-meaning notes
 - [x] Reclassification queue feedback loop with `Not useful` dismissal and telemetry-aware downranking
 - [x] Implement deeper Cards and Timeline views
-- [ ] Deepen Favorites and Archive views
+- [x] Deepen Favorites and Archive views
 - [x] Broader RightPanel guidance and cluster actions
 
 ### Phase 5: Resurface ⏳

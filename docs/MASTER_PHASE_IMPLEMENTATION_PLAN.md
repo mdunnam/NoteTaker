@@ -86,7 +86,6 @@ Shipped:
 - AI performance visibility for clarification-noise trends and learn-from-hint interactions
 
 Not yet shipped:
-- Full surface depth for Favorites and Archive
 - Deeper synthesis layers on top of Projects and Topics views
 - Recurring-idea resurfacing beyond the current heuristics
 - Capture from outside the app
@@ -247,8 +246,8 @@ src/
       topics/page.tsx                # Topic cluster browser
       timeline/page.tsx              # Timeline (placeholder)
       search/page.tsx                # Search & Ask experience
-      favorites/page.tsx             # Favorites (placeholder)
-      archive/page.tsx               # Archive (placeholder)
+      favorites/page.tsx             # Favorites with health, selection, and synthesis
+      archive/page.tsx               # Archive with restore candidates and synthesis
       settings/page.tsx              # Settings + hint analytics
       collections/page.tsx           # Collections view
     api/
@@ -287,6 +286,7 @@ src/
       CardsClient.tsx
       ReclassificationQueue.tsx
       NoteCard.tsx
+      SavedNotesClient.tsx
       InboxStream.tsx
       InboxFilterBar.tsx
       ClarificationLoop.tsx

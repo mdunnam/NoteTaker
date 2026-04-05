@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import NoteCard from "@/components/notes/NoteCard";
+import SavedNotesClient from "@/components/notes/SavedNotesClient";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 
@@ -33,7 +33,7 @@ export default async function ArchivePage() {
     <div className="p-6">
       <h1 className="mb-2 text-3xl font-bold text-gray-900">Archive</h1>
       <p className="mb-6 text-gray-600">
-        {notes.length} archived note{notes.length === 1 ? "" : "s"}.
+        {notes.length} archived note{notes.length === 1 ? "" : "s"}. Revisit archived work with health signals, restore candidates, and synthesis before pulling anything back into the active loop.
       </p>
 
       {notes.length === 0 ? (
@@ -41,11 +41,7 @@ export default async function ArchivePage() {
           Archive is empty.
         </div>
       ) : (
-        <div className="space-y-4 max-w-3xl">
-          {notes.map((note) => (
-            <NoteCard key={note.id} note={note} />
-          ))}
-        </div>
+        <SavedNotesClient notes={notes} mode="archive" />
       )}
     </div>
   );
