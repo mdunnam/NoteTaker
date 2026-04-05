@@ -78,6 +78,7 @@ Shipped:
 - settings visibility for active suppressions and review-action history
 - feedback-aware resurfacing that uses review telemetry to down-rank noisy signals
 - note-health scoring that turns confidence and staleness into a concrete maintenance signal
+- recurring-idea resurfacing from repeated note language even without explicit tags or entities
 - note-level reorganization suggestions and changed-meaning queues
 - reclassification queue feedback that down-ranks repeated false positives
 - clarification feedback that down-ranks or suppresses noisy question styles, with restore controls in Settings
@@ -87,7 +88,6 @@ Shipped:
 
 Not yet shipped:
 - Deeper synthesis layers on top of Projects and Topics views
-- Recurring-idea resurfacing beyond the current heuristics
 - Capture from outside the app
 
 ---

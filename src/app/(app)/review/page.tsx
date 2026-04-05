@@ -274,9 +274,9 @@ export default async function ReviewPage() {
           {visibleReviewPatterns.length > 0 && (
             <section className="space-y-3">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">Repeated Patterns</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Repeated Themes</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  Recent notes are clustering around these same themes. This is the first layer of pattern review before full synthesis lands.
+                  Recent notes are clustering around the same project, topic, and idea threads. This is the first layer of recurring-idea review before deeper planning lands.
                 </p>
               </div>
 
@@ -289,7 +289,7 @@ export default async function ReviewPage() {
                         <p className="mt-1 text-sm text-purple-900">{pattern.reason}</p>
                       </div>
 
-                      <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-medium ${pattern.kind === "project" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-medium ${pattern.kind === "project" ? "bg-blue-100 text-blue-700" : pattern.kind === "topic" ? "bg-purple-100 text-purple-700" : "bg-emerald-100 text-emerald-700"}`}>
                         {pattern.kind}
                       </span>
                     </div>

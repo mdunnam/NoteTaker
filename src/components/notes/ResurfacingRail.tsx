@@ -61,14 +61,16 @@ export default function ResurfacingRail({
 
       {reviewPatterns.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700">Recurring patterns</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-purple-700">Recurring themes</p>
           {reviewPatterns.slice(0, compact ? 2 : 4).map((pattern) => (
             <article key={pattern.id} className="rounded-lg border border-purple-200 bg-purple-50 p-3">
               <p className={`font-medium text-gray-900 ${compact ? "text-xs" : "text-sm"}`}>{pattern.label}</p>
               <p className={`mt-1 text-gray-700 ${compact ? "text-[11px]" : "text-xs"}`}>{pattern.reason}</p>
               <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
                 <span className="rounded-full bg-white px-2 py-0.5 text-purple-700">{pattern.noteCount} notes</span>
-                <span className="rounded-full bg-white px-2 py-0.5 text-gray-600">{pattern.kind}</span>
+                <span className={`rounded-full bg-white px-2 py-0.5 ${pattern.kind === "project" ? "text-blue-700" : pattern.kind === "topic" ? "text-purple-700" : "text-emerald-700"}`}>
+                  {pattern.kind}
+                </span>
               </div>
               <ReviewSuppressionActions kind="pattern" targetId={pattern.id} label={pattern.label} />
             </article>

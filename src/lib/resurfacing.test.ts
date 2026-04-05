@@ -109,6 +109,40 @@ describe("resurfacing heuristics", () => {
     expect(patterns.some((pattern) => pattern.label === "Downtime" && pattern.kind === "topic")).toBe(true);
   });
 
+  it("detects recurring idea threads even without explicit entities or tags", () => {
+    const now = new Date("2026-04-05T00:00:00.000Z");
+    const notes: ResurfacingNoteInput[] = [
+      makeNote({
+        id: "i1",
+        title: "Pricing strategy for SMB onboarding",
+        summary: "Thinking through the pricing strategy for onboarding smaller teams.",
+        rawContent: "Pricing strategy should reduce onboarding friction for SMB customers.",
+        createdAt: new Date("2026-04-02T00:00:00.000Z"),
+        updatedAt: new Date("2026-04-02T00:00:00.000Z"),
+      }),
+      makeNote({
+        id: "i2",
+        title: "SMB pricing strategy follow-up",
+        summary: "Need a sharper pricing strategy for the SMB motion.",
+        rawContent: "Follow-up on pricing strategy and onboarding for SMB accounts.",
+        createdAt: new Date("2026-04-03T00:00:00.000Z"),
+        updatedAt: new Date("2026-04-03T00:00:00.000Z"),
+      }),
+      makeNote({
+        id: "i3",
+        title: "Onboarding and pricing strategy questions",
+        summary: "More pricing strategy questions coming up from onboarding calls.",
+        rawContent: "Pricing strategy is still fuzzy for onboarding smaller teams.",
+        createdAt: new Date("2026-04-04T00:00:00.000Z"),
+        updatedAt: new Date("2026-04-04T00:00:00.000Z"),
+      }),
+    ];
+
+    const patterns = inferReviewPatternsFromNotes(notes, { now, limit: 5 });
+
+    expect(patterns.some((pattern) => pattern.kind === "idea" && pattern.noteCount === 3)).toBe(true);
+  });
+
   it("suppresses forgotten notes with heavy dismiss history", () => {
     const now = new Date("2026-04-04T00:00:00.000Z");
     const notes: ResurfacingNoteInput[] = [

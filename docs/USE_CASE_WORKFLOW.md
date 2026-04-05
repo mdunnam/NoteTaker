@@ -112,6 +112,7 @@ When the user wants one place to process system-generated work:
 - `/review` combines low-confidence notes and changed-meaning suggestions,
 - forgotten-note resurfacing appears there when older notes still overlap with recent work,
 - repeated-pattern cards show when recent notes keep circling the same theme,
+- recurring idea threads can also surface when notes keep reusing the same language even without shared tags or explicit entities,
 - clarification can happen directly from the review page,
 - regrouping suggestions can be applied in batches,
 - regrouping suggestions can also be dismissed as not useful,

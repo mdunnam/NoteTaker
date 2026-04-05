@@ -43,6 +43,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Note health**: Notes now carry a health score based on confidence, staleness, missing structure, and unresolved clarification pressure
 - **Multi-note synthesis**: Selected cards, timeline notes, and contextual note clusters can be synthesized into one shared summary, themes, and next actions
 - **Broader resurfacing**: Forgotten-note and recurring-pattern signals now surface in Inbox and the shared RightPanel, not only in Review
+- **Recurring idea detection**: Repeated language across recent notes now forms recurring idea threads even without explicit entities or tags
 - **Cards and Timeline depth**: Both views now support health-aware filtering, selection, and synthesis workflows
 - **Favorites and Archive depth**: Saved-note views now support health-aware filtering, selection, synthesis, and revisit or restore candidates
 - **Reclassification queue**: Background-rescored after enrichment, surfaces notes whose project/category meaning changed based on newer linked context, and lets you apply suggestions in batches
@@ -277,7 +278,7 @@ src/
 - [x] Settings visibility for active suppressions and review action history
 - [x] Automatic downranking and suppression of noisy resurfacing signals from review feedback
 - [x] Note health widget
-- [ ] Recurring idea detection beyond review heuristics
+- [x] Recurring idea detection beyond review heuristics
 - [x] Broader resurfacing across inbox, right panel, and notifications
 
 ### Phase 6: Synthesis & Planning 📋
