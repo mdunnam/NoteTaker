@@ -335,6 +335,28 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
           </div>
         )}
 
+        {aiMeta.externalCapture && (aiMeta.externalCapture.title || aiMeta.externalCapture.url || aiMeta.externalCapture.source) && (
+          <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">Captured from outside QNote</p>
+            {aiMeta.externalCapture.source && (
+              <p className="mt-1 text-xs font-medium text-sky-900">Source: {aiMeta.externalCapture.source}</p>
+            )}
+            {aiMeta.externalCapture.title && (
+              <p className="mt-2 text-sm font-medium text-sky-900">{aiMeta.externalCapture.title}</p>
+            )}
+            {aiMeta.externalCapture.url && (
+              <a
+                href={aiMeta.externalCapture.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block break-all text-sm text-sky-700 hover:underline"
+              >
+                {aiMeta.externalCapture.url}
+              </a>
+            )}
+          </div>
+        )}
+
         {/* Clarification questions */}
         {(hasClarifications || aiMeta.clarificationHistory.length > 0) && (
           <ClarificationLoop

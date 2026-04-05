@@ -18,7 +18,7 @@ describe("/capture/share POST", () => {
 
     expect(response.status).toBe(303);
     expect(response.headers.get("location")).toBe(
-      "http://localhost/capture?title=Interesting+article&url=https%3A%2F%2Fexample.com%2Fstory&text=Selected+quote"
+      "http://localhost/capture?title=Interesting+article&url=https%3A%2F%2Fexample.com%2Fstory&text=Selected+quote&source=share-target"
     );
   });
 });

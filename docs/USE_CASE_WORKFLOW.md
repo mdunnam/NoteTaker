@@ -34,6 +34,7 @@ Alternate capture paths:
 Expected behavior:
 
 - Note is created immediately.
+- External captures retain source title, URL, and capture origin instead of flattening all context into raw text.
 - AI organization runs in background.
 
 ### Step 2: First-Pass AI Organization

@@ -15,7 +15,7 @@ export default function CaptureFromAnywherePanel() {
     }
 
     const captureUrl = `${window.location.origin}/capture`;
-    return `javascript:(()=>{const selection=window.getSelection?String(window.getSelection()||'').trim():'';const payload=[document.title,location.href,selection].filter(Boolean).join('\\n\\n');window.open('${captureUrl}?text='+encodeURIComponent(payload),'_blank','noopener,noreferrer');})();`;
+    return `javascript:(()=>{const selection=window.getSelection?String(window.getSelection()||'').trim():'';const params=new URLSearchParams();if(document.title)params.set('title',document.title);if(location.href)params.set('url',location.href);if(selection)params.set('text',selection);params.set('source','bookmarklet');window.open('${captureUrl}?'+params.toString(),'_blank','noopener,noreferrer');})();`;
   }, []);
 
   /** Copy the bookmarklet code for browsers where dragging is inconvenient. */

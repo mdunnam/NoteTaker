@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildExternalCaptureCallbackPath,
   buildExternalCaptureContent,
+  getExternalCaptureSource,
   sanitizeCallbackPath,
 } from "@/lib/externalCapture";
 
@@ -18,12 +19,19 @@ describe("external capture helpers", () => {
     expect(buildExternalCaptureCallbackPath({
       title: "Interesting article",
       text: "Selected quote",
-    })).toBe("/capture?title=Interesting+article&text=Selected+quote");
+      source: "bookmarklet",
+    })).toBe("/capture?title=Interesting+article&text=Selected+quote&source=bookmarklet");
   });
 
   it("only allows safe callback paths", () => {
     expect(sanitizeCallbackPath("/capture?text=hello")).toBe("/capture?text=hello");
     expect(sanitizeCallbackPath("https://evil.example")).toBe("/inbox");
     expect(sanitizeCallbackPath("//evil.example")).toBe("/inbox");
+  });
+
+  it("normalizes supported external capture sources", () => {
+    expect(getExternalCaptureSource("bookmarklet")).toBe("bookmarklet");
+    expect(getExternalCaptureSource("share-target")).toBe("share-target");
+    expect(getExternalCaptureSource("other")).toBeNull();
   });
 });

@@ -87,6 +87,7 @@ Shipped:
 - project/topic cluster planning directly from the Projects and Topics surfaces
 - review planning workflows that turn queue slices into synthesis and action plans
 - browser bookmarklet capture foundation with focused `/capture` landing page
+- structured source metadata for external captures, preserved through enrichment and visible in note detail
 - AI performance visibility and learn-from-hint interactions
 - AI performance visibility for clarification-noise trends and learn-from-hint interactions
 

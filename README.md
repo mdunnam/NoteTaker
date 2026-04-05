@@ -53,6 +53,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Review planning workflows**: Review can now turn clarification, regrouping, and resurfacing queues into concrete plans without leaving the review page
 - **Capture-from-anywhere foundation**: Settings now generates a browser bookmarklet and `/capture` provides a focused quick-capture landing page for short external clips
 - **Installed-browser share target**: QNote now ships a minimal PWA/share-target foundation so supported browsers can share titles, URLs, and text into the same capture flow
+- **Structured capture source metadata**: External clips now preserve source title, URL, and capture origin, and note detail surfaces that context directly
 - **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
 - **Suppressed review recovery**: Review shows suppressed-item counts and lets you restore snoozed or dismissed resurfacing items immediately
 - **Review telemetry in Settings**: Settings now shows active suppressions plus snooze/dismiss/restore history so resurfacing noise is visible and manageable

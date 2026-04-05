@@ -4,10 +4,25 @@
  */
 
 import { auth } from "@/auth";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { splitNote } from "@/lib/ai";
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { z } from "zod";
+
+const CreateNoteRequestSchema = z.object({
+  rawContent: z.string().trim().min(1),
+  tags: z.array(z.string().trim().min(1)).max(24).optional(),
+  collectionId: z.string().trim().min(1).nullable().optional(),
+  projectHint: z.string().trim().max(120).optional(),
+  contextHint: z.string().trim().max(120).optional(),
+  autoSplit: z.boolean().optional(),
+  dumpMode: z.boolean().optional(),
+  captureSource: z.enum(["bookmarklet", "share-target", "manual"]).optional(),
+  sourceTitle: z.string().trim().max(240).optional(),
+  sourceUrl: z.string().trim().max(2048).optional(),
+}).passthrough();
 
 /**
  * Enqueue an enrichment job and trigger the worker endpoint asynchronously.
@@ -47,6 +62,28 @@ interface CreateNoteOptions {
   projectHint?: string;
   contextHint?: string;
   dumpMode?: boolean;
+  captureSource?: "bookmarklet" | "share-target" | "manual";
+  sourceTitle?: string;
+  sourceUrl?: string;
+}
+
+function buildInitialAiMeta(options: CreateNoteOptions): Prisma.InputJsonValue | undefined {
+  const nextMeta: Record<string, unknown> = {};
+
+  if (options.dumpMode) {
+    nextMeta.captureMode = "dump";
+  }
+
+  if (options.captureSource || options.sourceTitle || options.sourceUrl) {
+    nextMeta.captureMode = "external";
+    nextMeta.externalCapture = {
+      source: options.captureSource || "manual",
+      title: options.sourceTitle?.trim() || null,
+      url: options.sourceUrl?.trim() || null,
+    };
+  }
+
+  return Object.keys(nextMeta).length > 0 ? nextMeta as Prisma.InputJsonValue : undefined;
 }
 
 /**
@@ -60,11 +97,7 @@ async function createBaseNote(options: CreateNoteOptions) {
       tags: options.tags || [],
       suggestedProject: options.projectHint?.trim() || null,
       category: options.contextHint?.trim() || null,
-      aiMeta: options.dumpMode
-        ? {
-            captureMode: "dump",
-          }
-        : undefined,
+      aiMeta: buildInitialAiMeta(options),
       collectionId: options.collectionId || null,
       status: "PROCESSING",
     },
@@ -90,6 +123,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const parsedBody = CreateNoteRequestSchema.safeParse(await request.json());
+
+    if (!parsedBody.success) {
+      return NextResponse.json(
+        { error: "Invalid note payload" },
+        { status: 400 }
+      );
+    }
+
     const {
       rawContent,
       tags,
@@ -98,14 +140,10 @@ export async function POST(request: NextRequest) {
       contextHint,
       autoSplit = true,
       dumpMode = false,
-    } = await request.json();
-
-    if (!rawContent || !rawContent.trim()) {
-      return NextResponse.json(
-        { error: "Content is required" },
-        { status: 400 }
-      );
-    }
+      captureSource,
+      sourceTitle,
+      sourceUrl,
+    } = parsedBody.data;
 
     const createdNoteIds: string[] = [];
 
@@ -127,6 +165,9 @@ export async function POST(request: NextRequest) {
               projectHint,
               contextHint,
               dumpMode,
+              captureSource,
+              sourceTitle,
+              sourceUrl,
             });
 
             createdNoteIds.push(created.id);
@@ -173,6 +214,9 @@ export async function POST(request: NextRequest) {
       projectHint,
       contextHint,
       dumpMode,
+      captureSource,
+      sourceTitle,
+      sourceUrl,
     });
 
     await enqueueEnrichment(note.id, session.user.id, request.nextUrl.origin);

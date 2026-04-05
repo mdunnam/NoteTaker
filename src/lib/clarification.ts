@@ -38,6 +38,11 @@ export interface ParsedNoteAiMeta {
   nextAction: string | null;
   clarificationQuestions: string[];
   clarificationHistory: ClarificationTurn[];
+  externalCapture: {
+    source: string | null;
+    title: string | null;
+    url: string | null;
+  } | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -169,8 +174,17 @@ export function parseNoteAiMeta(raw: unknown): ParsedNoteAiMeta {
       nextAction: null,
       clarificationQuestions: [],
       clarificationHistory: [],
+      externalCapture: null,
     };
   }
+
+  const externalCapture = isRecord(raw.externalCapture)
+    ? {
+        source: typeof raw.externalCapture.source === "string" ? raw.externalCapture.source : null,
+        title: typeof raw.externalCapture.title === "string" ? raw.externalCapture.title : null,
+        url: typeof raw.externalCapture.url === "string" ? raw.externalCapture.url : null,
+      }
+    : null;
 
   return {
     intent: typeof raw.intent === "string" ? raw.intent : null,
@@ -179,6 +193,7 @@ export function parseNoteAiMeta(raw: unknown): ParsedNoteAiMeta {
       ? raw.clarificationQuestions.filter((question): question is string => typeof question === "string")
       : [],
     clarificationHistory: parseClarificationHistory(raw.clarificationHistory),
+    externalCapture,
   };
 }
 

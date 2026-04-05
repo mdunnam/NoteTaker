@@ -2,18 +2,29 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import type { ExternalCaptureSource } from "@/lib/externalCapture";
 
 interface ExternalCaptureClientProps {
   initialContent: string;
+  initialSourceTitle?: string;
+  initialSourceUrl?: string;
+  captureSource?: ExternalCaptureSource | null;
 }
 
 /**
  * Focused capture form used by the browser bookmarklet and other external entry points.
  */
-export default function ExternalCaptureClient({ initialContent }: ExternalCaptureClientProps) {
+export default function ExternalCaptureClient({
+  initialContent,
+  initialSourceTitle = "",
+  initialSourceUrl = "",
+  captureSource = null,
+}: ExternalCaptureClientProps) {
   const [content, setContent] = useState(initialContent);
   const [projectHint, setProjectHint] = useState("");
   const [contextHint, setContextHint] = useState("");
+  const [sourceTitle] = useState(initialSourceTitle);
+  const [sourceUrl] = useState(initialSourceUrl);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
@@ -39,6 +50,9 @@ export default function ExternalCaptureClient({ initialContent }: ExternalCaptur
           rawContent: content,
           projectHint: projectHint.trim() || undefined,
           contextHint: contextHint.trim() || undefined,
+          captureSource: captureSource || undefined,
+          sourceTitle: sourceTitle || undefined,
+          sourceUrl: sourceUrl || undefined,
           autoSplit: false,
         }),
       });
@@ -69,6 +83,19 @@ export default function ExternalCaptureClient({ initialContent }: ExternalCaptur
         <p className="mt-2 text-sm text-gray-600">
           This page is the landing zone for bookmarklet clips and quick captures from outside QNote. It works best for short selections, page titles, URLs, and quick thoughts.
         </p>
+
+        {(sourceTitle || sourceUrl || captureSource) && (
+          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+            <p className="font-medium text-blue-900">Source metadata</p>
+            {captureSource && <p className="mt-1 text-xs uppercase tracking-wide text-blue-700">{captureSource}</p>}
+            {sourceTitle && <p className="mt-2">{sourceTitle}</p>}
+            {sourceUrl && (
+              <a href={sourceUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block break-all text-blue-700 hover:underline">
+                {sourceUrl}
+              </a>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSave} className="mt-6 space-y-4">
           <div>

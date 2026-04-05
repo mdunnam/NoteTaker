@@ -3,6 +3,7 @@ import {
   buildClarificationQuestionKey,
   filterClarificationQuestionsByFeedback,
   getClarificationQuestionNoiseAssessment,
+  parseNoteAiMeta,
   type ClarificationQuestionStat,
 } from "@/lib/clarification";
 
@@ -73,5 +74,21 @@ describe("clarification feedback helpers", () => {
 
     expect(assessment.level).toBe("normal");
     expect(assessment.noiseScore).toBe(0);
+  });
+
+  it("parses external capture metadata from aiMeta", () => {
+    const parsed = parseNoteAiMeta({
+      externalCapture: {
+        source: "bookmarklet",
+        title: "Interesting article",
+        url: "https://example.com/story",
+      },
+    });
+
+    expect(parsed.externalCapture).toEqual({
+      source: "bookmarklet",
+      title: "Interesting article",
+      url: "https://example.com/story",
+    });
   });
 });

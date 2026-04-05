@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
     title: typeof title === "string" ? title : undefined,
     text: typeof text === "string" ? text : undefined,
     url: typeof url === "string" ? url : undefined,
+    source: "share-target",
   });
 
   return NextResponse.redirect(new URL(redirectPath, request.url), 303);
