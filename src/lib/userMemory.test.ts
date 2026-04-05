@@ -10,7 +10,12 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { prisma } from "@/lib/db";
-import { recordClarificationQuestionFeedback, restoreReviewItem, suppressReviewItem } from "@/lib/userMemory";
+import {
+  recordClarificationQuestionFeedback,
+  restoreClarificationQuestionFeedback,
+  restoreReviewItem,
+  suppressReviewItem,
+} from "@/lib/userMemory";
 
 const mockedFindUnique = vi.mocked(prisma.userPreferences.findUnique);
 const mockedUpsert = vi.mocked(prisma.userPreferences.upsert);
@@ -152,7 +157,64 @@ describe("userMemory review state", () => {
                 key: "project",
                 answers: 1,
                 dismisses: 0,
+                restores: 0,
                 lastAction: "answered",
+              }),
+            ]),
+          }),
+        }),
+      })
+    );
+  });
+
+  it("records a restore event for an over-suppressed clarification style", async () => {
+    mockedFindUnique.mockResolvedValue({
+      thinkingMemory: {
+        knownProjects: [],
+        knownContexts: [],
+        knownPeople: [],
+        knownTopics: [],
+        hintStats: [],
+        reviewState: {
+          forgottenNotes: [],
+          patterns: [],
+          reclassifications: [],
+        },
+        reviewActionStats: [],
+        clarificationQuestionStats: [
+          {
+            key: "project",
+            label: "Which project is this for?",
+            answers: 0,
+            dismisses: 2,
+            restores: 0,
+            lastAction: "dismissed",
+            lastActionAt: "2026-04-04T00:00:00.000Z",
+          },
+        ],
+        clarificationQuestionEvents: [],
+      },
+    } as never);
+
+    const restored = await restoreClarificationQuestionFeedback("u1", "project");
+
+    expect(restored).toBe(true);
+    expect(mockedUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          thinkingMemory: expect.objectContaining({
+            clarificationQuestionStats: expect.arrayContaining([
+              expect.objectContaining({
+                key: "project",
+                dismisses: 2,
+                restores: 1,
+                lastAction: "restored",
+              }),
+            ]),
+            clarificationQuestionEvents: expect.arrayContaining([
+              expect.objectContaining({
+                key: "project",
+                action: "restored",
               }),
             ]),
           }),

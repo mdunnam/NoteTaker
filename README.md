@@ -32,7 +32,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Summary refresh**: Regenerate weak summaries from detail and inbox cards
 - **Semantic search**: Uses stored pgvector embeddings with on-the-fly fallback
 - **Clarification loop**: Conversational follow-up answers plus quick project/context hints in inbox and note detail
-- **Clarification feedback**: Low-value clarification prompts can be marked `Not useful`, tracked in Settings, and filtered from future follow-up question sets
+- **Clarification feedback**: Low-value clarification prompts can be marked `Not useful`, tracked in Settings, restored later if over-suppressed, and filtered from future follow-up question sets
 - **Bulk clarify**: Apply project/context hints to selected notes and regenerate
 - **Contextual RightPanel**: Intent, next action, contextual tasks, related notes on note detail routes
 - **Hint effectiveness analytics**: Settings view tracks per-hint usage and average confidence lift
@@ -140,6 +140,7 @@ src/
       search/semantic/route.ts  # Semantic + keyword search
       search/ask/route.ts       # Ask across note corpus
       review/state/route.ts     # Persist snooze/dismiss review actions
+      user/clarification-feedback/route.ts # Restore over-suppressed clarification styles
       user/stats/route.ts   # AI performance dashboard metrics
       user/hint-stats/route.ts # Hint effectiveness analytics
       worker/metric-snapshots/route.ts  # Metric snapshot backfill worker

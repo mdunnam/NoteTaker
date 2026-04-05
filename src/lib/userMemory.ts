@@ -243,7 +243,8 @@ function parseClarificationQuestionStats(value: unknown): ClarificationQuestionS
         item.label.trim().length > 0 &&
         typeof item.answers === "number" &&
         typeof item.dismisses === "number" &&
-        (item.lastAction === "answered" || item.lastAction === "dismissed") &&
+        typeof item.restores === "number" &&
+        (item.lastAction === "answered" || item.lastAction === "dismissed" || item.lastAction === "restored") &&
         typeof item.lastActionAt === "string"
       );
     })
@@ -266,7 +267,7 @@ function parseClarificationQuestionEvents(value: unknown): ClarificationQuestion
         item.key.trim().length > 0 &&
         typeof item.label === "string" &&
         item.label.trim().length > 0 &&
-        (item.action === "answered" || item.action === "dismissed") &&
+        (item.action === "answered" || item.action === "dismissed" || item.action === "restored") &&
         typeof item.createdAt === "string"
       );
     })
@@ -315,8 +316,8 @@ function sortReviewActionStats(stats: ReviewActionStat[]): ReviewActionStat[] {
 function sortClarificationQuestionStats(stats: ClarificationQuestionStat[]): ClarificationQuestionStat[] {
   return [...stats]
     .sort((left, right) => {
-      const rightScore = right.dismisses * 2 + right.answers;
-      const leftScore = left.dismisses * 2 + left.answers;
+      const rightScore = right.dismisses * 3 + right.restores * 2 + right.answers;
+      const leftScore = left.dismisses * 3 + left.restores * 2 + left.answers;
       return rightScore - leftScore || new Date(right.lastActionAt).getTime() - new Date(left.lastActionAt).getTime();
     })
     .slice(0, MAX_CLARIFICATION_QUESTION_STATS);
@@ -372,11 +373,11 @@ function upsertReviewActionStat(
 
 function upsertClarificationQuestionStat(
   stats: ClarificationQuestionStat[],
-  question: string,
+  key: string,
+  label: string,
   action: ClarificationFeedbackAction
 ): ClarificationQuestionStat[] {
   const now = new Date().toISOString();
-  const key = buildClarificationQuestionKey(question);
   const existingIndex = stats.findIndex((item) => item.key === key);
 
   if (existingIndex === -1) {
@@ -384,9 +385,10 @@ function upsertClarificationQuestionStat(
       ...stats,
       {
         key,
-        label: question,
+        label,
         answers: action === "answered" ? 1 : 0,
         dismisses: action === "dismissed" ? 1 : 0,
+        restores: action === "restored" ? 1 : 0,
         lastAction: action,
         lastActionAt: now,
       },
@@ -397,9 +399,10 @@ function upsertClarificationQuestionStat(
   const existing = next[existingIndex];
   next[existingIndex] = {
     ...existing,
-    label: question,
+    label,
     answers: existing.answers + (action === "answered" ? 1 : 0),
     dismisses: existing.dismisses + (action === "dismissed" ? 1 : 0),
+    restores: existing.restores + (action === "restored" ? 1 : 0),
     lastAction: action,
     lastActionAt: now,
   };
@@ -656,7 +659,7 @@ export async function getReviewActionStats(userId: string): Promise<ReviewAction
 export async function getClarificationQuestionStats(userId: string): Promise<ClarificationQuestionStat[]> {
   const memory = await getThinkingMemory(userId);
   return sortClarificationQuestionStats(memory.clarificationQuestionStats)
-    .filter((stat) => stat.answers > 0 || stat.dismisses > 0);
+    .filter((stat) => stat.answers > 0 || stat.dismisses > 0 || stat.restores > 0);
 }
 
 /** Record whether one clarification question style was answered or dismissed by the user. */
@@ -669,6 +672,7 @@ export async function recordClarificationQuestionFeedback(
   const key = buildClarificationQuestionKey(question);
   const clarificationQuestionStats = upsertClarificationQuestionStat(
     current.clarificationQuestionStats,
+    key,
     question,
     action
   );
@@ -687,6 +691,40 @@ export async function recordClarificationQuestionFeedback(
     clarificationQuestionStats,
     clarificationQuestionEvents,
   });
+}
+
+/** Restore one clarification question style so it can reappear without deleting prior history. */
+export async function restoreClarificationQuestionFeedback(userId: string, key: string): Promise<boolean> {
+  const current = await getThinkingMemory(userId);
+  const existing = current.clarificationQuestionStats.find((stat) => stat.key === key);
+
+  if (!existing) {
+    return false;
+  }
+
+  const clarificationQuestionStats = upsertClarificationQuestionStat(
+    current.clarificationQuestionStats,
+    existing.key,
+    existing.label,
+    "restored"
+  );
+  const clarificationQuestionEvents = sortClarificationQuestionEvents([
+    {
+      key: existing.key,
+      label: existing.label,
+      action: "restored",
+      createdAt: new Date().toISOString(),
+    },
+    ...current.clarificationQuestionEvents,
+  ]);
+
+  await persistThinkingMemory(userId, {
+    ...current,
+    clarificationQuestionStats,
+    clarificationQuestionEvents,
+  });
+
+  return true;
 }
 
 /** Return whether a review item is currently suppressed. */

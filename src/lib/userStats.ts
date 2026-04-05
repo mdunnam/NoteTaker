@@ -90,7 +90,7 @@ function endOfDay(value: Date): Date {
 }
 
 function buildClarificationDismissRateHistory(
-  events: Array<{ createdAt: string; action: "answered" | "dismissed" }>,
+  events: Array<{ createdAt: string; action: "answered" | "dismissed" | "restored" }>,
   now: Date,
   days = 30
 ): MetricSeriesPoint[] {
@@ -103,7 +103,7 @@ function buildClarificationDismissRateHistory(
     const dayEvents = events.filter((event) => {
       const createdAt = new Date(event.createdAt);
       return createdAt >= day && createdAt < nextDay;
-    });
+    }).filter((event) => event.action === "answered" || event.action === "dismissed");
     const dismisses = dayEvents.filter((event) => event.action === "dismissed").length;
 
     return {
@@ -114,12 +114,12 @@ function buildClarificationDismissRateHistory(
 }
 
 function buildClarificationDismissRate(
-  events: Array<{ createdAt: string; action: "answered" | "dismissed" }>,
+  events: Array<{ createdAt: string; action: "answered" | "dismissed" | "restored" }>,
   windowStart?: Date
 ): number {
-  const filteredEvents = windowStart
+  const filteredEvents = (windowStart
     ? events.filter((event) => new Date(event.createdAt) >= windowStart)
-    : events;
+    : events).filter((event) => event.action === "answered" || event.action === "dismissed");
   const dismisses = filteredEvents.filter((event) => event.action === "dismissed").length;
 
   return filteredEvents.length > 0 ? dismisses / filteredEvents.length : 0;

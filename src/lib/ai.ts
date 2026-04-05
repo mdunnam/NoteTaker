@@ -247,11 +247,11 @@ function buildClarificationFeedbackHints(stats?: ClarificationQuestionStat[]): s
   const dismissed = stats
     .filter((stat) => getClarificationQuestionNoiseAssessment(stat).level !== "normal")
     .slice(0, 3)
-    .map((stat) => `${stat.label} (${stat.dismisses} dismisses, ${stat.answers} answers)`);
+    .map((stat) => `${stat.label} (${stat.dismisses} dismisses, ${stat.answers} answers, ${stat.restores} restores)`);
   const answered = stats
-    .filter((stat) => stat.answers > stat.dismisses)
+    .filter((stat) => stat.answers + stat.restores > stat.dismisses)
     .slice(0, 3)
-    .map((stat) => `${stat.label} (${stat.answers} answers)`);
+    .map((stat) => `${stat.label} (${stat.answers} answers, ${stat.restores} restores)`);
 
   const hints: string[] = [];
 

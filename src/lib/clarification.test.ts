@@ -18,6 +18,7 @@ describe("clarification feedback helpers", () => {
       label: "Which project is this for?",
       answers: 0,
       dismisses: 2,
+      restores: 0,
       lastAction: "dismissed",
       lastActionAt: "2026-04-04T00:00:00.000Z",
     });
@@ -32,6 +33,7 @@ describe("clarification feedback helpers", () => {
         label: "Which project is this for?",
         answers: 0,
         dismisses: 2,
+        restores: 0,
         lastAction: "dismissed",
         lastActionAt: "2026-04-04T00:00:00.000Z",
       },
@@ -40,6 +42,7 @@ describe("clarification feedback helpers", () => {
         label: "What context is this in?",
         answers: 1,
         dismisses: 0,
+        restores: 0,
         lastAction: "answered",
         lastActionAt: "2026-04-04T00:00:00.000Z",
       },
@@ -55,5 +58,20 @@ describe("clarification feedback helpers", () => {
     );
 
     expect(questions).toEqual(["What context is this in?"]);
+  });
+
+  it("lets restore actions offset a previously suppressed clarification style", () => {
+    const assessment = getClarificationQuestionNoiseAssessment({
+      key: "project",
+      label: "Which project is this for?",
+      answers: 0,
+      dismisses: 2,
+      restores: 1,
+      lastAction: "restored",
+      lastActionAt: "2026-04-04T00:00:00.000Z",
+    });
+
+    expect(assessment.level).toBe("normal");
+    expect(assessment.noiseScore).toBe(0);
   });
 });

@@ -5,13 +5,14 @@ export interface ClarificationTurn {
   createdAt: string;
 }
 
-export type ClarificationFeedbackAction = "answered" | "dismissed";
+export type ClarificationFeedbackAction = "answered" | "dismissed" | "restored";
 
 export interface ClarificationQuestionStat {
   key: string;
   label: string;
   answers: number;
   dismisses: number;
+  restores: number;
   lastAction: ClarificationFeedbackAction;
   lastActionAt: string;
 }
@@ -63,7 +64,7 @@ export function buildClarificationQuestionKey(question: string): string {
 
 /**
  * Convert clarification feedback into a noise assessment.
- * Dismisses count against a question style, while answered questions offset that noise.
+ * Dismisses count against a question style, while answered and restored styles offset that noise.
  */
 export function getClarificationQuestionNoiseAssessment(
   stat?: ClarificationQuestionStat | null
@@ -76,7 +77,7 @@ export function getClarificationQuestionNoiseAssessment(
     };
   }
 
-  const rawNoiseScore = stat.dismisses * 2 - stat.answers * 2;
+  const rawNoiseScore = stat.dismisses * 2 - stat.answers * 2 - stat.restores * 4;
   const noiseScore = Math.max(0, rawNoiseScore);
 
   if (noiseScore >= 4 && stat.dismisses >= 2) {

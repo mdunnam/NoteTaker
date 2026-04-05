@@ -66,7 +66,7 @@ export default async function SettingsPage() {
       <div className="mt-10 max-w-5xl">
         <h2 className="mb-1 text-xl font-bold text-gray-900">Clarification Feedback</h2>
         <p className="mb-4 text-sm text-gray-600">
-          Track which clarification question styles you answer, dismiss, or implicitly train away so QNote can ask tighter follow-up questions over time.
+          Track which clarification question styles you answer, dismiss, restore, or implicitly train away so QNote can ask tighter follow-up questions over time.
         </p>
         <ClarificationFeedbackPanel stats={clarificationQuestionStats} />
       </div>

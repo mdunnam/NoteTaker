@@ -36,7 +36,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Per-user memory profile: projects, contexts, people, topics
 - Organization prompts conditioned on per-user memory
 - Conversational clarification loop with persisted Q/A history per note
-- Clarification question feedback with `Not useful` dismissal, per-style telemetry, and feedback-aware filtering
+- Clarification question feedback with `Not useful` dismissal, per-style telemetry, feedback-aware filtering, and Settings-side restore
 - Chip-click confidence lift tracking
 - Hint effectiveness analytics in settings
 - AI performance dashboard in settings
@@ -76,7 +76,7 @@ Shipped:
 - feedback-aware resurfacing that uses review telemetry to down-rank noisy signals
 - note-level reorganization suggestions and changed-meaning queues
 - reclassification queue feedback that down-ranks repeated false positives
-- clarification feedback that down-ranks or suppresses noisy question styles
+- clarification feedback that down-ranks or suppresses noisy question styles, with restore controls in Settings
 - AI performance visibility and learn-from-hint interactions
 - AI performance visibility for clarification-noise trends and learn-from-hint interactions
 
@@ -262,6 +262,7 @@ src/
       search/ask/route.ts            # POST conversational ask
       auth/signup/route.ts           # POST create user
       user/route.ts                  # PATCH user profile
+      user/clarification-feedback/route.ts # POST restore clarification style
       user/hint-stats/route.ts       # GET hint effectiveness stats
       user/stats/route.ts            # GET AI performance metrics and history
       worker/enrich/route.ts         # POST/GET enrichment worker
@@ -349,6 +350,7 @@ POST   /api/notes/[id]/split         Preview or create split cards
 POST   /api/notes/[id]/summary       Regenerate AI organization and confidence
 POST   /api/notes/analyze-dump       Analyze raw dump into organized previews
 POST   /api/notes/analyze-dump/confirm Create selected dump notes
+POST   /api/user/clarification-feedback Restore one over-suppressed clarification style
 GET    /api/notes/[id]/insights      Get related notes, tasks, cluster context, and reorganization suggestions for detail view
 ```
 
