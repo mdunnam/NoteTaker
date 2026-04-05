@@ -11,6 +11,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { z } from "zod";
 
+const CaptureFileSchema = z.object({
+  name: z.string().trim().min(1).max(240),
+  type: z.string().trim().max(160),
+  size: z.number().int().min(0).max(25_000_000),
+  kind: z.enum(["text", "image", "other"]),
+  width: z.number().int().min(1).max(20_000).nullable().optional(),
+  height: z.number().int().min(1).max(20_000).nullable().optional(),
+});
+
 const CreateNoteRequestSchema = z.object({
   rawContent: z.string().trim().min(1),
   tags: z.array(z.string().trim().min(1)).max(24).optional(),
@@ -22,6 +31,7 @@ const CreateNoteRequestSchema = z.object({
   captureSource: z.enum(["bookmarklet", "share-target", "manual"]).optional(),
   sourceTitle: z.string().trim().max(240).optional(),
   sourceUrl: z.string().trim().max(2048).optional(),
+  captureFiles: z.array(CaptureFileSchema).max(6).optional(),
 }).passthrough();
 
 /**
@@ -65,6 +75,7 @@ interface CreateNoteOptions {
   captureSource?: "bookmarklet" | "share-target" | "manual";
   sourceTitle?: string;
   sourceUrl?: string;
+  captureFiles?: Array<z.infer<typeof CaptureFileSchema>>;
 }
 
 function buildInitialAiMeta(options: CreateNoteOptions): Prisma.InputJsonValue | undefined {
@@ -74,12 +85,13 @@ function buildInitialAiMeta(options: CreateNoteOptions): Prisma.InputJsonValue |
     nextMeta.captureMode = "dump";
   }
 
-  if (options.captureSource || options.sourceTitle || options.sourceUrl) {
+  if (options.captureSource || options.sourceTitle || options.sourceUrl || (options.captureFiles?.length || 0) > 0) {
     nextMeta.captureMode = "external";
     nextMeta.externalCapture = {
       source: options.captureSource || "manual",
       title: options.sourceTitle?.trim() || null,
       url: options.sourceUrl?.trim() || null,
+      files: options.captureFiles || [],
     };
   }
 
@@ -143,6 +155,7 @@ export async function POST(request: NextRequest) {
       captureSource,
       sourceTitle,
       sourceUrl,
+      captureFiles,
     } = parsedBody.data;
 
     const createdNoteIds: string[] = [];
@@ -168,6 +181,7 @@ export async function POST(request: NextRequest) {
               captureSource,
               sourceTitle,
               sourceUrl,
+              captureFiles,
             });
 
             createdNoteIds.push(created.id);
@@ -217,6 +231,7 @@ export async function POST(request: NextRequest) {
       captureSource,
       sourceTitle,
       sourceUrl,
+      captureFiles,
     });
 
     await enqueueEnrichment(note.id, session.user.id, request.nextUrl.origin);

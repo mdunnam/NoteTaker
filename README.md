@@ -54,6 +54,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Capture-from-anywhere foundation**: Settings now generates a browser bookmarklet and `/capture` provides a focused quick-capture landing page for short external clips
 - **Installed-browser share target**: QNote now ships a minimal PWA/share-target foundation so supported browsers can share titles, URLs, and text into the same capture flow
 - **Structured capture source metadata**: External clips now preserve source title, URL, and capture origin, and note detail surfaces that context directly
+- **File and screenshot intake**: The external capture page now accepts pasted screenshots and attached files; small text files are inlined for AI organization while binaries remain structured metadata in note detail
 - **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
 - **Suppressed review recovery**: Review shows suppressed-item counts and lets you restore snoozed or dismissed resurfacing items immediately
 - **Review telemetry in Settings**: Settings now shows active suppressions plus snooze/dismiss/restore history so resurfacing noise is visible and manageable
@@ -172,7 +173,7 @@ src/
       RightPanelContextual.tsx # Note-detail context widgets
     notes/
       CardsClient.tsx      # Cards filters, selection, synthesis
-      ExternalCaptureClient.tsx # Focused quick-capture form for external clips
+      ExternalCaptureClient.tsx # Focused quick-capture form for external clips, files, and screenshots
       KnowledgeClustersClient.tsx # Shared Projects and Topics planning surface
       NoteCard.tsx          # Individual note display
       InboxStream.tsx       # Note list view

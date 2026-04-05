@@ -354,6 +354,21 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
                 {aiMeta.externalCapture.url}
               </a>
             )}
+            {aiMeta.externalCapture.files.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {aiMeta.externalCapture.files.map((file) => (
+                  <li key={`${file.name}-${file.size}-${file.type}`} className="rounded-lg border border-sky-100 bg-white px-3 py-2 text-sm text-sky-900">
+                    <p className="font-medium">{file.name}</p>
+                    <p className="text-xs text-sky-700">
+                      {file.kind}
+                      {file.type ? ` · ${file.type}` : ""}
+                      {file.width && file.height ? ` · ${file.width}x${file.height}` : ""}
+                      {` · ${Math.max(1, Math.round(file.size / 1024))} KB`}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 

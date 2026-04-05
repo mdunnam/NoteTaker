@@ -6,6 +6,16 @@ export interface ExternalCaptureSearchParams {
 }
 
 export type ExternalCaptureSource = "bookmarklet" | "share-target" | "manual";
+export type ExternalCaptureFileKind = "text" | "image" | "other";
+
+export interface ExternalCaptureFile {
+  name: string;
+  type: string;
+  size: number;
+  kind: ExternalCaptureFileKind;
+  width?: number | null;
+  height?: number | null;
+}
 
 function getFirstValue(value: string | string[] | null | undefined): string {
   if (Array.isArray(value)) {

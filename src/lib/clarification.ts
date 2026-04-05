@@ -1,3 +1,5 @@
+import type { ExternalCaptureFile } from "@/lib/externalCapture";
+
 export interface ClarificationTurn {
   question: string;
   answer: string;
@@ -42,6 +44,7 @@ export interface ParsedNoteAiMeta {
     source: string | null;
     title: string | null;
     url: string | null;
+    files: ExternalCaptureFile[];
   } | null;
 }
 
@@ -178,11 +181,29 @@ export function parseNoteAiMeta(raw: unknown): ParsedNoteAiMeta {
     };
   }
 
+  const externalCaptureFiles = isRecord(raw.externalCapture) && Array.isArray(raw.externalCapture.files)
+    ? raw.externalCapture.files.filter((file): file is ExternalCaptureFile => {
+        if (!isRecord(file)) {
+          return false;
+        }
+
+        return (
+          typeof file.name === "string" &&
+          typeof file.type === "string" &&
+          typeof file.size === "number" &&
+          (file.kind === "text" || file.kind === "image" || file.kind === "other") &&
+          (file.width === undefined || file.width === null || typeof file.width === "number") &&
+          (file.height === undefined || file.height === null || typeof file.height === "number")
+        );
+      })
+    : [];
+
   const externalCapture = isRecord(raw.externalCapture)
     ? {
         source: typeof raw.externalCapture.source === "string" ? raw.externalCapture.source : null,
         title: typeof raw.externalCapture.title === "string" ? raw.externalCapture.title : null,
         url: typeof raw.externalCapture.url === "string" ? raw.externalCapture.url : null,
+        files: externalCaptureFiles,
       }
     : null;
 

@@ -82,6 +82,14 @@ describe("clarification feedback helpers", () => {
         source: "bookmarklet",
         title: "Interesting article",
         url: "https://example.com/story",
+        files: [
+          {
+            name: "notes.txt",
+            type: "text/plain",
+            size: 120,
+            kind: "text",
+          },
+        ],
       },
     });
 
@@ -89,6 +97,14 @@ describe("clarification feedback helpers", () => {
       source: "bookmarklet",
       title: "Interesting article",
       url: "https://example.com/story",
+      files: [
+        {
+          name: "notes.txt",
+          type: "text/plain",
+          size: 120,
+          kind: "text",
+        },
+      ],
     });
   });
 });

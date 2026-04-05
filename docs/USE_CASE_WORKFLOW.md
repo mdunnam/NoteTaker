@@ -30,11 +30,13 @@ Alternate capture paths:
 - Organize This Dump modal for large pasted brain dumps, meeting notes, or copied text that should be reviewed before creation
 - Browser bookmarklet capture for short web clips, URLs, and selected text outside the main app
 - Installed-browser share target for supported browsers that can send titles, URLs, and text into `/capture`
+- File and screenshot intake on `/capture` for pasted screenshots, small text files, and binary file metadata
 
 Expected behavior:
 
 - Note is created immediately.
 - External captures retain source title, URL, and capture origin instead of flattening all context into raw text.
+- Small text files can be inlined for AI organization, while screenshots and other binaries remain visible as structured source metadata.
 - AI organization runs in background.
 
 ### Step 2: First-Pass AI Organization
