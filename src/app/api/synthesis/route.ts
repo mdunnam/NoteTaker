@@ -7,6 +7,7 @@ import { z } from "zod";
 
 const SynthesisRequestSchema = z.object({
   noteIds: z.array(z.string().min(1)).min(2).max(12),
+  planningGoal: z.string().trim().max(240).optional(),
 });
 
 /**
@@ -57,7 +58,9 @@ export async function POST(request: NextRequest) {
     const synthesis = await synthesizeNotes(notes.map((note) => ({
       ...note,
       createdAt: note.createdAt.toISOString(),
-    })));
+    })), {
+      planningGoal: parsedBody.data.planningGoal?.trim() || undefined,
+    });
 
     return NextResponse.json(synthesis, { status: 200 });
   } catch (error) {

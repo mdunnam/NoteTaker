@@ -42,6 +42,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Clarification-noise trend**: AI performance now includes clarification dismiss-rate trends plus down-ranked and suppressed question-style counts
 - **Note health**: Notes now carry a health score based on confidence, staleness, missing structure, and unresolved clarification pressure
 - **Multi-note synthesis**: Selected cards, timeline notes, and contextual note clusters can be synthesized into one shared summary, themes, and next actions
+- **Planning outputs**: Synthesis now also returns a concrete plan with objective, first move, ordered steps, risks, and a success signal
 - **Broader resurfacing**: Forgotten-note and recurring-pattern signals now surface in Inbox and the shared RightPanel, not only in Review
 - **Recurring idea detection**: Repeated language across recent notes now forms recurring idea threads even without explicit entities or tags
 - **Cards and Timeline depth**: Both views now support health-aware filtering, selection, and synthesis workflows
@@ -59,11 +60,11 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - Semantic search UX with filters, snippets, and typeahead
 - Project/topic clustering with browsable grouped notes and reorganization suggestions
 - Reclassification queue for changed-meaning notes in inbox and right panel
-- Cards, Timeline, Favorites, and Archive still need deeper product depth
+- Cards, Timeline, Favorites, and Archive now support deeper health-aware browsing and synthesis workflows
 
 ### Phase 5+ 📋
 - Resurface old notes
-- Multi-note synthesis and planning outputs
+- Deeper synthesis and planning layers
 - Review and resurfacing workflows
 - Desktop (Tauri) and iOS (Capacitor) wrappers
 
@@ -127,7 +128,7 @@ src/
     (app)/                  # Protected routes with layout
       layout.tsx            # App shell (sidebar, capture bar, right panel)
       inbox/page.tsx        # Main inbox view
-      cards/page.tsx        # Card grid view (still shallow)
+      cards/page.tsx        # Card grid with health, selection, and synthesis
       projects/page.tsx     # Project cluster browser
       review/page.tsx       # Dedicated review workflow
       topics/page.tsx       # Topic cluster browser
@@ -143,7 +144,7 @@ src/
       notes/[id]/summary/route.ts  # Regenerate AI summary for a note
       notes/analyze-dump/route.ts  # Analyze raw dump into note previews
       notes/analyze-dump/confirm/route.ts  # Create reviewed dump notes
-      synthesis/route.ts  # Synthesize multiple selected notes
+      synthesis/route.ts  # Synthesize selected notes and return a structured plan
       search/semantic/route.ts  # Semantic + keyword search
       search/ask/route.ts       # Ask across note corpus
       review/state/route.ts     # Persist snooze/dismiss review actions
@@ -283,7 +284,7 @@ src/
 
 ### Phase 6: Synthesis & Planning 📋
 - [x] Multi-note synthesis
-- [ ] Planning outputs
+- [x] Planning outputs
 - [ ] Review workflows
 
 ### Phase 7: Desktop (Tauri) 📋

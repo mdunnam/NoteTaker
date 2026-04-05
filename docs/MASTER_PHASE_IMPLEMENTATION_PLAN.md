@@ -83,6 +83,7 @@ Shipped:
 - reclassification queue feedback that down-ranks repeated false positives
 - clarification feedback that down-ranks or suppresses noisy question styles, with restore controls in Settings
 - multi-note synthesis across selected notes and contextual clusters
+- planning outputs layered onto the synthesis route with objective, first move, steps, risks, and success signal
 - AI performance visibility and learn-from-hint interactions
 - AI performance visibility for clarification-noise trends and learn-from-hint interactions
 
@@ -241,10 +242,10 @@ src/
       inbox/page.tsx                 # Main triage view
       notes/[id]/page.tsx            # Note detail
       review/page.tsx                # Dedicated review workflow
-      cards/page.tsx                 # Card grid (placeholder)
+      cards/page.tsx                 # Card grid with health, selection, and synthesis
       projects/page.tsx              # Project cluster browser
       topics/page.tsx                # Topic cluster browser
-      timeline/page.tsx              # Timeline (placeholder)
+      timeline/page.tsx              # Timeline with health filters, bucket selection, and synthesis
       search/page.tsx                # Search & Ask experience
       favorites/page.tsx             # Favorites with health, selection, and synthesis
       archive/page.tsx               # Archive with restore candidates and synthesis
@@ -260,7 +261,7 @@ src/
       notes/analyze-dump/route.ts    # POST analyze raw dump into note previews
       notes/analyze-dump/confirm/route.ts # POST create selected reviewed dump notes
       notes/[id]/insights/route.ts   # GET contextual note insights
-      synthesis/route.ts             # POST synthesize selected notes
+      synthesis/route.ts             # POST synthesize selected notes and return a plan
       review/state/route.ts          # POST snooze/dismiss review items
       search/semantic/route.ts       # POST semantic search
       search/ask/route.ts            # POST conversational ask
@@ -1279,7 +1280,7 @@ Stripe scaffolded in `src/lib/stripe.ts`. Remaining:
 1. Resurfacing engine (forgotten + pattern)
 2. Multi-note synthesis
 3. RightPanel depth upgrades tied to clustering and synthesis
-4. Review mode and planning outputs
+4. Deeper project/topic planning layers
 5. Capture-from-anywhere surfaces
 
 ### Should Have

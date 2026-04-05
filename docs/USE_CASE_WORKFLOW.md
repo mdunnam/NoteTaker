@@ -155,7 +155,8 @@ Expected behavior:
 - user sees what to do next,
 - user can quickly navigate to relevant prior notes,
 - user can apply better project/category context when new notes reveal a stronger grouping,
-- user can synthesize the current note with its surrounding context when one note is no longer enough.
+- user can synthesize the current note with its surrounding context when one note is no longer enough,
+- user can turn a synthesis into a concrete plan with a first move, ordered steps, risks, and a success signal.
 
 ### Step 6: Learning Feedback Visibility
 
@@ -200,6 +201,7 @@ Execution:
 Reflection:
 
 - user checks related/contextual notes in RightPanel,
+- user uses synthesis and planning outputs when a cluster of notes needs to become a real execution path,
 - user searches by meaning or exact wording to reconnect older notes quickly,
 - revisits unresolved low-confidence items.
 

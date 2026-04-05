@@ -101,18 +101,31 @@ describe("/api/synthesis POST", () => {
       openQuestions: ["Who owns approval?"],
       dominantProject: "QNote",
       dominantCategory: "Work",
+      plan: {
+        objective: "Ship the launch plan.",
+        firstMove: "Resolve the top blocker.",
+        steps: [
+          { title: "Resolve blocker", detail: "Unblock the launch.", horizon: "now" },
+          { title: "Sequence follow-up", detail: "Order the remaining work.", horizon: "next" },
+        ],
+        risks: ["Approval is still unclear."],
+        successSignal: "The launch has a clear next step and owner.",
+      },
       noteCount: 2,
       sourceNoteIds: ["n1", "n2"],
     });
 
-    const response = await POST(makeRequest({ noteIds: ["n1", "n2"] }));
+    const response = await POST(makeRequest({ noteIds: ["n1", "n2"], planningGoal: "Ship this week" }));
     const payload = await response.json();
 
     expect(response.status).toBe(200);
     expect(payload.title).toBe("Launch synthesis");
+    expect(payload.plan.objective).toBe("Ship the launch plan.");
     expect(mockedSynthesizeNotes).toHaveBeenCalledWith([
       expect.objectContaining({ id: "n1" }),
       expect.objectContaining({ id: "n2" }),
-    ]);
+    ], {
+      planningGoal: "Ship this week",
+    });
   });
 });

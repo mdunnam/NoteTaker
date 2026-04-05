@@ -15,6 +15,17 @@ interface SynthesisResult {
   openQuestions: string[];
   dominantProject: string | null;
   dominantCategory: string | null;
+  plan: {
+    objective: string;
+    firstMove: string;
+    steps: Array<{
+      title: string;
+      detail: string;
+      horizon: "now" | "next" | "later";
+    }>;
+    risks: string[];
+    successSignal: string;
+  };
   noteCount: number;
 }
 
@@ -35,6 +46,7 @@ export default function MultiNoteSynthesisPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SynthesisResult | null>(null);
+  const [planningGoal, setPlanningGoal] = useState("");
 
   const selectedIds = notes.map((note) => note.id);
   const canSynthesize = selectedIds.length >= 2;
@@ -52,7 +64,10 @@ export default function MultiNoteSynthesisPanel({
       const response = await fetch("/api/synthesis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noteIds: selectedIds }),
+        body: JSON.stringify({
+          noteIds: selectedIds,
+          ...(planningGoal.trim() ? { planningGoal: planningGoal.trim() } : {}),
+        }),
       });
 
       if (!response.ok) {
@@ -91,6 +106,14 @@ export default function MultiNoteSynthesisPanel({
         </p>
       )}
 
+      <input
+        type="text"
+        value={planningGoal}
+        onChange={(event) => setPlanningGoal(event.target.value)}
+        placeholder="Optional planning lens: ship this week, prep client meeting, unblock launch..."
+        className={`mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 ${compact ? "text-xs" : "text-sm"}`}
+      />
+
       {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
 
       {result && (
@@ -117,6 +140,41 @@ export default function MultiNoteSynthesisPanel({
                 {result.openQuestions.map((question) => <li key={question}>• {question}</li>)}
               </ul>
             </div>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-blue-200 bg-white p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Plan</p>
+            <p className={`mt-1 font-medium text-gray-900 ${compact ? "text-xs" : "text-sm"}`}>{result.plan.objective}</p>
+            <p className={`mt-2 text-gray-700 ${compact ? "text-[11px]" : "text-xs"}`}>
+              <span className="font-semibold text-gray-900">First move:</span> {result.plan.firstMove}
+            </p>
+
+            <ol className="mt-3 space-y-2">
+              {result.plan.steps.slice(0, compact ? 3 : result.plan.steps.length).map((step, index) => (
+                <li key={`${step.title}-${index}`} className="rounded border border-gray-200 bg-gray-50 p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`font-medium text-gray-900 ${compact ? "text-xs" : "text-sm"}`}>{step.title}</p>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${step.horizon === "now" ? "bg-green-100 text-green-700" : step.horizon === "next" ? "bg-amber-100 text-amber-700" : "bg-gray-200 text-gray-700"}`}>
+                      {step.horizon}
+                    </span>
+                  </div>
+                  <p className={`mt-1 text-gray-700 ${compact ? "text-[11px]" : "text-xs"}`}>{step.detail}</p>
+                </li>
+              ))}
+            </ol>
+
+            {result.plan.risks.length > 0 && (
+              <div className="mt-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">Risks</p>
+                <ul className="mt-1 space-y-1 text-xs text-gray-700">
+                  {result.plan.risks.slice(0, compact ? 2 : result.plan.risks.length).map((risk) => <li key={risk}>• {risk}</li>)}
+                </ul>
+              </div>
+            )}
+
+            <p className={`mt-3 text-gray-700 ${compact ? "text-[11px]" : "text-xs"}`}>
+              <span className="font-semibold text-gray-900">Success signal:</span> {result.plan.successSignal}
+            </p>
           </div>
 
           {(result.dominantProject || result.dominantCategory) && (

@@ -102,6 +102,17 @@ const SynthesizedNotesSchema = z.object({
   openQuestions: z.array(z.string()).max(6),
   dominantProject: z.string().nullable().optional(),
   dominantCategory: z.string().nullable().optional(),
+  plan: z.object({
+    objective: z.string(),
+    firstMove: z.string(),
+    steps: z.array(z.object({
+      title: z.string(),
+      detail: z.string(),
+      horizon: z.enum(["now", "next", "later"]),
+    })).min(2).max(6),
+    risks: z.array(z.string()).max(5),
+    successSignal: z.string(),
+  }),
 });
 
 /**
@@ -196,6 +207,36 @@ function buildSynthesisFallback(notes: SynthesisNoteInput[]): SynthesizedNotesPa
     ],
     dominantProject: projects[0] || null,
     dominantCategory: categories[0] || null,
+    plan: {
+      objective: projects[0]
+        ? `Turn the selected notes into a concrete plan for ${projects[0]}.`
+        : `Turn the selected notes into one coherent plan.` ,
+      firstMove: notes[0]?.summary || notes[0]?.title || "Review the selected notes and choose one concrete next move.",
+      steps: [
+        {
+          title: "Clarify the main objective",
+          detail: projects[0]
+            ? `Anchor the work around ${projects[0]} and decide what outcome matters most right now.`
+            : "Decide what single outcome the selected notes should drive toward.",
+          horizon: "now",
+        },
+        {
+          title: "Convert the strongest actions into a short plan",
+          detail: "Choose the most important actions from the synthesis and order them by urgency.",
+          horizon: "next",
+        },
+        {
+          title: "Remove ambiguity before execution",
+          detail: "Answer the remaining open questions so the plan can move without more note-churn.",
+          horizon: "later",
+        },
+      ],
+      risks: [
+        "The selected notes may still mix more than one objective.",
+        "Open questions may block execution if they are not resolved early.",
+      ],
+      successSignal: "You end up with one clear next move and a short ordered plan instead of another loose cluster of notes.",
+    },
     noteCount: notes.length,
     sourceNoteIds: notes.map((note) => note.id),
   };
@@ -297,8 +338,23 @@ export interface SynthesizedNotesPayload {
   openQuestions: string[];
   dominantProject: string | null;
   dominantCategory: string | null;
+  plan: {
+    objective: string;
+    firstMove: string;
+    steps: Array<{
+      title: string;
+      detail: string;
+      horizon: "now" | "next" | "later";
+    }>;
+    risks: string[];
+    successSignal: string;
+  };
   noteCount: number;
   sourceNoteIds: string[];
+}
+
+interface SynthesizeNotesOptions {
+  planningGoal?: string;
 }
 
 /** Build compact guidance so the model avoids question styles the user repeatedly dismisses. */
@@ -480,9 +536,12 @@ export async function splitNote(rawContent: string) {
 }
 
 /**
- * Synthesize a group of notes into one coherent overview with themes, actions, and open questions.
+ * Synthesize a group of notes into one coherent overview and planning output.
  */
-export async function synthesizeNotes(notes: SynthesisNoteInput[]): Promise<SynthesizedNotesPayload> {
+export async function synthesizeNotes(
+  notes: SynthesisNoteInput[],
+  options?: SynthesizeNotesOptions
+): Promise<SynthesizedNotesPayload> {
   if (notes.length === 0) {
     return buildSynthesisFallback(notes);
   }
@@ -500,15 +559,15 @@ export async function synthesizeNotes(notes: SynthesisNoteInput[]): Promise<Synt
         {
           role: "system",
           content:
-            "You synthesize multiple notes into one actionable overview. Find the shared thread, collapse repeated work, and highlight the most important actions and unresolved questions. Return strict JSON with keys: title, summary, themes, actions, openQuestions, dominantProject, dominantCategory.",
+            "You synthesize multiple notes into one actionable overview and plan. Find the shared thread, collapse repeated work, and highlight the most important actions and unresolved questions. Also produce a concrete plan with objective, firstMove, ordered steps, risks, and a successSignal. If a planning lens is provided, treat it as authoritative. Return strict JSON with keys: title, summary, themes, actions, openQuestions, dominantProject, dominantCategory, plan.",
         },
         {
           role: "user",
-          content: notes
+          content: `Planning lens: ${options?.planningGoal?.trim() || "(none)"}\n\n${notes
             .map((note, index) => {
               return `${index + 1}. ${note.title || "Untitled note"}\nProject: ${note.suggestedProject || "(none)"}\nCategory: ${note.category || "(none)"}\nSummary: ${note.summary || "(none)"}\nBody: ${note.rawContent.slice(0, 500)}`;
             })
-            .join("\n\n"),
+            .join("\n\n")}`,
         },
       ],
     });
@@ -524,6 +583,7 @@ export async function synthesizeNotes(notes: SynthesisNoteInput[]): Promise<Synt
       openQuestions: parsed.openQuestions,
       dominantProject: parsed.dominantProject || null,
       dominantCategory: parsed.dominantCategory || null,
+      plan: parsed.plan,
       noteCount: notes.length,
       sourceNoteIds: notes.map((note) => note.id),
     };
