@@ -138,6 +138,7 @@ src/
       search/page.tsx       # Search & Ask experience
       ... (other views)
     capture/page.tsx        # Top-level external capture page with auth-preserving redirect
+    capture/share/route.ts  # Share-target POST handoff into the capture flow
     api/
       notes/route.ts        # CRUD endpoints for notes
       notes/[id]/route.ts   # Single note operations
@@ -206,6 +207,10 @@ src/
 
   prisma/
     schema.prisma           # Data model
+
+  public/
+    manifest.webmanifest   # Installed-browser capture/share target manifest
+    sw.js                  # Minimal service worker for PWA registration
 
   auth.ts                   # NextAuth configuration
 ```

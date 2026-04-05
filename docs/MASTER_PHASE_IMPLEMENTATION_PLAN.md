@@ -254,6 +254,7 @@ src/
       settings/page.tsx              # Settings + hint analytics
       collections/page.tsx           # Collections view
     capture/page.tsx                 # Top-level external capture page with auth-preserving redirect
+    capture/share/route.ts           # Share-target POST handoff into the capture flow
     api/
       notes/route.ts                 # GET, POST notes
       notes/[id]/route.ts            # PATCH, DELETE single note
@@ -330,6 +331,10 @@ src/
     userMemory.ts                    # memory CRUD + hint stats + clarification feedback stats
     clarification.ts                 # clarification history parsing + feedback-aware question filtering
     userStats.ts                     # AI performance metrics + snapshot history
+
+  public/
+    manifest.webmanifest             # installed-browser share target manifest
+    sw.js                            # minimal service worker for PWA registration
     searchRanking.ts                 # semantic + keyword blending
     rateLimit.ts                     # per-user API rate limiting
     stripe.ts                        # billing (placeholder)
