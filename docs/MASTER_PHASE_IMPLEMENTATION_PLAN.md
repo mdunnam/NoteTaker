@@ -54,6 +54,9 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Suppressed-item counts and restore actions on the Review route
 - Settings visibility for active suppressions and review action telemetry
 - Feedback-aware resurfacing that down-ranks or suppresses noisy signals after repeated dismisses/snoozes
+- Note-health scoring in note detail, Cards, Timeline, and the shared right panel
+- Multi-note synthesis workflow for selected notes and contextual clusters
+- Resurfacing signals visible outside Review in Inbox and the shared right panel
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
 - Background-rescored reclassification queue in inbox and right panel for notes whose meaning changed based on newer supporting context
@@ -74,17 +77,18 @@ Shipped:
 - suppressed-item counts and restore controls in Review
 - settings visibility for active suppressions and review-action history
 - feedback-aware resurfacing that uses review telemetry to down-rank noisy signals
+- note-health scoring that turns confidence and staleness into a concrete maintenance signal
 - note-level reorganization suggestions and changed-meaning queues
 - reclassification queue feedback that down-ranks repeated false positives
 - clarification feedback that down-ranks or suppresses noisy question styles, with restore controls in Settings
+- multi-note synthesis across selected notes and contextual clusters
 - AI performance visibility and learn-from-hint interactions
 - AI performance visibility for clarification-noise trends and learn-from-hint interactions
 
 Not yet shipped:
-- Full surface depth for Cards, Timeline, Favorites, Archive
+- Full surface depth for Favorites and Archive
 - Deeper synthesis layers on top of Projects and Topics views
-- Smart resurfacing
-- Multi-note synthesis
+- Recurring-idea resurfacing beyond the current heuristics
 - Capture from outside the app
 
 ---
@@ -257,6 +261,7 @@ src/
       notes/analyze-dump/route.ts    # POST analyze raw dump into note previews
       notes/analyze-dump/confirm/route.ts # POST create selected reviewed dump notes
       notes/[id]/insights/route.ts   # GET contextual note insights
+      synthesis/route.ts             # POST synthesize selected notes
       review/state/route.ts          # POST snooze/dismiss review items
       search/semantic/route.ts       # POST semantic search
       search/ask/route.ts            # POST conversational ask
@@ -279,12 +284,18 @@ src/
       RightPanel.tsx
       RightPanelContextual.tsx
     notes/
+      CardsClient.tsx
       ReclassificationQueue.tsx
       NoteCard.tsx
       InboxStream.tsx
       InboxFilterBar.tsx
       ClarificationLoop.tsx
+      MultiNoteSynthesisPanel.tsx
+      NoteHealthBadge.tsx
+      NoteHealthPanel.tsx
       NoteDetailClient.tsx
+      ResurfacingRail.tsx
+      TimelineClient.tsx
       DumpModal.tsx
     search/
       SearchClient.tsx
@@ -304,6 +315,7 @@ src/
     clusters.ts                      # cluster inference + reclassification ranking
     enrichNote.ts                    # full enrichment pipeline
     db.ts                            # Prisma client singleton
+    noteHealth.ts                    # note-health scoring
     userMemory.ts                    # memory CRUD + hint stats + clarification feedback stats
     clarification.ts                 # clarification history parsing + feedback-aware question filtering
     userStats.ts                     # AI performance metrics + snapshot history
@@ -350,6 +362,7 @@ POST   /api/notes/[id]/split         Preview or create split cards
 POST   /api/notes/[id]/summary       Regenerate AI organization and confidence
 POST   /api/notes/analyze-dump       Analyze raw dump into organized previews
 POST   /api/notes/analyze-dump/confirm Create selected dump notes
+POST   /api/synthesis                Synthesize selected notes into one shared overview
 POST   /api/user/clarification-feedback Restore one over-suppressed clarification style
 GET    /api/notes/[id]/insights      Get related notes, tasks, cluster context, and reorganization suggestions for detail view
 ```

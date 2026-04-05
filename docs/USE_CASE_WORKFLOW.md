@@ -126,19 +126,35 @@ When the user wants one place to process system-generated work:
 - repeated dismissal of the same clarification style makes future follow-up questioning less aggressive too,
 - this becomes the foundation for deeper resurfacing and synthesis.
 
+### Step 4.9: Resurfacing Outside Review
+
+When the user stays in day-to-day views instead of opening Review:
+
+- Inbox shows in-app resurfacing alerts for forgotten notes and recurring patterns,
+- the shared RightPanel shows the same resurfacing signals in compact form,
+- suppression actions still work from those surfaces,
+- the user can pull older work back into the active loop without context switching.
+
+Expected behavior:
+
+- resurfacing is useful during normal triage, not only in dedicated review sessions,
+- noisy resurfacing signals remain feedback-aware everywhere they appear.
+
 ### Step 5: Contextual Review in Note Detail + RightPanel
 
 On note detail routes:
 
 - main content shows summary, intent, next action, tasks, clarifications,
-- RightPanel shows contextual related notes, inferred topic/project clusters, and note-level reorganization suggestions.
+- note health makes confidence, staleness, and unresolved clarification pressure explicit,
+- RightPanel shows contextual related notes, inferred topic/project clusters, note-level reorganization suggestions, and contextual synthesis.
 
 Expected behavior:
 
 - user understands why the note matters,
 - user sees what to do next,
 - user can quickly navigate to relevant prior notes,
-- user can apply better project/category context when new notes reveal a stronger grouping.
+- user can apply better project/category context when new notes reveal a stronger grouping,
+- user can synthesize the current note with its surrounding context when one note is no longer enough.
 
 ### Step 6: Learning Feedback Visibility
 

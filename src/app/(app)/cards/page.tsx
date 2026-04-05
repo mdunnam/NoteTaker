@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
+import CardsClient from "@/components/notes/CardsClient";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import NoteCard from "@/components/notes/NoteCard";
 
 /**
  * Cards page that renders notes in a responsive card grid.
@@ -29,6 +29,10 @@ export default async function CardsPage() {
     },
   });
 
+  const categories = [...new Set(notes.map((note) => note.category).filter(Boolean))] as string[];
+  const projects = [...new Set(notes.map((note) => note.suggestedProject).filter(Boolean))] as string[];
+  const types = [...new Set(notes.map((note) => note.type).filter(Boolean))] as string[];
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -47,11 +51,7 @@ export default async function CardsPage() {
           <p className="text-sm text-gray-500">Capture your first thought using the box at the top of the page.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-          {notes.map((note) => (
-            <NoteCard key={note.id} note={note} />
-          ))}
-        </div>
+        <CardsClient notes={notes} filterOptions={{ categories, projects, types }} />
       )}
     </div>
   );

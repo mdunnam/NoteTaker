@@ -3,6 +3,10 @@ import { getUserReclassificationCandidates } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import ReclassificationQueue from "@/components/notes/ReclassificationQueue";
 import RightPanelContextual from "@/components/layout/RightPanelContextual";
+import ResurfacingRail from "@/components/notes/ResurfacingRail";
+import { getUserForgottenNoteCandidates, getUserReviewPatterns } from "@/lib/resurfacing";
+import { getThinkingMemory, isReviewItemSuppressed } from "@/lib/userMemory";
+import { getNoteHealthAssessment, summarizeWorkspaceHealth } from "@/lib/noteHealth";
 
 /**
  * Right panel showing live note health and recent extracted tasks.
@@ -19,10 +23,14 @@ export default async function RightPanel() {
     uncategorizedCount,
     processingCount,
     recentNotes,
+    healthNotes,
     topRelations,
     lowConfidenceNotes,
     highPriorityNotes,
     reclassificationCandidates,
+    forgottenCandidates,
+    reviewPatterns,
+    thinkingMemory,
   ] = await Promise.all([
     prisma.note.count({
       where: {
@@ -56,6 +64,32 @@ export default async function RightPanel() {
         id: true,
         title: true,
         extractedTasks: true,
+      },
+    }),
+    prisma.note.findMany({
+      where: {
+        userId: session.user.id,
+        isArchived: false,
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+      take: 150,
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        rawContent: true,
+        category: true,
+        type: true,
+        status: true,
+        confidenceScore: true,
+        priority: true,
+        suggestedProject: true,
+        aiMeta: true,
+        extractedTasks: true,
+        createdAt: true,
+        updatedAt: true,
       },
     }),
     prisma.noteRelation.findMany({
@@ -112,7 +146,23 @@ export default async function RightPanel() {
       },
     }),
     getUserReclassificationCandidates(session.user.id, 3),
+    getUserForgottenNoteCandidates(session.user.id, 3),
+    getUserReviewPatterns(session.user.id, 3),
+    getThinkingMemory(session.user.id),
   ]);
+
+  const workspaceHealth = summarizeWorkspaceHealth(healthNotes);
+  const atRiskNotes = healthNotes
+    .map((note) => ({ note, assessment: getNoteHealthAssessment(note) }))
+    .filter((entry) => entry.assessment.state === "at-risk")
+    .sort((left, right) => left.assessment.score - right.assessment.score)
+    .slice(0, 3);
+  const visibleForgottenCandidates = forgottenCandidates.filter(
+    (candidate) => !isReviewItemSuppressed(thinkingMemory.reviewState, "forgotten-note", candidate.note.id)
+  );
+  const visibleReviewPatterns = reviewPatterns.filter(
+    (pattern) => !isReviewItemSuppressed(thinkingMemory.reviewState, "pattern", pattern.id)
+  );
 
   const extractedTasks: Array<{
     noteId: string;
@@ -167,6 +217,18 @@ export default async function RightPanel() {
           <h3 className="font-semibold text-sm mb-3">Note Health</h3>
           <ul className="space-y-2 text-xs text-gray-700">
             <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
+              <span>Average score</span>
+              <strong>{workspaceHealth.averageScore}</strong>
+            </li>
+            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
+              <span>At risk</span>
+              <strong>{workspaceHealth.atRiskCount}</strong>
+            </li>
+            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
+              <span>Watch</span>
+              <strong>{workspaceHealth.watchCount}</strong>
+            </li>
+            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
               <span>Total active notes</span>
               <strong>{totalNotes}</strong>
             </li>
@@ -179,7 +241,31 @@ export default async function RightPanel() {
               <strong>{processingCount}</strong>
             </li>
           </ul>
+
+          {atRiskNotes.length > 0 && (
+            <ul className="mt-3 space-y-2">
+              {atRiskNotes.map(({ note, assessment }) => (
+                <li key={note.id} className="rounded border border-red-200 bg-red-50 p-3">
+                  <a href={`/notes/${note.id}`} className="text-xs font-medium text-red-900 hover:underline">
+                    {note.title || "Untitled note"}
+                  </a>
+                  <p className="mt-1 text-[11px] text-red-800">{assessment.reasons[0] || "Needs attention soon."}</p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
+
+        {(visibleForgottenCandidates.length > 0 || visibleReviewPatterns.length > 0) && (
+          <div className="pt-6 border-t border-gray-200">
+            <ResurfacingRail
+              forgottenCandidates={visibleForgottenCandidates}
+              reviewPatterns={visibleReviewPatterns}
+              compact
+              title="Resurfacing"
+            />
+          </div>
+        )}
 
         <div className="pt-6 border-t border-gray-200">
           <h3 className="font-semibold text-sm mb-3">Recent Extracted Tasks</h3>

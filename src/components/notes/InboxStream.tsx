@@ -5,12 +5,14 @@
 "use client";
 
 import type { ReclassificationCandidate } from "@/lib/clusters";
+import type { ForgottenNoteCandidate, ReviewPatternCandidate } from "@/lib/resurfacing";
 import { Note } from "@prisma/client";
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Trash2 } from "lucide-react";
 import NoteCard from "./NoteCard";
 import ReclassificationQueue from "./ReclassificationQueue";
+import ResurfacingRail from "./ResurfacingRail";
 
 interface InboxStreamProps {
   notes: (Note & {
@@ -18,13 +20,15 @@ interface InboxStreamProps {
     entities: Array<{ entity: { id: string; name: string; type: string } }>;
   })[];
   reclassificationCandidates?: ReclassificationCandidate[];
+  forgottenCandidates?: ForgottenNoteCandidate[];
+  reviewPatterns?: ReviewPatternCandidate[];
   quickHints?: {
     projects: string[];
     contexts: string[];
   };
 }
 
-export default function InboxStream({ notes, reclassificationCandidates, quickHints }: InboxStreamProps) {
+export default function InboxStream({ notes, reclassificationCandidates, forgottenCandidates, reviewPatterns, quickHints }: InboxStreamProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
@@ -258,6 +262,25 @@ export default function InboxStream({ notes, reclassificationCandidates, quickHi
       {!!reclassificationCandidates?.length && (
         <div className="mb-4">
           <ReclassificationQueue candidates={reclassificationCandidates} showBatchActions title="Reclassification Queue" />
+        </div>
+      )}
+
+      {((forgottenCandidates?.length || 0) > 0 || (reviewPatterns?.length || 0) > 0) && (
+        <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+          <p className="text-sm font-semibold text-indigo-900">Resurfacing alerts</p>
+          <p className="mt-1 text-xs text-indigo-800">
+            QNote found {(forgottenCandidates?.length || 0) + (reviewPatterns?.length || 0)} resurfacing signal{(forgottenCandidates?.length || 0) + (reviewPatterns?.length || 0) === 1 ? "" : "s"} outside Review.
+          </p>
+        </div>
+      )}
+
+      {((forgottenCandidates?.length || 0) > 0 || (reviewPatterns?.length || 0) > 0) && (
+        <div className="mb-4">
+          <ResurfacingRail
+            forgottenCandidates={forgottenCandidates || []}
+            reviewPatterns={reviewPatterns || []}
+            title="Inbox resurfacing"
+          />
         </div>
       )}
 

@@ -28,6 +28,15 @@ export async function GET(request: NextRequest, { params }: Params) {
       },
       select: {
         id: true,
+        title: true,
+        summary: true,
+        category: true,
+        suggestedProject: true,
+        confidenceScore: true,
+        priority: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
         aiMeta: true,
         extractedTasks: true,
         relatedNotesFrom: {
@@ -61,6 +70,18 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     return NextResponse.json({
       noteId: note.id,
+      note: {
+        id: note.id,
+        title: note.title,
+        summary: note.summary,
+        category: note.category,
+        suggestedProject: note.suggestedProject,
+        confidenceScore: note.confidenceScore,
+        priority: note.priority,
+        status: note.status,
+        createdAt: note.createdAt.toISOString(),
+        updatedAt: note.updatedAt.toISOString(),
+      },
       aiMeta: note.aiMeta,
       extractedTasks: note.extractedTasks,
       clusters: knowledgeContext?.clusters || [],

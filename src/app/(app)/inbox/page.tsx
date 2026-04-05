@@ -5,11 +5,12 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { getUserReclassificationCandidates } from "@/lib/clusters";
+import { getUserForgottenNoteCandidates, getUserReviewPatterns } from "@/lib/resurfacing";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import InboxStream from "@/components/notes/InboxStream";
 import InboxFilterBar from "@/components/notes/InboxFilterBar";
-import { getThinkingMemory, getThinkingMemoryHints } from "@/lib/userMemory";
+import { getThinkingMemory, getThinkingMemoryHints, isReviewItemSuppressed } from "@/lib/userMemory";
 
 interface InboxPageProps {
   searchParams?: { category?: string; tag?: string };
@@ -25,7 +26,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   const activeCategory = searchParams?.category || "";
   const activeTag = searchParams?.tag || "";
 
-  const [notes, reclassificationCandidates] = await Promise.all([
+  const [notes, reclassificationCandidates, forgottenCandidates, reviewPatterns] = await Promise.all([
     prisma.note.findMany({
       where: {
         userId: session.user.id,
@@ -47,6 +48,8 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
       },
     }),
     getUserReclassificationCandidates(session.user.id, 6),
+    getUserForgottenNoteCandidates(session.user.id, 4),
+    getUserReviewPatterns(session.user.id, 4),
   ]);
 
   // Collect unique categories and tags from ALL non-archived notes for the filter bar.
@@ -59,6 +62,12 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   const tags = [...new Set(allNotes.flatMap((n) => n.tags))].filter(Boolean).slice(0, 20);
   const thinkingMemory = await getThinkingMemory(session.user.id);
   const quickHints = getThinkingMemoryHints(thinkingMemory);
+  const visibleForgottenCandidates = forgottenCandidates.filter(
+    (candidate) => !isReviewItemSuppressed(thinkingMemory.reviewState, "forgotten-note", candidate.note.id)
+  );
+  const visibleReviewPatterns = reviewPatterns.filter(
+    (pattern) => !isReviewItemSuppressed(thinkingMemory.reviewState, "pattern", pattern.id)
+  );
 
   return (
     <div className="p-6">
@@ -77,7 +86,13 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
         </Suspense>
       )}
 
-      <InboxStream notes={notes} reclassificationCandidates={reclassificationCandidates} quickHints={quickHints} />
+      <InboxStream
+        notes={notes}
+        reclassificationCandidates={reclassificationCandidates}
+        forgottenCandidates={visibleForgottenCandidates}
+        reviewPatterns={visibleReviewPatterns}
+        quickHints={quickHints}
+      />
     </div>
   );
 }

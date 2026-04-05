@@ -11,12 +11,16 @@ import { useRouter } from "next/navigation";
 import ClarificationLoop from "@/components/notes/ClarificationLoop";
 import SplitNoteModal from "@/components/notes/SplitNoteModal";
 import { getConfidenceBadgeConfig } from "@/lib/confidence";
+import NoteHealthBadge from "@/components/notes/NoteHealthBadge";
+import { getNoteHealthAssessment } from "@/lib/noteHealth";
 
-interface NoteData {
+export interface NoteData {
   id: string;
   title: string | null;
+  summary: string | null;
   rawContent: string;
   createdAt: Date;
+  updatedAt: Date;
   isPinned: boolean;
   isArchived: boolean;
   category: string | null;
@@ -25,6 +29,8 @@ interface NoteData {
   status: string;
   confidenceScore: number | null;
   priority: string | null;
+  suggestedProject: string | null;
+  extractedTasks: unknown;
   aiMeta: unknown;
   collection: { id: string; name: string; color?: string | null } | null;
   entities: Array<{ entity: { id: string; name: string; type: string } }>;
@@ -57,6 +63,7 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
   const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
   const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
   const confidenceBadge = getConfidenceBadgeConfig(note.confidenceScore);
+  const noteHealth = getNoteHealthAssessment(note);
   const aiMeta = parseNoteAiMeta(note.aiMeta);
   const hasClarifications = (aiMeta.clarificationQuestions?.length ?? 0) > 0 && (note.confidenceScore ?? 1) < 0.65;
 
@@ -234,6 +241,7 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
             {note.title && (
               <h3 className="font-semibold text-base text-gray-900 truncate">{note.title}</h3>
             )}
+            <NoteHealthBadge assessment={noteHealth} />
           </div>
           <p className="text-xs text-gray-400">
             {new Date(note.createdAt).toLocaleDateString("en-US", {
@@ -342,6 +350,12 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
         </p>
       )}
 
+      {!isEditing && note.summary && (
+        <p className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-2.5 py-2 text-xs text-blue-900">
+          {note.summary}
+        </p>
+      )}
+
       {/* AI Intent callout */}
       {!isEditing && aiMeta.intent && (
         <p className="mb-3 text-xs text-indigo-700 bg-indigo-50 rounded-md px-2.5 py-1.5 border border-indigo-100">
@@ -388,6 +402,12 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
         {note.category && (
           <span className="px-2 py-1 rounded-full bg-purple-100 text-purple-700">
             {note.category}
+          </span>
+        )}
+
+        {note.suggestedProject && (
+          <span className="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700">
+            {note.suggestedProject}
           </span>
         )}
 

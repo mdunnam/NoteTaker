@@ -94,6 +94,16 @@ const SplitNotesSchema = z.object({
   needsSplit: z.boolean().describe("Whether this note needed splitting"),
 });
 
+const SynthesizedNotesSchema = z.object({
+  title: z.string(),
+  summary: z.string(),
+  themes: z.array(z.string()).max(6),
+  actions: z.array(z.string()).max(6),
+  openQuestions: z.array(z.string()).max(6),
+  dominantProject: z.string().nullable().optional(),
+  dominantCategory: z.string().nullable().optional(),
+});
+
 /**
  * Tokenize text for overlap scoring to detect extractive summaries.
  */
@@ -158,6 +168,37 @@ function synthesizeStructuredSummary(rawContent: string, organized: OrganizedNot
 
   const firstLine = rawContent.split("\n").map((line) => line.trim()).find(Boolean) || "captured note";
   return `Captured ${organized.type?.toLowerCase() || "note"} in ${organized.category || "General"}: ${firstLine.slice(0, 120)}.`;
+}
+
+function buildSynthesisFallback(notes: SynthesisNoteInput[]): SynthesizedNotesPayload {
+  const projects = notes.map((note) => note.suggestedProject).filter(Boolean) as string[];
+  const categories = notes.map((note) => note.category).filter(Boolean) as string[];
+  const themes = [...new Set([
+    ...projects,
+    ...categories,
+    ...notes.flatMap((note) => {
+      const source = `${note.title || ""} ${note.summary || note.rawContent}`.toLowerCase();
+      return source.split(/[^a-z0-9]+/).filter((token) => token.length > 4).slice(0, 2);
+    }),
+  ])].slice(0, 5);
+
+  return {
+    title: notes.length <= 2 ? "Shared note synthesis" : `Synthesis across ${notes.length} notes`,
+    summary: `These notes are circling around ${themes.slice(0, 3).join(", ") || "a shared thread"}. Review the common actions and open questions to turn the cluster into a next step.`,
+    themes,
+    actions: notes
+      .map((note) => note.summary || note.title || note.rawContent.split("\n")[0] || "Review note")
+      .filter(Boolean)
+      .slice(0, 4),
+    openQuestions: [
+      "What is the single next step across these notes?",
+      "Which note should become the source of truth?",
+    ],
+    dominantProject: projects[0] || null,
+    dominantCategory: categories[0] || null,
+    noteCount: notes.length,
+    sourceNoteIds: notes.map((note) => note.id),
+  };
 }
 
 /**
@@ -236,6 +277,28 @@ interface OrganizeNoteOptions {
   explicitContext?: string;
   clarificationContext?: string;
   clarificationQuestionStats?: ClarificationQuestionStat[];
+}
+
+export interface SynthesisNoteInput {
+  id: string;
+  title: string | null;
+  summary: string | null;
+  rawContent: string;
+  category: string | null;
+  suggestedProject: string | null;
+  createdAt: string;
+}
+
+export interface SynthesizedNotesPayload {
+  title: string;
+  summary: string;
+  themes: string[];
+  actions: string[];
+  openQuestions: string[];
+  dominantProject: string | null;
+  dominantCategory: string | null;
+  noteCount: number;
+  sourceNoteIds: string[];
 }
 
 /** Build compact guidance so the model avoids question styles the user repeatedly dismisses. */
@@ -413,6 +476,60 @@ export async function splitNote(rawContent: string) {
   } catch (error) {
     console.error("Error splitting note:", error);
     throw new Error("Failed to split note");
+  }
+}
+
+/**
+ * Synthesize a group of notes into one coherent overview with themes, actions, and open questions.
+ */
+export async function synthesizeNotes(notes: SynthesisNoteInput[]): Promise<SynthesizedNotesPayload> {
+  if (notes.length === 0) {
+    return buildSynthesisFallback(notes);
+  }
+
+  if (!openaiClient) {
+    return buildSynthesisFallback(notes);
+  }
+
+  try {
+    const completion = await openaiClient.chat.completions.create({
+      model: "gpt-5.4",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You synthesize multiple notes into one actionable overview. Find the shared thread, collapse repeated work, and highlight the most important actions and unresolved questions. Return strict JSON with keys: title, summary, themes, actions, openQuestions, dominantProject, dominantCategory.",
+        },
+        {
+          role: "user",
+          content: notes
+            .map((note, index) => {
+              return `${index + 1}. ${note.title || "Untitled note"}\nProject: ${note.suggestedProject || "(none)"}\nCategory: ${note.category || "(none)"}\nSummary: ${note.summary || "(none)"}\nBody: ${note.rawContent.slice(0, 500)}`;
+            })
+            .join("\n\n"),
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content || "{}";
+    const parsed = SynthesizedNotesSchema.parse(JSON.parse(raw));
+
+    return {
+      title: parsed.title,
+      summary: parsed.summary,
+      themes: parsed.themes,
+      actions: parsed.actions,
+      openQuestions: parsed.openQuestions,
+      dominantProject: parsed.dominantProject || null,
+      dominantCategory: parsed.dominantCategory || null,
+      noteCount: notes.length,
+      sourceNoteIds: notes.map((note) => note.id),
+    };
+  } catch (error) {
+    console.error("Error synthesizing notes:", error);
+    return buildSynthesisFallback(notes);
   }
 }
 

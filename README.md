@@ -40,6 +40,10 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Dump Mode**: Zero-friction background organization path with keyboard-first inbox triage
 - **AI performance dashboard**: Settings page shows confidence, clarification rate, trend deltas, and 30-day sparkline history
 - **Clarification-noise trend**: AI performance now includes clarification dismiss-rate trends plus down-ranked and suppressed question-style counts
+- **Note health**: Notes now carry a health score based on confidence, staleness, missing structure, and unresolved clarification pressure
+- **Multi-note synthesis**: Selected cards, timeline notes, and contextual note clusters can be synthesized into one shared summary, themes, and next actions
+- **Broader resurfacing**: Forgotten-note and recurring-pattern signals now surface in Inbox and the shared RightPanel, not only in Review
+- **Cards and Timeline depth**: Both views now support health-aware filtering, selection, and synthesis workflows
 - **Reclassification queue**: Background-rescored after enrichment, surfaces notes whose project/category meaning changed based on newer linked context, and lets you apply suggestions in batches
 - **Review page**: Dedicated workflow surface for low-confidence clarification, changed-meaning regrouping, forgotten-note resurfacing, and repeated-pattern review
 - **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
@@ -137,6 +141,7 @@ src/
       notes/[id]/summary/route.ts  # Regenerate AI summary for a note
       notes/analyze-dump/route.ts  # Analyze raw dump into note previews
       notes/analyze-dump/confirm/route.ts  # Create reviewed dump notes
+      synthesis/route.ts  # Synthesize multiple selected notes
       search/semantic/route.ts  # Semantic + keyword search
       search/ask/route.ts       # Ask across note corpus
       review/state/route.ts     # Persist snooze/dismiss review actions
@@ -156,11 +161,17 @@ src/
       RightPanel.tsx        # AI insights panel
       RightPanelContextual.tsx # Note-detail context widgets
     notes/
+      CardsClient.tsx      # Cards filters, selection, synthesis
       NoteCard.tsx          # Individual note display
       InboxStream.tsx       # Note list view
       ClarificationLoop.tsx # Shared conversational clarification UI
+      MultiNoteSynthesisPanel.tsx # Shared synthesis UI for selected notes
+      NoteHealthBadge.tsx  # Compact note health state badge
+      NoteHealthPanel.tsx  # Detailed note health widget
       ReclassificationQueue.tsx # Batch apply changed-meaning regrouping
+      ResurfacingRail.tsx  # Forgotten-note and recurring-pattern surface
       SplitNoteModal.tsx    # Split preview/create modal
+      TimelineClient.tsx   # Timeline filters, selection, synthesis
       DumpModal.tsx         # Organize This Dump modal
     settings/
       SettingsClient.tsx    # Settings page client shell
@@ -173,6 +184,7 @@ src/
     ai.ts                   # AI utilities (organize, embed, split)
     clarification.ts        # aiMeta clarification parsing + feedback-aware question filtering
     clusters.ts             # Project/topic clustering + reclassification ranking
+    noteHealth.ts           # Note-health scoring and workspace summaries
     userMemory.ts           # Per-user memory profile, review telemetry, and clarification feedback stats
     searchRanking.ts        # Keyword/semantic ranking helpers
     userStats.ts            # AI performance metrics + snapshot history
@@ -251,9 +263,9 @@ src/
 - [x] Note-level reorganization suggestions from shared topic/project context
 - [x] Background-rescored reclassification queue with batch apply for changed-meaning notes
 - [x] Reclassification queue feedback loop with `Not useful` dismissal and telemetry-aware downranking
-- [ ] Implement deeper Cards and Timeline views
+- [x] Implement deeper Cards and Timeline views
 - [ ] Deepen Favorites and Archive views
-- [ ] Broader RightPanel guidance and cluster actions
+- [x] Broader RightPanel guidance and cluster actions
 
 ### Phase 5: Resurface ⏳
 - [x] Forgotten-note resurfacing in Review
@@ -262,12 +274,12 @@ src/
 - [x] Suppressed-item counts and restore actions in Review
 - [x] Settings visibility for active suppressions and review action history
 - [x] Automatic downranking and suppression of noisy resurfacing signals from review feedback
-- [ ] Note health widget
+- [x] Note health widget
 - [ ] Recurring idea detection beyond review heuristics
-- [ ] Broader resurfacing across inbox, right panel, and notifications
+- [x] Broader resurfacing across inbox, right panel, and notifications
 
 ### Phase 6: Synthesis & Planning 📋
-- [ ] Multi-note synthesis
+- [x] Multi-note synthesis
 - [ ] Planning outputs
 - [ ] Review workflows
 

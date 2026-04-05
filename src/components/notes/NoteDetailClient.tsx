@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
 import ClarificationLoop from "@/components/notes/ClarificationLoop";
+import MultiNoteSynthesisPanel from "@/components/notes/MultiNoteSynthesisPanel";
+import NoteHealthPanel from "@/components/notes/NoteHealthPanel";
 import { parseNoteAiMeta } from "@/lib/clarification";
 import SplitNoteModal from "@/components/notes/SplitNoteModal";
 import { getConfidenceBadgeConfig } from "@/lib/confidence";
+import { getNoteHealthAssessment } from "@/lib/noteHealth";
 
 interface RelatedNote {
   id: string;
@@ -66,6 +69,11 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
   const confidenceBadge = getConfidenceBadgeConfig(displayedConfidence);
   const aiMeta = parseNoteAiMeta(note.aiMeta);
   const hasClarifications = (aiMeta.clarificationQuestions?.length ?? 0) > 0 && (note.confidenceScore ?? 1) < 0.65;
+  const noteHealth = getNoteHealthAssessment({
+    ...note,
+    summary: displayedSummary,
+    confidenceScore: displayedConfidence,
+  });
 
   const extractedTasks = Array.isArray(note.extractedTasks)
     ? (note.extractedTasks as Array<{ text: string; dueDate?: string; priority?: string }>)
@@ -369,6 +377,18 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
 
       {/* Sidebar */}
       <div className="space-y-4">
+        <NoteHealthPanel assessment={noteHealth} />
+
+        <MultiNoteSynthesisPanel
+          notes={[
+            { id: note.id, title: note.title },
+            ...allRelated.map((related) => ({ id: related.id, title: related.title })),
+          ].filter((value, index, array) => array.findIndex((item) => item.id === value.id) === index)}
+          title="Synthesize this note with context"
+          description="Blend the current note with its strongest related context to get one sharper summary."
+          compact
+        />
+
         {/* Entities */}
         {note.entities.length > 0 && (
           <div className="rounded-lg border border-gray-200 bg-white p-4">

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import MultiNoteSynthesisPanel from "@/components/notes/MultiNoteSynthesisPanel";
 
 interface ClusterNotePreview {
   id: string;
@@ -40,6 +41,18 @@ interface InsightNote {
 
 interface InsightsPayload {
   noteId: string;
+  note: {
+    id: string;
+    title: string | null;
+    summary: string | null;
+    category: string | null;
+    suggestedProject: string | null;
+    confidenceScore: number | null;
+    priority: string | null;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  };
   aiMeta: {
     intent?: string | null;
     nextAction?: string | null;
@@ -187,6 +200,17 @@ export default function RightPanelContextual() {
           </ul>
         </div>
       )}
+
+      <MultiNoteSynthesisPanel
+        notes={[
+          { id: insights.note.id, title: insights.note.title },
+          ...insights.related.map((related) => ({ id: related.id, title: related.title })),
+          ...insights.clusters.flatMap((cluster) => cluster.notes.map((note) => ({ id: note.id, title: note.title }))),
+        ].filter((value, index, array) => array.findIndex((item) => item.id === value.id) === index)}
+        title="Synthesize context"
+        description="Blend this note with its related context and cluster evidence."
+        compact
+      />
 
       {extractedTasks.length > 0 && (
         <div>
