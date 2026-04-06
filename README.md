@@ -139,9 +139,14 @@ Typical local usage:
 
 ```bash
 npm run desktop:dev
+npm run desktop:build
 ```
 
-By default it targets `http://127.0.0.1:3000/capture?source=desktop-hotkey`. Override that by setting `QNOTE_DESKTOP_CAPTURE_URL` before running a desktop build or dev session. See `docs/DESKTOP_CAPTURE_HELPER.md` for setup notes and Windows prerequisites.
+By default it targets `http://127.0.0.1:3000/capture?source=desktop-hotkey`. Override that by setting `QNOTE_DESKTOP_CAPTURE_URL` before running a desktop build or dev session.
+
+`npm run desktop:build` now produces both Windows NSIS and MSI installers under `src-tauri/target/release/bundle/nsis/` and `src-tauri/target/release/bundle/msi/`. The NSIS installer uses `currentUser` mode by default, and both Windows installers fall back to Microsoft’s WebView2 bootstrapper if the runtime is missing. MSI packaging also depends on the Windows VBSCRIPT optional feature being enabled.
+
+See `docs/DESKTOP_CAPTURE_HELPER.md` for setup notes and Windows prerequisites.
 
 ## Project Structure
 

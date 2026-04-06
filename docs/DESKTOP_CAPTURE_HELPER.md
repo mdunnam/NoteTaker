@@ -37,8 +37,17 @@ npm run desktop:dev
 npm run desktop:build
 ```
 
+## Build output
+
+- `npm run desktop:build` produces packaged Windows NSIS and MSI installers
+- Installer output path: `src-tauri/target/release/bundle/nsis/`
+- MSI output path: `src-tauri/target/release/bundle/msi/`
+- Raw optimized binary path: `src-tauri/target/release/qnote-capture-helper.exe`
+- NSIS install mode: `currentUser`
+- WebView2 install mode: `downloadBootstrapper`
+- MSI packaging requires the Windows VBSCRIPT optional feature
+
 ## Current limitations
 
 - This is a helper foundation, not a full offline desktop bundle of the Next.js app.
 - The global shortcut only works while the helper app is running in the tray.
-- This environment did not have Rust tooling installed, so the Tauri build could not be compile-verified here.

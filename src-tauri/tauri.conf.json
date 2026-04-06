@@ -29,7 +29,29 @@
     }
   },
   "bundle": {
-    "active": false,
-    "shortDescription": "Global-hotkey helper that launches QNote capture in your browser"
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "publisher": "QNote",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ],
+    "shortDescription": "Global-hotkey helper that launches QNote capture in your browser",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "startMenuFolder": "QNote"
+      },
+      "wix": {
+        "language": "en-US"
+      }
+    }
   }
 }
