@@ -8,14 +8,17 @@ Current intent:
 - stay resident in the system tray instead of requiring the helper window to remain open
 - open the normal QNote browser capture flow instead of inventing a second capture stack
 - reuse browser auth and the existing `/capture` workflow by launching the URL in the default browser
+- tolerate common global-hotkey conflicts by trying fallback shortcuts automatically
 
 ## Default behavior
 
 - Shortcut: `Ctrl/Cmd + Shift + Space`
+- Automatic fallback order: `Ctrl/Cmd + Alt + Space`, then `Ctrl/Cmd + Shift + Alt + Space`
 - Left-click tray icon: open capture immediately
 - Tray menu: open capture, show helper window, or quit
 - Default target: `http://127.0.0.1:3000/capture?source=desktop-hotkey`
 - Override target with `QNOTE_DESKTOP_CAPTURE_URL`
+- Override shortcut with `QNOTE_DESKTOP_CAPTURE_SHORTCUT`
 
 ## Windows prerequisites
 

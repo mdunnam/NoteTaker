@@ -92,8 +92,10 @@
           <li>Leave this helper running in the tray while you want the shortcut active.</li>
           <li>Left-click the tray icon to open capture immediately.</li>
           <li>Use the tray menu to show this window again or quit the helper.</li>
+          <li>If <code>Ctrl/Cmd + Shift + Space</code> is already taken, the helper falls back to another available shortcut.</li>
           <li>The helper opens <code>/capture?source=desktop-hotkey</code> in your normal browser session, so it can reuse existing QNote auth.</li>
           <li>Override the target with <code>QNOTE_DESKTOP_CAPTURE_URL</code> if your app is not running at <code>http://127.0.0.1:3000/capture</code>.</li>
+          <li>Override the shortcut with <code>QNOTE_DESKTOP_CAPTURE_SHORTCUT</code> if you want a fixed custom binding.</li>
         </ul>
 
         <div class="note">
