@@ -363,6 +363,7 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
                       {file.kind}
                       {file.type ? ` · ${file.type}` : ""}
                       {file.width && file.height ? ` · ${file.width}x${file.height}` : ""}
+                      {file.textExtracted ? " · text extracted" : ""}
                       {` · ${Math.max(1, Math.round(file.size / 1024))} KB`}
                     </p>
                   </li>

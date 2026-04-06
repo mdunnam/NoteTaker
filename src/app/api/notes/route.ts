@@ -18,6 +18,7 @@ const CaptureFileSchema = z.object({
   kind: z.enum(["text", "image", "other"]),
   width: z.number().int().min(1).max(20_000).nullable().optional(),
   height: z.number().int().min(1).max(20_000).nullable().optional(),
+  textExtracted: z.boolean().optional(),
 });
 
 const CreateNoteRequestSchema = z.object({
@@ -28,7 +29,7 @@ const CreateNoteRequestSchema = z.object({
   contextHint: z.string().trim().max(120).optional(),
   autoSplit: z.boolean().optional(),
   dumpMode: z.boolean().optional(),
-  captureSource: z.enum(["bookmarklet", "share-target", "manual"]).optional(),
+  captureSource: z.enum(["bookmarklet", "share-target", "manual", "desktop-hotkey"]).optional(),
   sourceTitle: z.string().trim().max(240).optional(),
   sourceUrl: z.string().trim().max(2048).optional(),
   captureFiles: z.array(CaptureFileSchema).max(6).optional(),
@@ -72,7 +73,7 @@ interface CreateNoteOptions {
   projectHint?: string;
   contextHint?: string;
   dumpMode?: boolean;
-  captureSource?: "bookmarklet" | "share-target" | "manual";
+  captureSource?: "bookmarklet" | "share-target" | "manual" | "desktop-hotkey";
   sourceTitle?: string;
   sourceUrl?: string;
   captureFiles?: Array<z.infer<typeof CaptureFileSchema>>;

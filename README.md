@@ -55,6 +55,8 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 - **Installed-browser share target**: QNote now ships a minimal PWA/share-target foundation so supported browsers can share titles, URLs, and text into the same capture flow
 - **Structured capture source metadata**: External clips now preserve source title, URL, and capture origin, and note detail surfaces that context directly
 - **File and screenshot intake**: The external capture page now accepts pasted screenshots and attached files; small text files are inlined for AI organization while binaries remain structured metadata in note detail
+- **Screenshot OCR**: Attached or pasted images on `/capture` now attempt text extraction so screenshots can contribute real text to AI organization
+- **Desktop helper foundation**: A Tauri-based desktop capture helper is scaffolded under `src-tauri/`, runs from the system tray, and registers a global shortcut that launches the browser capture flow
 - **Review-state persistence**: Forgotten-note and pattern review cards can be snoozed or dismissed so they stay out of the queue for a time window
 - **Suppressed review recovery**: Review shows suppressed-item counts and lets you restore snoozed or dismissed resurfacing items immediately
 - **Review telemetry in Settings**: Settings now shows active suppressions plus snooze/dismiss/restore history so resurfacing noise is visible and manageable
@@ -71,7 +73,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 ### Phase 5+ 📋
 - Resurface old notes
 - Review and resurfacing workflows
-- Native desktop and mobile capture wrappers
+- Deeper desktop packaging and mobile capture wrappers
 
 ## Quick Start
 
@@ -79,6 +81,7 @@ A capture-first, auto-organizing note inbox app that helps you store thoughts fa
 
 - Node.js 18+
 - npm or yarn
+- Rust + Windows Tauri prerequisites only if you want to build the desktop helper
 
 ### Setup
 
@@ -120,14 +123,32 @@ NEXTAUTH_SECRET="your-secret-here"
 # AI
 OPENAI_API_KEY="sk-..."
 
+# Optional desktop helper target
+QNOTE_DESKTOP_CAPTURE_URL="http://127.0.0.1:3000/capture"
+
 # Workers (recommended)
 WORKER_SECRET="your-worker-secret"
 CRON_SECRET="your-cron-secret"
 ```
 
+## Desktop Helper
+
+The repo now includes a lightweight Tauri desktop helper that runs from the system tray, keeps a global hotkey registered, and opens the same browser capture flow used by `/capture`.
+
+Typical local usage:
+
+```bash
+npm run desktop:dev
+```
+
+By default it targets `http://127.0.0.1:3000/capture?source=desktop-hotkey`. Override that by setting `QNOTE_DESKTOP_CAPTURE_URL` before running a desktop build or dev session. See `docs/DESKTOP_CAPTURE_HELPER.md` for setup notes and Windows prerequisites.
+
 ## Project Structure
 
 ```
+desktop-shell/
+  index.html              # Local helper UI for the Tauri desktop capture shell
+
 src/
   app/
     (app)/                  # Protected routes with layout
@@ -209,6 +230,12 @@ src/
 
   prisma/
     schema.prisma           # Data model
+
+src-tauri/
+  Cargo.toml                # Tauri desktop helper crate
+  build.rs                  # Tauri build script
+  src/main.rs               # Global-hotkey desktop helper entrypoint
+  tauri.conf.json           # Desktop helper window + build config
 
   public/
     manifest.webmanifest   # Installed-browser capture/share target manifest

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "QNote Capture Helper",
+  "version": "0.1.0",
+  "identifier": "com.qnote.capturehelper",
+  "build": {
+    "frontendDist": "../desktop-shell"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "QNote Capture Helper",
+        "url": "index.html",
+        "width": 520,
+        "height": 460,
+        "center": true,
+        "resizable": false,
+        "fullscreen": false,
+        "focus": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "pattern": {
+        "use": "brownfield"
+      }
+    }
+  },
+  "bundle": {
+    "active": false,
+    "shortDescription": "Global-hotkey helper that launches QNote capture in your browser"
+  }
+}

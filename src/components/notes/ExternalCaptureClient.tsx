@@ -2,40 +2,25 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import type { ExternalCaptureFile, ExternalCaptureFileKind, ExternalCaptureSource } from "@/lib/externalCapture";
+import type { ExternalCaptureFile, ExternalCaptureSource } from "@/lib/externalCapture";
+import {
+  buildCaptureFileKey,
+  formatCaptureFileSummary,
+  formatImageOcrSection,
+  inferCaptureFileKind,
+  MAX_CAPTURE_FILES,
+  MAX_INLINE_TEXT_BYTES,
+  MAX_OCR_IMAGE_BYTES,
+} from "@/lib/externalCaptureFiles";
 
-const MAX_CAPTURE_FILES = 6;
-const MAX_INLINE_TEXT_BYTES = 200_000;
-
-function buildCaptureFileKey(file: Pick<ExternalCaptureFile, "name" | "size" | "type">): string {
-  return `${file.name}::${file.size}::${file.type}`;
+interface TextDetectorResult {
+  rawValue: string;
 }
 
-function inferCaptureFileKind(file: File): ExternalCaptureFileKind {
-  if (file.type.startsWith("image/")) {
-    return "image";
-  }
-
-  if (file.type.startsWith("text/") || /\.(txt|md|markdown|json|csv|tsv|log)$/i.test(file.name)) {
-    return "text";
-  }
-
-  return "other";
-}
-
-function formatCaptureFileSummary(file: ExternalCaptureFile): string {
-  const sizeKb = Math.max(1, Math.round(file.size / 1024));
-
-  if (file.kind === "image") {
-    const dimensions = file.width && file.height ? `, ${file.width}x${file.height}` : "";
-    return `[Attached image: ${file.name}${dimensions}]`;
-  }
-
-  if (file.kind === "text") {
-    return `[Attached text file: ${file.name}, ${sizeKb} KB]`;
-  }
-
-  return `[Attached file: ${file.name}, ${file.type || "unknown"}, ${sizeKb} KB]`;
+interface TextDetectorConstructor {
+  new (): {
+    detect(image: ImageBitmapSource): Promise<TextDetectorResult[]>;
+  };
 }
 
 async function getImageDimensions(file: File): Promise<{ width: number | null; height: number | null }> {
@@ -57,6 +42,48 @@ async function getImageDimensions(file: File): Promise<{ width: number | null; h
   });
 }
 
+async function extractTextWithBrowserDetector(file: File): Promise<string | null> {
+  const detectorClass = (globalThis as typeof globalThis & { TextDetector?: TextDetectorConstructor }).TextDetector;
+
+  if (!detectorClass || typeof createImageBitmap !== "function") {
+    return null;
+  }
+
+  const imageBitmap = await createImageBitmap(file);
+
+  try {
+    const detector = new detectorClass();
+    const blocks = await detector.detect(imageBitmap);
+    const detectedText = blocks.map((block) => block.rawValue.trim()).filter(Boolean).join("\n");
+    return detectedText || null;
+  } finally {
+    imageBitmap.close();
+  }
+}
+
+async function extractTextWithTesseract(file: File): Promise<string> {
+  const { createWorker } = await import("tesseract.js");
+  const worker = await createWorker("eng");
+
+  try {
+    const result = await worker.recognize(file);
+    return result.data.text.trim();
+  } finally {
+    await worker.terminate();
+  }
+}
+
+/** Extract text from an attached image using browser OCR first, then Tesseract as fallback. */
+async function extractTextFromImageFile(file: File): Promise<string> {
+  const browserText = await extractTextWithBrowserDetector(file);
+
+  if (browserText) {
+    return browserText;
+  }
+
+  return extractTextWithTesseract(file);
+}
+
 async function prepareCaptureFile(file: File): Promise<{ metadata: ExternalCaptureFile; appendedText: string }> {
   const kind = inferCaptureFileKind(file);
   const imageDimensions = kind === "image" ? await getImageDimensions(file) : { width: null, height: null };
@@ -67,6 +94,7 @@ async function prepareCaptureFile(file: File): Promise<{ metadata: ExternalCaptu
     kind,
     width: imageDimensions.width,
     height: imageDimensions.height,
+    textExtracted: kind === "text",
   };
 
   if (kind === "text") {
@@ -114,11 +142,68 @@ export default function ExternalCaptureClient({
   const [sourceTitle] = useState(initialSourceTitle);
   const [sourceUrl] = useState(initialSourceUrl);
   const [captureFiles, setCaptureFiles] = useState<ExternalCaptureFile[]>([]);
+  const [ocrStatus, setOcrStatus] = useState<Record<string, "extracting" | "done" | "error">>({});
+  const [ocrMessages, setOcrMessages] = useState<Record<string, string>>({});
+  const [captureNotice, setCaptureNotice] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [savedNoteId, setSavedNoteId] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /** Run OCR for an attached image and append the extracted text once it is ready. */
+  const startImageOcr = async (file: File, metadata: ExternalCaptureFile) => {
+    const key = buildCaptureFileKey(metadata);
+
+    if (file.size > MAX_OCR_IMAGE_BYTES) {
+      setOcrStatus((current) => ({ ...current, [key]: "error" }));
+      setOcrMessages((current) => ({ ...current, [key]: "Image too large for OCR on the capture page." }));
+      return;
+    }
+
+    setOcrStatus((current) => ({ ...current, [key]: "extracting" }));
+    setOcrMessages((current) => ({ ...current, [key]: "Extracting text from image..." }));
+
+    try {
+      const extractedText = await extractTextFromImageFile(file);
+      let fileStillPresent = false;
+
+      setCaptureFiles((current) => {
+        fileStillPresent = current.some((captureFile) => buildCaptureFileKey(captureFile) === key);
+
+        if (!fileStillPresent) {
+          return current;
+        }
+
+        return current.map((captureFile) => (
+          buildCaptureFileKey(captureFile) === key
+            ? { ...captureFile, textExtracted: Boolean(extractedText.trim()) }
+            : captureFile
+        ));
+      });
+
+      if (!fileStillPresent) {
+        return;
+      }
+
+      if (extractedText.trim()) {
+        const ocrSection = formatImageOcrSection(file.name, extractedText);
+        setContent((current) => {
+          const sections = [current.trim(), ocrSection.trim()].filter(Boolean);
+          return sections.join("\n\n");
+        });
+        setOcrStatus((current) => ({ ...current, [key]: "done" }));
+        setOcrMessages((current) => ({ ...current, [key]: "OCR text added to the note body." }));
+      } else {
+        setOcrStatus((current) => ({ ...current, [key]: "done" }));
+        setOcrMessages((current) => ({ ...current, [key]: "No text detected in the image." }));
+      }
+    } catch (error) {
+      console.error("Error extracting text from image:", error);
+      setOcrStatus((current) => ({ ...current, [key]: "error" }));
+      setOcrMessages((current) => ({ ...current, [key]: "OCR failed. You can still save the image metadata and type the text manually." }));
+    }
+  };
 
   /** Add selected files or pasted screenshots into the capture payload. */
   const handleSelectedFiles = async (fileList: FileList | File[]) => {
@@ -132,6 +217,9 @@ export default function ExternalCaptureClient({
     const selectedFiles = files.slice(0, remainingSlots);
     const nextMetadata: ExternalCaptureFile[] = [];
     const appendedSections: string[] = [];
+    const imageJobs: Array<{ file: File; metadata: ExternalCaptureFile }> = [];
+
+    setCaptureNotice("");
 
     for (const file of selectedFiles) {
       const key = buildCaptureFileKey({ name: file.name, size: file.size, type: file.type || "application/octet-stream" });
@@ -143,6 +231,10 @@ export default function ExternalCaptureClient({
       const prepared = await prepareCaptureFile(file);
       nextMetadata.push(prepared.metadata);
       appendedSections.push(prepared.appendedText);
+
+      if (prepared.metadata.kind === "image") {
+        imageJobs.push({ file, metadata: prepared.metadata });
+      }
     }
 
     if (nextMetadata.length === 0) {
@@ -156,13 +248,32 @@ export default function ExternalCaptureClient({
     });
 
     if (files.length > remainingSlots) {
-      setMessage(`Only the first ${MAX_CAPTURE_FILES} files are kept on one capture.`);
+      setCaptureNotice(`Only the first ${MAX_CAPTURE_FILES} files are kept on one capture.`);
+    }
+
+    for (const imageJob of imageJobs) {
+      void startImageOcr(imageJob.file, imageJob.metadata);
     }
   };
 
   /** Remove one captured file from the metadata list. */
   const removeCaptureFile = (fileToRemove: ExternalCaptureFile) => {
-    setCaptureFiles((current) => current.filter((file) => buildCaptureFileKey(file) !== buildCaptureFileKey(fileToRemove)));
+    const key = buildCaptureFileKey(fileToRemove);
+    setCaptureFiles((current) => current.filter((file) => buildCaptureFileKey(file) !== key));
+    setOcrStatus((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    setOcrMessages((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+
+    if (fileToRemove.textExtracted) {
+      setCaptureNotice("Removed file metadata. Any extracted or inlined text already added to the note body remains editable in the capture text.");
+    }
   };
 
   /** Save one externally captured note using the existing notes API. */
@@ -176,6 +287,7 @@ export default function ExternalCaptureClient({
     setIsSaving(true);
     setMessage("");
     setSavedNoteId(null);
+    setCaptureNotice("");
 
     try {
       const response = await fetch("/api/notes", {
@@ -204,6 +316,8 @@ export default function ExternalCaptureClient({
       setProjectHint("");
       setContextHint("");
       setCaptureFiles([]);
+      setOcrStatus({});
+      setOcrMessages({});
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -222,6 +336,10 @@ export default function ExternalCaptureClient({
         <h1 className="text-3xl font-bold text-gray-900">Capture From Anywhere</h1>
         <p className="mt-2 text-sm text-gray-600">
           This page is the landing zone for bookmarklet clips and quick captures from outside QNote. It works best for short selections, page titles, URLs, and quick thoughts.
+        </p>
+
+        <p className="mt-2 text-sm text-gray-600">
+          Pasted screenshots and attached images now attempt OCR automatically. When text is found, it is added to the note body so organization can use it immediately.
         </p>
 
         {(sourceTitle || sourceUrl || captureSource) && (
@@ -278,7 +396,7 @@ export default function ExternalCaptureClient({
                 Add files or screenshots
               </label>
               <p className="text-xs text-gray-600">
-                Paste a screenshot into the text box, or attach files here. Small text files are inlined for AI organization; images and binaries keep metadata.
+                Paste a screenshot into the text box, or attach files here. Small text files are inlined for AI organization, images run OCR when possible, and binaries keep structured metadata.
               </p>
             </div>
 
@@ -292,7 +410,13 @@ export default function ExternalCaptureClient({
                         {file.kind}
                         {file.type ? ` · ${file.type}` : ""}
                         {file.width && file.height ? ` · ${file.width}x${file.height}` : ""}
+                        {file.textExtracted ? " · text extracted" : ""}
                       </p>
+                      {ocrMessages[buildCaptureFileKey(file)] && (
+                        <p className={`mt-1 text-xs ${ocrStatus[buildCaptureFileKey(file)] === "error" ? "text-red-600" : "text-gray-500"}`}>
+                          {ocrMessages[buildCaptureFileKey(file)]}
+                        </p>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -304,6 +428,10 @@ export default function ExternalCaptureClient({
                   </li>
                 ))}
               </ul>
+            )}
+
+            {captureNotice && (
+              <p className="mt-3 text-xs text-amber-700">{captureNotice}</p>
             )}
           </div>
 

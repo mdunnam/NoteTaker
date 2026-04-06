@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QNote Capture Helper</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", sans-serif;
+        background: #f5f3ee;
+        color: #1f2937;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, rgba(245, 158, 11, 0.15), transparent 32%),
+          linear-gradient(180deg, #fcfbf7 0%, #f3efe6 100%);
+      }
+
+      main {
+        margin: 0 auto;
+        max-width: 34rem;
+        padding: 2rem;
+      }
+
+      .panel {
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 1.5rem;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 18px 50px rgba(15, 23, 42, 0.1);
+        padding: 1.5rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.9rem;
+      }
+
+      p,
+      li {
+        line-height: 1.6;
+      }
+
+      .shortcut {
+        display: inline-flex;
+        margin-top: 1rem;
+        border-radius: 999px;
+        background: #0f172a;
+        color: white;
+        padding: 0.55rem 0.9rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+
+      code {
+        border-radius: 0.4rem;
+        background: #f1f5f9;
+        padding: 0.15rem 0.35rem;
+        font-family: Consolas, monospace;
+        font-size: 0.9em;
+      }
+
+      ul {
+        margin: 1rem 0 0;
+        padding-left: 1.1rem;
+      }
+
+      .note {
+        margin-top: 1rem;
+        border-radius: 1rem;
+        background: #fff7ed;
+        color: #9a3412;
+        padding: 0.9rem 1rem;
+        font-size: 0.92rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>QNote Capture Helper</h1>
+        <p>
+          This desktop helper lives in the system tray, keeps a global shortcut registered, and opens the same QNote capture flow in your default browser.
+        </p>
+
+        <span class="shortcut">Ctrl/Cmd + Shift + Space</span>
+
+        <ul>
+          <li>Leave this helper running in the tray while you want the shortcut active.</li>
+          <li>Left-click the tray icon to open capture immediately.</li>
+          <li>Use the tray menu to show this window again or quit the helper.</li>
+          <li>The helper opens <code>/capture?source=desktop-hotkey</code> in your normal browser session, so it can reuse existing QNote auth.</li>
+          <li>Override the target with <code>QNOTE_DESKTOP_CAPTURE_URL</code> if your app is not running at <code>http://127.0.0.1:3000/capture</code>.</li>
+        </ul>
+
+        <div class="note">
+          Rust tooling is required to build this helper. On Windows, install Rust, WebView2, and the Visual C++ build tools before running the Tauri scripts.
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

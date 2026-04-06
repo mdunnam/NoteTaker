@@ -193,7 +193,8 @@ export function parseNoteAiMeta(raw: unknown): ParsedNoteAiMeta {
           typeof file.size === "number" &&
           (file.kind === "text" || file.kind === "image" || file.kind === "other") &&
           (file.width === undefined || file.width === null || typeof file.width === "number") &&
-          (file.height === undefined || file.height === null || typeof file.height === "number")
+          (file.height === undefined || file.height === null || typeof file.height === "number") &&
+          (file.textExtracted === undefined || typeof file.textExtracted === "boolean")
         );
       })
     : [];

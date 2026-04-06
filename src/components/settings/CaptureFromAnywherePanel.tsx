@@ -35,6 +35,9 @@ export default function CaptureFromAnywherePanel() {
       <p className="mt-2 text-sm text-gray-600">
         Save short web clips from outside the app with a bookmarklet, or install QNote in a supporting browser and share text and links into the focused capture page.
       </p>
+      <p className="mt-2 text-sm text-gray-600">
+        The focused capture page now accepts pasted screenshots and runs OCR when possible. There is also a desktop helper foundation in this repo that can launch the same capture flow from a global hotkey.
+      </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <a
@@ -60,10 +63,11 @@ export default function CaptureFromAnywherePanel() {
         <li>On any page, select short text if you want to capture a snippet.</li>
         <li>Click the bookmarklet to open QNote’s focused capture page with the clip prefilled.</li>
         <li>For installed browsers that support web-app sharing, install QNote and use the system share sheet to send a title, URL, or selected text into QNote.</li>
+        <li>Paste screenshots or attach images on the capture page to add OCR text when it can be extracted.</li>
       </ol>
 
       <p className="mt-4 text-xs text-gray-500">
-        This is the browser capture foundation. It is designed for short clips and quick thoughts, not full-page scraping or native OS-level wrappers.
+        This is the browser capture foundation plus a desktop-helper scaffold. It is designed for quick capture, not full-page scraping or a fully bundled offline desktop app.
       </p>
 
       {copyMessage && (

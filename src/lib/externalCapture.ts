@@ -5,7 +5,7 @@ export interface ExternalCaptureSearchParams {
   source?: string | string[];
 }
 
-export type ExternalCaptureSource = "bookmarklet" | "share-target" | "manual";
+export type ExternalCaptureSource = "bookmarklet" | "share-target" | "manual" | "desktop-hotkey";
 export type ExternalCaptureFileKind = "text" | "image" | "other";
 
 export interface ExternalCaptureFile {
@@ -15,6 +15,7 @@ export interface ExternalCaptureFile {
   kind: ExternalCaptureFileKind;
   width?: number | null;
   height?: number | null;
+  textExtracted?: boolean;
 }
 
 function getFirstValue(value: string | string[] | null | undefined): string {
@@ -40,7 +41,7 @@ export function buildExternalCaptureContent(searchParams: ExternalCaptureSearchP
 export function getExternalCaptureSource(value: string | string[] | null | undefined): ExternalCaptureSource | null {
   const normalized = getFirstValue(value).trim().toLowerCase();
 
-  if (normalized === "bookmarklet" || normalized === "share-target" || normalized === "manual") {
+  if (normalized === "bookmarklet" || normalized === "share-target" || normalized === "manual" || normalized === "desktop-hotkey") {
     return normalized;
   }
 

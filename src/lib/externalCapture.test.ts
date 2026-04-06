@@ -32,6 +32,7 @@ describe("external capture helpers", () => {
   it("normalizes supported external capture sources", () => {
     expect(getExternalCaptureSource("bookmarklet")).toBe("bookmarklet");
     expect(getExternalCaptureSource("share-target")).toBe("share-target");
+    expect(getExternalCaptureSource("desktop-hotkey")).toBe("desktop-hotkey");
     expect(getExternalCaptureSource("other")).toBeNull();
   });
 });

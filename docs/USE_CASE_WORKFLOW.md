@@ -31,12 +31,14 @@ Alternate capture paths:
 - Browser bookmarklet capture for short web clips, URLs, and selected text outside the main app
 - Installed-browser share target for supported browsers that can send titles, URLs, and text into `/capture`
 - File and screenshot intake on `/capture` for pasted screenshots, small text files, and binary file metadata
+- Desktop helper hotkey that can launch the same browser capture flow for local desktop installs
 
 Expected behavior:
 
 - Note is created immediately.
 - External captures retain source title, URL, and capture origin instead of flattening all context into raw text.
 - Small text files can be inlined for AI organization, while screenshots and other binaries remain visible as structured source metadata.
+- When OCR succeeds, screenshots can add extracted text into the note before AI organization runs.
 - AI organization runs in background.
 
 ### Step 2: First-Pass AI Organization

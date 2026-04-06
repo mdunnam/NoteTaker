@@ -88,6 +88,7 @@ describe("clarification feedback helpers", () => {
             type: "text/plain",
             size: 120,
             kind: "text",
+            textExtracted: true,
           },
         ],
       },
@@ -103,6 +104,7 @@ describe("clarification feedback helpers", () => {
           type: "text/plain",
           size: 120,
           kind: "text",
+          textExtracted: true,
         },
       ],
     });

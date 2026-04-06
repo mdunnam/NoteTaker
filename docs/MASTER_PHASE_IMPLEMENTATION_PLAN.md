@@ -89,11 +89,14 @@ Shipped:
 - browser bookmarklet capture foundation with focused `/capture` landing page
 - structured source metadata for external captures, preserved through enrichment and visible in note detail
 - file and screenshot intake on the external capture page, with text-file inlining and binary metadata preservation
+- screenshot OCR on `/capture` so pasted or attached images can add extracted text before note creation
+- Tauri desktop helper scaffold with a global shortcut that launches the browser capture flow
 - AI performance visibility and learn-from-hint interactions
 - AI performance visibility for clarification-noise trends and learn-from-hint interactions
 
 Not yet shipped:
-- Native desktop and mobile capture surfaces
+- Fully packaged offline desktop capture app
+- Native mobile capture surfaces
 
 ---
 
