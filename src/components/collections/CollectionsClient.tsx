@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
@@ -164,7 +165,9 @@ export default function CollectionsClient({ initialCollections }: CollectionsCli
                     className="h-3 w-3 rounded-full"
                     style={{ background: collection.color || "#94a3b8" }}
                   />
-                  <h2 className="font-semibold text-gray-900">{collection.name}</h2>
+                  <Link href={`/collections/${collection.id}`} className="font-semibold text-gray-900 hover:text-blue-700 hover:underline">
+                    {collection.name}
+                  </Link>
                   <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
                     {collection._count.notes} notes
                   </span>
@@ -173,13 +176,21 @@ export default function CollectionsClient({ initialCollections }: CollectionsCli
                   <p className="mt-1 text-sm text-gray-600">{collection.description}</p>
                 )}
               </div>
-              <button
-                onClick={() => handleDelete(collection.id)}
-                className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-700 transition-colors"
-                title="Delete collection"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/collections/${collection.id}`}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  Open
+                </Link>
+                <button
+                  onClick={() => handleDelete(collection.id)}
+                  className="rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  title="Delete collection"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

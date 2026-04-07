@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import MultiNoteSynthesisPanel from "@/components/notes/MultiNoteSynthesisPanel";
 import type { KnowledgeCluster } from "@/lib/clusters";
 
@@ -10,13 +11,41 @@ interface KnowledgeClustersClientProps {
   kind: "project" | "topic";
 }
 
+interface ClusterCollectionFeedback {
+  type: "success" | "error";
+  message: string;
+  href?: string;
+}
+
+/** Build a default collection payload from one inferred cluster. */
+function buildClusterCollectionRequest(cluster: KnowledgeCluster, kind: "project" | "topic") {
+  const descriptionParts = [
+    kind === "project"
+      ? `Created from the ${cluster.label} project cluster.`
+      : `Created from the ${cluster.label} topic cluster.`,
+    cluster.crossReferences.length > 0
+      ? `${kind === "project" ? "Connected topics" : "Related projects"}: ${cluster.crossReferences.slice(0, 3).join(", ")}.`
+      : "",
+  ].filter(Boolean);
+
+  return {
+    name: cluster.label,
+    description: descriptionParts.join(" "),
+    color: kind === "project" ? "blue" : "purple",
+    noteIds: cluster.notes.map((note) => note.id),
+  };
+}
+
 /**
  * Rich cluster browser with per-cluster synthesis and planning actions.
  */
 export default function KnowledgeClustersClient({ clusters, kind }: KnowledgeClustersClientProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<"size" | "label">("size");
   const [expandedClusterId, setExpandedClusterId] = useState<string | null>(clusters[0]?.id || null);
+  const [creatingCollectionId, setCreatingCollectionId] = useState<string | null>(null);
+  const [collectionFeedback, setCollectionFeedback] = useState<Record<string, ClusterCollectionFeedback>>({});
 
   const filteredClusters = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -54,6 +83,50 @@ export default function KnowledgeClustersClient({ clusters, kind }: KnowledgeClu
   /** Expand or collapse one cluster's planning panel. */
   const toggleExpanded = (clusterId: string) => {
     setExpandedClusterId((current) => current === clusterId ? null : clusterId);
+  };
+
+  /** Create one real collection from the cluster's linked notes. */
+  const handleCreateCollection = async (cluster: KnowledgeCluster) => {
+    setCreatingCollectionId(cluster.id);
+    setCollectionFeedback((current) => {
+      const next = { ...current };
+      delete next[cluster.id];
+      return next;
+    });
+
+    try {
+      const response = await fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildClusterCollectionRequest(cluster, kind)),
+      });
+
+      const payload = await response.json() as { id?: string; error?: string; _count?: { notes: number } };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to create collection");
+      }
+
+      setCollectionFeedback((current) => ({
+        ...current,
+        [cluster.id]: {
+          type: "success",
+          message: `Collection created with ${payload._count?.notes ?? cluster.noteCount} notes.`,
+          href: payload.id ? `/collections/${payload.id}` : "/collections",
+        },
+      }));
+      router.refresh();
+    } catch (error) {
+      setCollectionFeedback((current) => ({
+        ...current,
+        [cluster.id]: {
+          type: "error",
+          message: error instanceof Error ? error.message : "Failed to create collection",
+        },
+      }));
+    } finally {
+      setCreatingCollectionId((current) => current === cluster.id ? null : current);
+    }
   };
 
   return (
@@ -127,14 +200,35 @@ export default function KnowledgeClustersClient({ clusters, kind }: KnowledgeClu
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(cluster.id)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
-                  >
-                    {isExpanded ? "Hide plan" : kind === "project" ? "Plan project" : "Plan topic"}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleCreateCollection(cluster)}
+                      disabled={creatingCollectionId === cluster.id}
+                      className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {creatingCollectionId === cluster.id ? "Creating..." : "Create collection"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleExpanded(cluster.id)}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      {isExpanded ? "Hide plan" : kind === "project" ? "Plan project" : "Plan topic"}
+                    </button>
+                  </div>
                 </div>
+
+                {collectionFeedback[cluster.id] && (
+                  <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${collectionFeedback[cluster.id]?.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+                    <span>{collectionFeedback[cluster.id]?.message}</span>
+                    {collectionFeedback[cluster.id]?.type === "success" && (
+                      <Link href={collectionFeedback[cluster.id]?.href || "/collections"} className="ml-2 font-medium underline underline-offset-2">
+                        Open collection
+                      </Link>
+                    )}
+                  </div>
+                )}
 
                 {cluster.crossReferences.length > 0 && (
                   <div className="mb-4 flex flex-wrap gap-2">

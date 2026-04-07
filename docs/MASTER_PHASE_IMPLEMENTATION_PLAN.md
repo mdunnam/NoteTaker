@@ -56,6 +56,10 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Feedback-aware resurfacing that down-ranks or suppresses noisy signals after repeated dismisses/snoozes
 - Note-health scoring in note detail, Cards, Timeline, and the shared right panel
 - Multi-note synthesis workflow for selected notes and contextual clusters
+- One-click collection creation from inferred project/topic clusters
+- Right panel unresolved-thread synthesis prompts on note detail
+- Suggested semantic note links with one-click acceptance on note detail
+- Real collection detail pages with collection-level synthesis
 - Resurfacing signals visible outside Review in Inbox and the shared right panel
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
@@ -83,6 +87,9 @@ Shipped:
 - reclassification queue feedback that down-ranks repeated false positives
 - clarification feedback that down-ranks or suppresses noisy question styles, with restore controls in Settings
 - multi-note synthesis across selected notes and contextual clusters
+- note-detail right panel unresolved-thread prompts with targeted synthesis
+- note-detail suggested semantic links with manual accept-link controls
+- collection detail browsing with collection-level synthesis
 - planning outputs layered onto the synthesis route with objective, first move, steps, risks, and success signal
 - project/topic cluster planning directly from the Projects and Topics surfaces
 - review planning workflows that turn queue slices into synthesis and action plans
@@ -379,6 +386,7 @@ DELETE /api/notes/[id]               Delete note
 ```
 POST   /api/notes/[id]/clarify       Continue note clarification conversation
 POST   /api/notes/[id]/clarify-feedback Record lightweight feedback for one clarification question
+POST   /api/notes/[id]/links         Create or confirm a manual note relation
 POST   /api/notes/[id]/split         Preview or create split cards
 POST   /api/notes/[id]/summary       Regenerate AI organization and confidence
 POST   /api/notes/analyze-dump       Analyze raw dump into organized previews
@@ -871,21 +879,21 @@ Shipped behavior:
 - Note detail surfaces cluster context and reorganization suggestions
 - Enrichment persists changed-meaning suggestions in the background
 - Inbox and right panel surface a changed-meaning reclassification queue
+- Project and topic cluster cards can be turned into real collections in one click
 
 **What is still missing**
 
 - Background rescoring immediately after enrichment rather than only on page load
 - Dismiss/snooze controls for noisy reclassification suggestions
 - Persisted cluster review state and dedicated cluster review surfaces
-- One-click “create collection from cluster” acceptance flow
 
 ---
 
 ### 11.3 Right Panel Depth Upgrade (Should Have — Priority 3)
 
-Current state: contextual RightPanel on note detail shows intent, next action, tasks, related notes, clarification questions, cluster context, reorganization suggestions, and the global panel shows a compact changed-meaning queue.
+Current state: contextual RightPanel on note detail shows intent, next action, tasks, related notes, unresolved-thread prompts, clarification questions, cluster context, suggested semantic links, reorganization suggestions, and the global panel shows a compact changed-meaning queue.
 
-New sections to add:
+Shipped additions:
 
 **Unresolved threads:**
 - "You've mentioned this 3 times without resolution"
@@ -896,6 +904,8 @@ New sections to add:
 - Notes that semantically cluster with this one but are not yet linked
 - "These 2 notes seem related"
 - Accept link button
+
+Still missing:
 
 **Conversion actions:**
 - "Turn this into a project" (when note has 3+ tasks and coherent goal)

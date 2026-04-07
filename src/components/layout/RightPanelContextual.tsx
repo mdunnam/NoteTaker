@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import MultiNoteSynthesisPanel from "@/components/notes/MultiNoteSynthesisPanel";
@@ -39,6 +40,21 @@ interface InsightNote {
   score: number;
 }
 
+interface UnresolvedThread {
+  label: string;
+  kind: "project" | "topic";
+  mentionCount: number;
+  notes: ClusterNotePreview[];
+}
+
+interface SuggestedLink {
+  id: string;
+  title: string | null;
+  summary: string | null;
+  score: number;
+  reason: string;
+}
+
 interface InsightsPayload {
   noteId: string;
   note: {
@@ -62,6 +78,8 @@ interface InsightsPayload {
   related: InsightNote[];
   clusters: KnowledgeCluster[];
   reorganizationSuggestion: ReorganizationSuggestion | null;
+  unresolvedThread: UnresolvedThread | null;
+  suggestedLinks: SuggestedLink[];
 }
 
 /**
@@ -73,6 +91,8 @@ export default function RightPanelContextual() {
   const [insights, setInsights] = useState<InsightsPayload | null>(null);
   const [isApplyingSuggestion, setIsApplyingSuggestion] = useState(false);
   const [suggestionMessage, setSuggestionMessage] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [acceptingLinkId, setAcceptingLinkId] = useState<string | null>(null);
 
   const noteId = useMemo(() => {
     const match = pathname?.match(/^\/notes\/([^/]+)$/);
@@ -108,7 +128,7 @@ export default function RightPanelContextual() {
     return () => {
       isMounted = false;
     };
-  }, [noteId]);
+  }, [noteId, reloadToken]);
 
   if (!noteId || !insights) {
     return null;
@@ -149,12 +169,49 @@ export default function RightPanelContextual() {
       }
 
       setSuggestionMessage("Applied inferred cluster context and regenerated the note.");
+      setReloadToken((current) => current + 1);
       router.refresh();
     } catch (error) {
       console.error("Error applying cluster suggestion:", error);
       setSuggestionMessage("Could not apply the inferred cluster context.");
     } finally {
       setIsApplyingSuggestion(false);
+    }
+  };
+
+  /** Accept one suggested semantic note link and persist the relation. */
+  const handleAcceptSuggestedLink = async (candidate: SuggestedLink) => {
+    if (!noteId) {
+      return;
+    }
+
+    setAcceptingLinkId(candidate.id);
+    setSuggestionMessage(null);
+
+    try {
+      const response = await fetch(`/api/notes/${noteId}/links`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetNoteId: candidate.id,
+          score: candidate.score,
+          reason: "Accepted from suggested links",
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json() as { error?: string };
+        throw new Error(payload.error || "Failed to accept suggested link");
+      }
+
+      setSuggestionMessage(`Linked ${candidate.title || "Untitled note"} to this note.`);
+      setReloadToken((current) => current + 1);
+      router.refresh();
+    } catch (error) {
+      console.error("Error accepting suggested link:", error);
+      setSuggestionMessage("Could not save this suggested link.");
+    } finally {
+      setAcceptingLinkId((current) => current === candidate.id ? null : current);
     }
   };
 
@@ -201,6 +258,36 @@ export default function RightPanelContextual() {
         </div>
       )}
 
+      {insights.unresolvedThread && (
+        <div className="rounded border border-orange-200 bg-orange-50 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-orange-700">Unresolved Thread</p>
+          <p className="mt-1 text-xs text-orange-900">
+            You&apos;ve mentioned <strong>{insights.unresolvedThread.label}</strong> {insights.unresolvedThread.mentionCount} times without a clear wrap-up.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {insights.unresolvedThread.notes.map((threadNote) => (
+              <li key={threadNote.id}>
+                <Link href={`/notes/${threadNote.id}`} className="text-[11px] text-orange-800 hover:underline">
+                  {threadNote.title || "Untitled note"}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3">
+            <MultiNoteSynthesisPanel
+              notes={[
+                { id: insights.note.id, title: insights.note.title },
+                ...insights.unresolvedThread.notes.map((note) => ({ id: note.id, title: note.title })),
+              ]}
+              title="Synthesize this thread"
+              description="Turn the repeated thread into one brief and next-step plan."
+              compact
+              planningGoalPlaceholder={`Optional planning lens: resolve ${insights.unresolvedThread.label}, decide next step, stop circling this thread...`}
+            />
+          </div>
+        </div>
+      )}
+
       <MultiNoteSynthesisPanel
         notes={[
           { id: insights.note.id, title: insights.note.title },
@@ -211,6 +298,38 @@ export default function RightPanelContextual() {
         description="Blend this note with its related context and cluster evidence."
         compact
       />
+
+      {insights.suggestedLinks.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">Suggested Links</p>
+          <ul className="space-y-2">
+            {insights.suggestedLinks.map((candidate) => (
+              <li key={candidate.id} className="rounded border border-gray-200 bg-white p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/notes/${candidate.id}`} className="text-xs font-medium text-gray-900 hover:underline">
+                      {candidate.title || "Untitled note"}
+                    </Link>
+                    {candidate.summary && (
+                      <p className="mt-1 line-clamp-2 text-[11px] text-gray-600">{candidate.summary}</p>
+                    )}
+                    <p className="mt-2 text-[11px] text-gray-700">{candidate.reason}</p>
+                    <p className="mt-1 text-[11px] text-blue-700">{Math.round(candidate.score * 100)}% semantic overlap</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleAcceptSuggestedLink(candidate)}
+                    disabled={acceptingLinkId === candidate.id || isApplyingSuggestion}
+                    className="shrink-0 rounded-md border border-blue-300 bg-white px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                  >
+                    {acceptingLinkId === candidate.id ? "Linking..." : "Accept link"}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {extractedTasks.length > 0 && (
         <div>
@@ -229,10 +348,10 @@ export default function RightPanelContextual() {
           <ul className="space-y-2">
             {insights.related.slice(0, 3).map((related) => (
               <li key={related.id}>
-                <a href={`/notes/${related.id}`} className="block rounded border border-gray-200 bg-white p-2 hover:border-blue-300">
+                <Link href={`/notes/${related.id}`} className="block rounded border border-gray-200 bg-white p-2 hover:border-blue-300">
                   <div className="text-xs font-medium text-gray-900 line-clamp-1">{related.title || "Untitled note"}</div>
                   <div className="mt-1 text-[11px] text-blue-700">{Math.round(related.score * 100)}% match</div>
-                </a>
+                </Link>
               </li>
             ))}
           </ul>
@@ -260,9 +379,9 @@ export default function RightPanelContextual() {
                   <ul className="mt-2 space-y-1">
                     {cluster.notes.slice(0, 2).map((relatedNote) => (
                       <li key={relatedNote.id}>
-                        <a href={`/notes/${relatedNote.id}`} className="text-[11px] text-blue-700 hover:underline">
+                        <Link href={`/notes/${relatedNote.id}`} className="text-[11px] text-blue-700 hover:underline">
                           {relatedNote.title || "Untitled note"}
-                        </a>
+                        </Link>
                       </li>
                     ))}
                   </ul>
@@ -294,9 +413,9 @@ export default function RightPanelContextual() {
             <ul className="mt-2 space-y-1">
               {insights.reorganizationSuggestion.supportingNotes.map((relatedNote) => (
                 <li key={relatedNote.id}>
-                  <a href={`/notes/${relatedNote.id}`} className="text-[11px] text-emerald-700 hover:underline">
+                  <Link href={`/notes/${relatedNote.id}`} className="text-[11px] text-emerald-700 hover:underline">
                     {relatedNote.title || "Untitled note"}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
