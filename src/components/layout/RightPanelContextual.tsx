@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import MultiNoteSynthesisPanel from "@/components/notes/MultiNoteSynthesisPanel";
+import SplitNoteModal from "@/components/notes/SplitNoteModal";
 
 interface ClusterNotePreview {
   id: string;
@@ -63,6 +64,7 @@ interface InsightsPayload {
     summary: string | null;
     category: string | null;
     suggestedProject: string | null;
+    collectionId: string | null;
     confidenceScore: number | null;
     priority: string | null;
     status: string;
@@ -80,6 +82,11 @@ interface InsightsPayload {
   reorganizationSuggestion: ReorganizationSuggestion | null;
   unresolvedThread: UnresolvedThread | null;
   suggestedLinks: SuggestedLink[];
+  collections: Array<{
+    id: string;
+    name: string;
+    color: string | null;
+  }>;
 }
 
 /**
@@ -93,6 +100,10 @@ export default function RightPanelContextual() {
   const [suggestionMessage, setSuggestionMessage] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [acceptingLinkId, setAcceptingLinkId] = useState<string | null>(null);
+  const [selectedCollectionId, setSelectedCollectionId] = useState("");
+  const [isSavingCollection, setIsSavingCollection] = useState(false);
+  const [isProjectizing, setIsProjectizing] = useState(false);
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
 
   const noteId = useMemo(() => {
     const match = pathname?.match(/^\/notes\/([^/]+)$/);
@@ -129,6 +140,10 @@ export default function RightPanelContextual() {
       isMounted = false;
     };
   }, [noteId, reloadToken]);
+
+  useEffect(() => {
+    setSelectedCollectionId(insights?.note.collectionId || "");
+  }, [insights?.note.collectionId]);
 
   if (!noteId || !insights) {
     return null;
@@ -218,10 +233,106 @@ export default function RightPanelContextual() {
   const extractedTasks = Array.isArray(insights.extractedTasks)
     ? (insights.extractedTasks as Array<{ text?: string }>).filter((task) => !!task?.text)
     : [];
+  const canTurnIntoProject = extractedTasks.length >= 3 && !insights.note.collectionId && Boolean(
+    insights.aiMeta?.intent || insights.aiMeta?.nextAction || insights.note.summary || insights.note.title
+  );
+  const collectionSelectionChanged = selectedCollectionId !== (insights.note.collectionId || "");
 
   const clarificationQuestions = Array.isArray(insights.aiMeta?.clarificationQuestions)
     ? insights.aiMeta?.clarificationQuestions || []
     : [];
+
+  /** Persist a new collection assignment or remove the current one. */
+  const handleSaveCollection = async () => {
+    if (!noteId || !collectionSelectionChanged) {
+      return;
+    }
+
+    setIsSavingCollection(true);
+    setSuggestionMessage(null);
+
+    try {
+      const response = await fetch(`/api/notes/${noteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collectionId: selectedCollectionId || null }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update collection assignment");
+      }
+
+      setSuggestionMessage(selectedCollectionId
+        ? "Updated collection assignment for this note."
+        : "Removed this note from its collection.");
+      setReloadToken((current) => current + 1);
+      router.refresh();
+    } catch (error) {
+      console.error("Error updating collection assignment:", error);
+      setSuggestionMessage("Could not update the collection assignment.");
+    } finally {
+      setIsSavingCollection(false);
+    }
+  };
+
+  /** Create a project collection from this note and attach the note to it. */
+  const handleTurnIntoProject = async () => {
+    if (!noteId || !canTurnIntoProject) {
+      return;
+    }
+
+    setIsProjectizing(true);
+    setSuggestionMessage(null);
+
+    const projectName = (insights.note.suggestedProject || insights.note.title || "New project").trim();
+    const description = [
+      insights.note.summary || "",
+      insights.aiMeta?.intent ? `Intent: ${insights.aiMeta.intent}` : "",
+    ].filter(Boolean).join(" ").trim();
+
+    try {
+      const response = await fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: projectName,
+          description,
+          color: "blue",
+          noteIds: [noteId],
+        }),
+      });
+
+      const payload = await response.json() as { id?: string; error?: string };
+      if (!response.ok || !payload.id) {
+        throw new Error(payload.error || "Failed to create project collection");
+      }
+
+      await fetch(`/api/notes/${noteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          suggestedProject: projectName,
+          collectionId: payload.id,
+        }),
+      });
+
+      setSuggestionMessage(`Created project collection ${projectName}.`);
+      setReloadToken((current) => current + 1);
+      router.refresh();
+    } catch (error) {
+      console.error("Error converting note into a project:", error);
+      setSuggestionMessage("Could not turn this note into a project.");
+    } finally {
+      setIsProjectizing(false);
+    }
+  };
+
+  /** Refresh note-detail state after creating split notes from the side panel. */
+  const handleSplitCreated = (count: number) => {
+    setSuggestionMessage(`Created ${count} split card${count === 1 ? "" : "s"}.`);
+    setReloadToken((current) => current + 1);
+    router.refresh();
+  };
 
   return (
     <div className="pt-6 border-t border-gray-200 space-y-4">
@@ -257,6 +368,77 @@ export default function RightPanelContextual() {
           </ul>
         </div>
       )}
+
+      <div className="rounded border border-gray-200 bg-white p-3">
+        <p className="text-[11px] uppercase tracking-wide text-gray-500">Conversion Actions</p>
+        <div className="mt-3 space-y-3">
+          <div className="rounded border border-gray-100 bg-gray-50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium text-gray-900">Turn this into a project</p>
+                <p className="mt-1 text-[11px] text-gray-600">
+                  {canTurnIntoProject
+                    ? "This note has enough extracted tasks to become a project collection."
+                    : insights.note.collectionId
+                      ? "This note is already attached to a collection."
+                      : "Available when a note has 3+ extracted tasks and a coherent goal."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void handleTurnIntoProject()}
+                disabled={!canTurnIntoProject || isProjectizing || isSavingCollection}
+                className="shrink-0 rounded-md border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+              >
+                {isProjectizing ? "Creating..." : "Create project"}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded border border-gray-100 bg-gray-50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-medium text-gray-900">Split this note</p>
+                <p className="mt-1 text-[11px] text-gray-600">Preview whether this note should become multiple cards.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSplitModalOpen(true)}
+                className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+              >
+                Split note
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded border border-gray-100 bg-gray-50 p-3">
+            <p className="text-xs font-medium text-gray-900">Add to collection</p>
+            <p className="mt-1 text-[11px] text-gray-600">Attach this note to an existing collection or remove it from one.</p>
+            <div className="mt-3 flex gap-2">
+              <select
+                value={selectedCollectionId}
+                onChange={(event) => setSelectedCollectionId(event.target.value)}
+                className="min-w-0 flex-1 rounded-md border border-gray-300 px-2.5 py-2 text-xs text-gray-900"
+              >
+                <option value="">No collection</option>
+                {insights.collections.map((collection) => (
+                  <option key={collection.id} value={collection.id}>
+                    {collection.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void handleSaveCollection()}
+                disabled={!collectionSelectionChanged || isSavingCollection || isProjectizing}
+                className="shrink-0 rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+              >
+                {isSavingCollection ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {insights.unresolvedThread && (
         <div className="rounded border border-orange-200 bg-orange-50 p-3">
@@ -430,6 +612,13 @@ export default function RightPanelContextual() {
           </button>
         </div>
       )}
+
+      <SplitNoteModal
+        noteId={noteId}
+        open={isSplitModalOpen}
+        onClose={() => setIsSplitModalOpen(false)}
+        onCreated={handleSplitCreated}
+      />
     </div>
   );
 }

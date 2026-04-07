@@ -60,6 +60,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Right panel unresolved-thread synthesis prompts on note detail
 - Suggested semantic note links with one-click acceptance on note detail
 - Real collection detail pages with collection-level synthesis
+- Note-detail right-panel conversion actions for project creation, note splitting, and collection assignment
 - Resurfacing signals visible outside Review in Inbox and the shared right panel
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
@@ -90,6 +91,7 @@ Shipped:
 - note-detail right panel unresolved-thread prompts with targeted synthesis
 - note-detail suggested semantic links with manual accept-link controls
 - collection detail browsing with collection-level synthesis
+- note-detail right-panel conversion actions for create-project, split-note, and collection assignment
 - planning outputs layered onto the synthesis route with objective, first move, steps, risks, and success signal
 - project/topic cluster planning directly from the Projects and Topics surfaces
 - review planning workflows that turn queue slices into synthesis and action plans
@@ -905,12 +907,12 @@ Shipped additions:
 - "These 2 notes seem related"
 - Accept link button
 
-Still missing:
-
 **Conversion actions:**
 - "Turn this into a project" (when note has 3+ tasks and coherent goal)
 - "Split this note" (when note covers 2+ unrelated topics)
 - "Add to collection" dropdown
+
+Still missing:
 
 **Global panel additions (non-detail routes):**
 - Priority queue: top 3 high-priority uncompleted tasks

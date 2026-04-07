@@ -197,6 +197,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         summary: true,
         category: true,
         suggestedProject: true,
+        collectionId: true,
         confidenceScore: true,
         priority: true,
         status: true,
@@ -248,7 +249,18 @@ export async function GET(request: NextRequest, { params }: Params) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
 
-    const knowledgeContext = await getNoteKnowledgeContext(session.user.id, params.id);
+    const [knowledgeContext, collections] = await Promise.all([
+      getNoteKnowledgeContext(session.user.id, params.id),
+      prisma.collection.findMany({
+        where: { userId: session.user.id },
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          color: true,
+        },
+      }),
+    ]);
     const clusters = (knowledgeContext?.clusters || []) as InsightCluster[];
     const unresolvedThread = buildUnresolvedThread(note.id, clusters);
     const suggestedLinks = await getSuggestedLinksForNote({
@@ -267,6 +279,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         summary: note.summary,
         category: note.category,
         suggestedProject: note.suggestedProject,
+        collectionId: note.collectionId,
         confidenceScore: note.confidenceScore,
         priority: note.priority,
         status: note.status,
@@ -280,6 +293,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       related,
       unresolvedThread,
       suggestedLinks,
+      collections,
     });
   } catch (error) {
     console.error("Error fetching note insights:", error);
