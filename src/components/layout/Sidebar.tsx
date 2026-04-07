@@ -19,6 +19,7 @@ import {
   LogOut,
   Library,
   Settings,
+  Upload,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -34,6 +35,7 @@ const navigationItems = [
 ];
 
 const secondaryItems = [
+  { label: "Import", href: "/import", icon: Upload },
   { label: "Favorites", href: "/favorites", icon: Heart },
   { label: "Archive", href: "/archive", icon: Archive },
   { label: "Settings", href: "/settings", icon: Settings },

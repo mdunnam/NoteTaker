@@ -26,9 +26,11 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.408.0",
+    "mammoth": "^1.12.0",
     "next": "^14.2.0",
     "next-auth": "^5.0.0-beta.21",
     "openai": "^4.52.0",
+    "pdf-parse": "^2.4.5",
     "postcss": "^8.4.38",
     "prisma": "^5.12.0",
     "react": "^18.3.1",
@@ -38,6 +40,7 @@
     "tailwindcss-animate": "^1.0.7",
     "tesseract.js": "^7.0.0",
     "typescript": "^5.4.5",
+    "xlsx": "^0.18.5",
     "zod": "^3.22.4"
   },
   "devDependencies": {
