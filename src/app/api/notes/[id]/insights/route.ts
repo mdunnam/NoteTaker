@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { cosineSimilarity } from "@/lib/ai";
 import { getNoteKnowledgeContext } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
-import { buildContextAwareResurfacing, parseDuplicateSuggestion, type ContextualResurfacingMatch, type SimilarityCandidate } from "@/lib/overlapSignals";
+import { buildContextAwareResurfacing, parseDuplicateSuggestion, type SimilarityCandidate } from "@/lib/overlapSignals";
 import { parsePgVectorLiteral } from "@/lib/pgvector";
 import { NextRequest, NextResponse } from "next/server";
 

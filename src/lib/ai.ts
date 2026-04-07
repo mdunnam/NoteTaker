@@ -573,7 +573,7 @@ export async function synthesizeNotes(
     });
 
     const raw = completion.choices[0]?.message?.content || "{}";
-    let parsed: z.infer<typeof SynthesizedNotesSchema>;
+    let parsed: z.infer<typeof SynthesizedNotesSchema>; // eslint-disable-line prefer-const
     const parseResult = SynthesizedNotesSchema.safeParse(JSON.parse(raw));
     if (!parseResult.success) {
       console.error("SynthesizedNotesSchema parse error:", parseResult.error.issues);
