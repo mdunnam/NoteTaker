@@ -27,10 +27,12 @@ export default async function ProjectsPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-2 text-gray-900">Projects</h1>
-      <p className="mb-6 max-w-3xl text-gray-600">
-        Project clusters combine AI-suggested projects, entity signals, and shared topics so notes can gradually reorganize into the work they actually belong to.
-      </p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Organize</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Your notes grouped by project. AI detects clusters automatically as you capture.
+        </p>
+      </div>
 
       {noteCount === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-6 text-gray-600">

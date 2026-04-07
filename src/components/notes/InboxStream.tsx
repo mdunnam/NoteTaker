@@ -244,12 +244,33 @@ export default function InboxStream({ notes, reclassificationCandidates, forgott
 
   if (notes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-          <span className="text-3xl">📥</span>
+      <div className="mt-8 max-w-xl">
+        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-blue-50">
+            <span className="text-2xl">⚡</span>
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Type anything above and hit Save</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Meeting notes, stray ideas, tasks, links, brain dumps — whatever it is, just get it in. QNote’s AI will automatically title, summarize, tag, and group it so you don’t have to.
+          </p>
+          <div className="grid grid-cols-3 gap-3 text-xs text-gray-500">
+            <div className="rounded-lg bg-gray-50 p-3">
+              <div className="text-base mb-1">✍️</div>
+              <div className="font-medium text-gray-700">Capture</div>
+              <div>Type or paste anything</div>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-3">
+              <div className="text-base mb-1">🤖</div>
+              <div className="font-medium text-gray-700">AI Organizes</div>
+              <div>Titles, tags &amp; categories auto-generated</div>
+            </div>
+            <div className="rounded-lg bg-gray-50 p-3">
+              <div className="text-base mb-1">🔍</div>
+              <div className="font-medium text-gray-700">Resurface</div>
+              <div>Find it later, instantly</div>
+            </div>
+          </div>
         </div>
-        <p className="text-lg font-medium text-gray-700 mb-1">Inbox is empty</p>
-        <p className="text-sm text-gray-500">Start capturing thoughts using the box above.</p>
       </div>
     );
   }

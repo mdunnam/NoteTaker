@@ -91,9 +91,9 @@ export default async function ReviewPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Review</h1>
-        <p className="mt-2 max-w-3xl text-gray-600">
-          Review is where QNote brings uncertain notes and changed-meaning suggestions into one queue so you can correct the system without hunting through inbox, note detail, and side panels.
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Needs Attention</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          AI flagged these notes — clarify, regroup, or dismiss to keep your workspace clean.
         </p>
       </div>
 

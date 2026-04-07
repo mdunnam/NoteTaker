@@ -72,11 +72,9 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   return (
     <div className="p-6">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Inbox</h1>
-        <p className="text-gray-600 mt-2">
-          {notes.length === 0
-            ? (activeCategory || activeTag ? "No notes match this filter." : "No notes yet. Start capturing!")
-            : `${notes.length} note${notes.length !== 1 ? "s" : ""}${activeCategory ? ` in "${activeCategory}"` : ""}${activeTag ? ` tagged #${activeTag}` : ""}`}
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Inbox</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Your latest captures — AI is organizing them in the background.
         </p>
       </div>
 

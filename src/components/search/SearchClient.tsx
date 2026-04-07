@@ -219,9 +219,9 @@ export default function SearchClient({ filterOptions }: SearchClientProps) {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Search Your Notes</h1>
-        <p className="mt-2 max-w-2xl text-sm text-gray-600">
-          Search by meaning first, then fall back to exact keyword mode when you need tighter literal matches.
+        <h1 className="text-2xl font-bold text-gray-900">Search</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Find anything. Search by meaning, keyword, category, or tag.
         </p>
       </div>
 

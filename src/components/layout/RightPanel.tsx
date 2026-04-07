@@ -3,6 +3,7 @@ import { getUserReclassificationCandidates } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import ReclassificationQueue from "@/components/notes/ReclassificationQueue";
 import RightPanelContextual from "@/components/layout/RightPanelContextual";
+import RightPanelShell from "@/components/layout/RightPanelShell";
 import ResurfacingRail from "@/components/notes/ResurfacingRail";
 import TimeResurfacingWidget from "@/components/notes/TimeResurfacingWidget";
 import { getUserForgottenNoteCandidates, getUserReviewPatterns } from "@/lib/resurfacing";
@@ -13,6 +14,7 @@ import { buildTimeResurfacingSummary } from "@/lib/timeResurfacing";
 
 /**
  * Right panel showing live note health, active queues, and recent extracted tasks.
+ * Collapses when there is nothing actionable to show.
  */
 export default async function RightPanel() {
   const session = await auth();
@@ -209,163 +211,144 @@ export default async function RightPanel() {
     }
   }
 
+  // Determine if there's anything actionable to show
+  const hasActionableContent =
+    reclassificationCandidates.length > 0 ||
+    priorityQueueItems.length > 0 ||
+    extractedTasks.length > 0 ||
+    lowConfidenceNotes.length > 0 ||
+    atRiskNotes.length > 0 ||
+    visibleForgottenCandidates.length > 0 ||
+    visibleReviewPatterns.length > 0 ||
+    topRelations.length > 0;
+
   return (
-    <aside className="w-80 border-l border-gray-200 bg-gray-50 p-6 overflow-y-auto">
-      <div className="space-y-6">
-        <RightPanelContextual />
+    <RightPanelShell hasContent={hasActionableContent}>
+      <RightPanelContextual />
 
-        {reclassificationCandidates.length > 0 && (
-          <ReclassificationQueue
-            candidates={reclassificationCandidates}
-            compact
-            title="Reclassification Queue"
-          />
-        )}
+      {reclassificationCandidates.length > 0 && (
+        <ReclassificationQueue
+          candidates={reclassificationCandidates}
+          compact
+          title="Changed Meaning"
+        />
+      )}
 
+      {priorityQueueItems.length > 0 && (
         <div>
-          <h3 className="font-semibold text-sm mb-3">Note Health</h3>
-          <ul className="space-y-2 text-xs text-gray-700">
-            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
-              <span>Average score</span>
-              <strong>{workspaceHealth.averageScore}</strong>
-            </li>
-            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
-              <span>At risk</span>
-              <strong>{workspaceHealth.atRiskCount}</strong>
-            </li>
-            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
-              <span>Watch</span>
-              <strong>{workspaceHealth.watchCount}</strong>
-            </li>
-            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
-              <span>Total active notes</span>
-              <strong>{totalNotes}</strong>
-            </li>
-            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
-              <span>Uncategorized</span>
-              <strong>{uncategorizedCount}</strong>
-            </li>
-            <li className="flex items-center justify-between rounded border border-gray-200 bg-white px-3 py-2">
-              <span>Still processing</span>
-              <strong>{processingCount}</strong>
-            </li>
+          <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wide mb-2">Priority Tasks</h3>
+          <ul className="space-y-2">
+            {priorityQueueItems.map((task, index) => (
+              <li key={`${task.noteId}-${index}`} className="rounded border border-red-200 bg-red-50 p-3">
+                <div className="text-xs font-medium text-red-900">{task.text}</div>
+                <a href={`/notes/${task.noteId}`} className="mt-1 block text-[11px] text-red-800 hover:underline">
+                  {task.noteTitle}
+                </a>
+                {task.dueDate && <p className="mt-1 text-[11px] text-red-700">Due: {task.dueDate}</p>}
+              </li>
+            ))}
           </ul>
+        </div>
+      )}
 
-          {atRiskNotes.length > 0 && (
-            <ul className="mt-3 space-y-2">
-              {atRiskNotes.map(({ note, assessment }) => (
-                <li key={note.id} className="rounded border border-red-200 bg-red-50 p-3">
-                  <a href={`/notes/${note.id}`} className="text-xs font-medium text-red-900 hover:underline">
+      {lowConfidenceNotes.length > 0 && (
+        <div>
+          <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wide mb-2">Needs Clarification</h3>
+          <ul className="space-y-2">
+            {lowConfidenceNotes.map((note) => {
+              const question = getFirstClarificationQuestion(note.aiMeta);
+              return (
+                <li key={note.id} className="rounded border border-amber-200 bg-amber-50 p-3">
+                  <a href={`/notes/${note.id}`} className="text-xs font-medium text-amber-900 hover:underline">
                     {note.title || "Untitled note"}
                   </a>
-                  <p className="mt-1 text-[11px] text-red-800">{assessment.reasons[0] || "Needs attention soon."}</p>
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    {Math.round((note.confidenceScore || 0) * 100)}% confidence
+                  </p>
+                  {question && <p className="mt-1 text-[11px] text-amber-800 italic">{question}</p>}
                 </li>
-              ))}
-            </ul>
-          )}
+              );
+            })}
+          </ul>
         </div>
+      )}
 
-        {(visibleForgottenCandidates.length > 0 || visibleReviewPatterns.length > 0) && (
-          <div className="pt-6 border-t border-gray-200">
-            <ResurfacingRail
-              forgottenCandidates={visibleForgottenCandidates}
-              reviewPatterns={visibleReviewPatterns}
-              compact
-              title="Resurfacing"
-            />
-          </div>
-        )}
-
-        <TimeResurfacingWidget summary={timeResurfacingSummary} />
-
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="font-semibold text-sm mb-3">Recent Extracted Tasks</h3>
-          {extractedTasks.length === 0 ? (
-            <p className="text-xs text-gray-600">No extracted tasks yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {extractedTasks.map((task, index) => (
-                <li key={`${task.noteId}-${index}`} className="rounded border border-gray-200 bg-white p-3">
-                  <div className="text-xs font-medium text-gray-900">{task.text}</div>
-                  <div className="mt-1 text-[11px] text-gray-600">{task.noteTitle}</div>
-                  {task.dueDate && (
-                    <div className="mt-1 text-[11px] text-blue-700">Due: {task.dueDate}</div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
+      {atRiskNotes.length > 0 && (
+        <div>
+          <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wide mb-2">At Risk</h3>
+          <ul className="space-y-2">
+            {atRiskNotes.map(({ note, assessment }) => (
+              <li key={note.id} className="rounded border border-red-200 bg-red-50 p-3">
+                <a href={`/notes/${note.id}`} className="text-xs font-medium text-red-900 hover:underline">
+                  {note.title || "Untitled note"}
+                </a>
+                <p className="mt-1 text-[11px] text-red-800">{assessment.reasons[0] || "Needs attention soon."}</p>
+              </li>
+            ))}
+          </ul>
         </div>
+      )}
 
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="font-semibold text-sm mb-3">Top Related Notes</h3>
-          {topRelations.length === 0 ? (
-            <p className="text-xs text-gray-600">No related-note links yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {topRelations.map((relation) => (
-                <li
-                  key={relation.id}
-                  className="rounded border border-gray-200 bg-white p-3 text-[11px] text-gray-700"
-                >
-                  <div className="font-medium text-gray-900">
-                    {relation.sourceNote.title || "Untitled note"}
-                  </div>
-                  <div className="mt-1">related to</div>
-                  <div className="font-medium text-gray-900">
-                    {relation.targetNote.title || "Untitled note"}
-                  </div>
-                  <div className="mt-1 text-blue-700">Score: {relation.score.toFixed(2)}</div>
-                </li>
-              ))}
-            </ul>
-          )}
+      {extractedTasks.length > 0 && (
+        <div>
+          <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wide mb-2">Extracted Tasks</h3>
+          <ul className="space-y-2">
+            {extractedTasks.map((task, index) => (
+              <li key={`${task.noteId}-${index}`} className="rounded border border-gray-200 bg-white p-3">
+                <div className="text-xs font-medium text-gray-900">{task.text}</div>
+                <div className="mt-1 text-[11px] text-gray-500">{task.noteTitle}</div>
+                {task.dueDate && <div className="mt-1 text-[11px] text-blue-700">Due: {task.dueDate}</div>}
+              </li>
+            ))}
+          </ul>
         </div>
+      )}
 
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="font-semibold text-sm mb-3">Needs Clarification</h3>
-          {lowConfidenceNotes.length === 0 ? (
-            <p className="text-xs text-gray-600">No notes below 0.5 confidence right now.</p>
-          ) : (
-            <ul className="space-y-2">
-              {lowConfidenceNotes.map((note) => {
-                const question = getFirstClarificationQuestion(note.aiMeta);
+      {(visibleForgottenCandidates.length > 0 || visibleReviewPatterns.length > 0) && (
+        <ResurfacingRail
+          forgottenCandidates={visibleForgottenCandidates}
+          reviewPatterns={visibleReviewPatterns}
+          compact
+          title="Resurface"
+        />
+      )}
 
-                return (
-                  <li key={note.id} className="rounded border border-amber-200 bg-amber-50 p-3">
-                    <a href={`/notes/${note.id}`} className="text-xs font-medium text-amber-900 hover:underline">
-                      {note.title || "Untitled note"}
-                    </a>
-                    <p className="mt-1 text-[11px] text-amber-700">
-                      Confidence: {Math.round((note.confidenceScore || 0) * 100)}%
-                    </p>
-                    {question && <p className="mt-1 text-[11px] text-amber-800">{question}</p>}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+      <TimeResurfacingWidget summary={timeResurfacingSummary} />
+
+      {topRelations.length > 0 && (
+        <div>
+          <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wide mb-2">Related Notes</h3>
+          <ul className="space-y-2">
+            {topRelations.map((relation) => (
+              <li key={relation.id} className="rounded border border-gray-200 bg-white p-3 text-[11px] text-gray-700">
+                <div className="font-medium text-gray-900">{relation.sourceNote.title || "Untitled note"}</div>
+                <div className="my-0.5 text-gray-400">related to</div>
+                <div className="font-medium text-gray-900">{relation.targetNote.title || "Untitled note"}</div>
+              </li>
+            ))}
+          </ul>
         </div>
+      )}
 
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="font-semibold text-sm mb-3">Priority Queue</h3>
-          {priorityQueueItems.length === 0 ? (
-            <p className="text-xs text-gray-600">No high-priority uncompleted tasks right now.</p>
-          ) : (
-            <ul className="space-y-2">
-              {priorityQueueItems.map((task, index) => (
-                <li key={`${task.noteId}-${index}`} className="rounded border border-red-200 bg-red-50 p-3">
-                  <div className="text-xs font-medium text-red-900">{task.text}</div>
-                  <a href={`/notes/${task.noteId}`} className="mt-1 block text-[11px] text-red-800 hover:underline">
-                    {task.noteTitle}
-                  </a>
-                  {task.dueDate && <p className="mt-1 text-[11px] text-red-700">Due: {task.dueDate}</p>}
-                </li>
-              ))}
-            </ul>
+      {/* Workspace stats — always last, always compact */}
+      <div>
+        <h3 className="font-semibold text-xs text-gray-500 uppercase tracking-wide mb-2">Workspace</h3>
+        <ul className="space-y-1 text-xs text-gray-600">
+          <li className="flex justify-between px-2 py-1 rounded bg-white border border-gray-100">
+            <span>Active notes</span><strong className="text-gray-900">{totalNotes}</strong>
+          </li>
+          {uncategorizedCount > 0 && (
+            <li className="flex justify-between px-2 py-1 rounded bg-amber-50 border border-amber-100">
+              <span>Uncategorized</span><strong className="text-amber-800">{uncategorizedCount}</strong>
+            </li>
           )}
-        </div>
+          {processingCount > 0 && (
+            <li className="flex justify-between px-2 py-1 rounded bg-blue-50 border border-blue-100">
+              <span>Processing…</span><strong className="text-blue-800">{processingCount}</strong>
+            </li>
+          )}
+        </ul>
       </div>
-    </aside>
+    </RightPanelShell>
   );
 }

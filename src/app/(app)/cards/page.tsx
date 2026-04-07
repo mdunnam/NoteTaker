@@ -36,9 +36,9 @@ export default async function CardsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2 text-gray-900">Cards</h1>
-        <p className="text-gray-600">
-          {notes.length} note{notes.length === 1 ? "" : "s"} in your active workspace.
+        <h1 className="text-2xl font-bold mb-1 text-gray-900">Cards</h1>
+        <p className="text-sm text-gray-500">
+          All your active notes in a visual grid. Filter by category, project, or type.
         </p>
       </div>
 

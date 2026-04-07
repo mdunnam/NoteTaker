@@ -27,10 +27,12 @@ export default async function TopicsPage() {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-2 text-gray-900">Topics</h1>
-      <p className="mb-6 max-w-3xl text-gray-600">
-        QNote now groups recurring themes across notes into topic clusters, so related conversations become browsable threads instead of isolated cards.
-      </p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">Topics</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Recurring themes across your notes, grouped automatically.
+        </p>
+      </div>
 
       {noteCount === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-6 text-gray-600">
