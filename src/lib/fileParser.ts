@@ -51,7 +51,10 @@ export async function parseFile(file: File): Promise<ParsedFile> {
   // --- PDF ---
   if (ext === "pdf" || mime === "application/pdf") {
     const buffer = await file.arrayBuffer();
-    const pdfParse = (await import("pdf-parse")).default;
+    // pdf-parse exports as a named export in some versions
+    const pdfParseModule = await import("pdf-parse");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfParse = ((pdfParseModule.default ?? pdfParseModule) as unknown) as (buf: Buffer) => Promise<{ text: string }>;
     const result = await pdfParse(Buffer.from(buffer));
     const text = clean(result.text);
     return { filename: name, text: truncate(text, name), suggestedChunks: 1 };
@@ -103,15 +106,9 @@ export async function parseFile(file: File): Promise<ParsedFile> {
     ext === "pptx" ||
     mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation"
   ) {
-    // Extract slide text via mammoth-compatible buffer read
-    // mammoth doesn't handle pptx — extract text manually from XML
-    const buffer = await file.arrayBuffer();
-    const JSZip = (await import("xlsx")).default; // xlsx bundles JSZip internally
-    // Fallback: just note we can't parse it and return a placeholder
-    void buffer;
     return {
       filename: name,
-      text: `[PPTX file: ${name}]\nPowerPoint files cannot be fully parsed in the browser. Please copy and paste the slide text manually, or export as PDF first.`,
+      text: `[PPTX file: ${name}]\nPowerPoint files cannot be fully parsed. Please copy and paste the slide text manually, or export as PDF first.`,
       suggestedChunks: 1,
     };
   }
