@@ -183,4 +183,63 @@ describe("/api/search/semantic POST", () => {
       })
     );
   });
+
+  it("injects older resurfaced notes when a date filter hides relevant context", async () => {
+    mockedAuth.mockResolvedValue({ user: { id: "u1" } } as never);
+    mockedFindMany
+      .mockResolvedValueOnce([
+        {
+          id: "recent-1",
+          title: "Current outage note",
+          summary: "Recent issue summary",
+          rawContent: "Debug recent outage",
+          createdAt: new Date("2026-04-05T00:00:00.000Z"),
+          category: "Work",
+          type: "NOTE",
+          tags: ["incident"],
+          suggestedProject: null,
+        },
+      ] as never)
+      .mockResolvedValueOnce([
+        {
+          id: "older-1",
+          title: "Last outage review",
+          summary: "Historical incident notes",
+          rawContent: "Past outage review",
+          createdAt: new Date("2026-03-01T00:00:00.000Z"),
+          category: "Work",
+          type: "NOTE",
+          tags: ["incident"],
+          suggestedProject: null,
+        },
+      ] as never);
+
+    mockedQueryRaw
+      .mockResolvedValueOnce([{ id: "recent-1", embeddingText: "[1,0]" }] as never)
+      .mockResolvedValueOnce([{ id: "older-1", embeddingText: "[1,0]" }] as never);
+    mockedEmbedNote.mockResolvedValueOnce([1, 0]);
+    mockedCosineSimilarity
+      .mockReturnValueOnce(0.91)
+      .mockReturnValueOnce(0.86);
+
+    const response = await POST(makeRequest({
+      query: "outage",
+      limit: 10,
+      filters: {
+        category: "Work",
+        dateRange: "7d",
+      },
+    }));
+    const payload = (await response.json()) as {
+      method: string;
+      results: Array<{ id: string }>;
+      resurfacedResults: Array<{ id: string; resurfacingReason: string }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(payload.method).toBe("semantic");
+    expect(payload.results[0]?.id).toBe("recent-1");
+    expect(payload.resurfacedResults[0]?.id).toBe("older-1");
+    expect(payload.resurfacedResults[0]?.resurfacingReason).toContain("Earlier note");
+  });
 });

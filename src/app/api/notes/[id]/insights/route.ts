@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { cosineSimilarity } from "@/lib/ai";
 import { getNoteKnowledgeContext } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
+import { buildContextAwareResurfacing, parseDuplicateSuggestion, type ContextualResurfacingMatch, type SimilarityCandidate } from "@/lib/overlapSignals";
 import { parsePgVectorLiteral } from "@/lib/pgvector";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -43,6 +44,8 @@ interface SuggestedLink {
   score: number;
   reason: string;
 }
+
+type RelatedSimilarityCandidate = SimilarityCandidate;
 
 /** Pick the strongest repeated cluster for the note and frame it as an unresolved thread. */
 function buildUnresolvedThread(noteId: string, clusters: InsightCluster[]): UnresolvedThread | null {
@@ -211,7 +214,14 @@ export async function GET(request: NextRequest, { params }: Params) {
           select: {
             score: true,
             targetNote: {
-              select: { id: true, title: true, summary: true },
+              select: {
+                id: true,
+                title: true,
+                summary: true,
+                createdAt: true,
+                suggestedProject: true,
+                category: true,
+              },
             },
           },
         },
@@ -221,7 +231,14 @@ export async function GET(request: NextRequest, { params }: Params) {
           select: {
             score: true,
             sourceNote: {
-              select: { id: true, title: true, summary: true },
+              select: {
+                id: true,
+                title: true,
+                summary: true,
+                createdAt: true,
+                suggestedProject: true,
+                category: true,
+              },
             },
           },
         },
@@ -232,22 +249,44 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 });
     }
 
-    const related = [
+    const parsedAiMeta = note.aiMeta && typeof note.aiMeta === "object" && !Array.isArray(note.aiMeta)
+      ? note.aiMeta as Record<string, unknown>
+      : {};
+    const duplicateSuggestion = parseDuplicateSuggestion(parsedAiMeta.duplicateSuggestion);
+
+    const relatedCandidates: RelatedSimilarityCandidate[] = [
       ...note.relatedNotesFrom.map((r) => ({
         id: r.targetNote.id,
         title: r.targetNote.title,
         summary: r.targetNote.summary,
+        createdAt: r.targetNote.createdAt,
+        suggestedProject: r.targetNote.suggestedProject,
+        category: r.targetNote.category,
         score: r.score,
       })),
       ...note.relatedNotesTo.map((r) => ({
         id: r.sourceNote.id,
         title: r.sourceNote.title,
         summary: r.sourceNote.summary,
+        createdAt: r.sourceNote.createdAt,
+        suggestedProject: r.sourceNote.suggestedProject,
+        category: r.sourceNote.category,
         score: r.score,
       })),
-    ]
+    ];
+
+    const related = [...relatedCandidates]
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
+    const contextMatches = buildContextAwareResurfacing(
+      note.createdAt,
+      {
+        suggestedProject: note.suggestedProject,
+        category: note.category,
+      },
+      relatedCandidates.filter((candidate) => candidate.score >= 0.78 && candidate.id !== duplicateSuggestion?.note.id),
+      2
+    );
 
     const [knowledgeContext, collections] = await Promise.all([
       getNoteKnowledgeContext(session.user.id, params.id),
@@ -291,6 +330,8 @@ export async function GET(request: NextRequest, { params }: Params) {
       clusters,
       reorganizationSuggestion: knowledgeContext?.suggestion || null,
       related,
+      duplicateSuggestion,
+      contextMatches,
       unresolvedThread,
       suggestedLinks,
       collections,

@@ -56,6 +56,28 @@ interface SuggestedLink {
   reason: string;
 }
 
+interface DuplicateSuggestion {
+  note: {
+    id: string;
+    title: string | null;
+    summary: string | null;
+    createdAt: string;
+  };
+  score: number;
+  reason: string;
+}
+
+interface ContextualResurfacingMatch {
+  note: {
+    id: string;
+    title: string | null;
+    summary: string | null;
+    createdAt: string;
+  };
+  score: number;
+  reason: string;
+}
+
 interface InsightsPayload {
   noteId: string;
   note: {
@@ -80,6 +102,8 @@ interface InsightsPayload {
   related: InsightNote[];
   clusters: KnowledgeCluster[];
   reorganizationSuggestion: ReorganizationSuggestion | null;
+  duplicateSuggestion: DuplicateSuggestion | null;
+  contextMatches: ContextualResurfacingMatch[];
   unresolvedThread: UnresolvedThread | null;
   suggestedLinks: SuggestedLink[];
   collections: Array<{
@@ -364,6 +388,50 @@ export default function RightPanelContextual() {
           <ul className="mt-1 space-y-1">
             {clarificationQuestions.slice(0, 2).map((question) => (
               <li key={question} className="text-xs text-amber-900">• {question}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {insights.duplicateSuggestion && (
+        <div className="rounded border border-rose-200 bg-rose-50 p-3">
+          <p className="text-[11px] uppercase tracking-wide text-rose-700">Possible Duplicate</p>
+          <p className="mt-1 text-xs text-rose-900">{insights.duplicateSuggestion.reason}</p>
+          <Link href={`/notes/${insights.duplicateSuggestion.note.id}`} className="mt-2 block text-xs font-medium text-rose-900 hover:underline">
+            {insights.duplicateSuggestion.note.title || "Untitled note"}
+          </Link>
+          {insights.duplicateSuggestion.note.summary && (
+            <p className="mt-1 line-clamp-2 text-[11px] text-rose-800">{insights.duplicateSuggestion.note.summary}</p>
+          )}
+          <div className="mt-3">
+            <MultiNoteSynthesisPanel
+              notes={[
+                { id: insights.note.id, title: insights.note.title },
+                { id: insights.duplicateSuggestion.note.id, title: insights.duplicateSuggestion.note.title },
+              ]}
+              title="Compare overlap"
+              description="Review whether these notes should stay linked or collapse into one clearer thread."
+              compact
+              planningGoalPlaceholder="Optional lens: compare overlap, merge context, decide whether this is a duplicate capture..."
+            />
+          </div>
+        </div>
+      )}
+
+      {insights.contextMatches.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">You&apos;ve Thought About This Before</p>
+          <ul className="space-y-2">
+            {insights.contextMatches.map((match) => (
+              <li key={match.note.id} className="rounded border border-indigo-200 bg-indigo-50 p-3">
+                <Link href={`/notes/${match.note.id}`} className="text-xs font-medium text-indigo-900 hover:underline">
+                  {match.note.title || "Untitled note"}
+                </Link>
+                {match.note.summary && (
+                  <p className="mt-1 line-clamp-2 text-[11px] text-indigo-800">{match.note.summary}</p>
+                )}
+                <p className="mt-2 text-[11px] text-indigo-800">{match.reason}</p>
+              </li>
             ))}
           </ul>
         </div>

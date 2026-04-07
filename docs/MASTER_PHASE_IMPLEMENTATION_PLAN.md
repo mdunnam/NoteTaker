@@ -62,6 +62,8 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Real collection detail pages with collection-level synthesis
 - Note-detail right-panel conversion actions for project creation, note splitting, and collection assignment
 - Shared right-panel priority task queue, low-confidence queue, and reclassification queue on non-detail routes
+- Duplicate-overlap cues persisted at enrichment time and surfaced on note detail
+- Context-aware resurfacing on note detail and semantic search with older-note recall under active date filters
 - Resurfacing signals visible outside Review in Inbox and the shared right panel
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
@@ -94,6 +96,8 @@ Shipped:
 - collection detail browsing with collection-level synthesis
 - note-detail right-panel conversion actions for create-project, split-note, and collection assignment
 - shared right-panel queues for high-priority tasks, sub-0.5 confidence notes, and reclassification candidates
+- note-detail duplicate-overlap cues persisted from enrichment-time similarity checks
+- context-aware resurfacing cues on note detail and in semantic search when older matches are hidden by date filters
 - planning outputs layered onto the synthesis route with objective, first move, steps, risks, and success signal
 - project/topic cluster planning directly from the Projects and Topics surfaces
 - review planning workflows that turn queue slices into synthesis and action plans
@@ -1018,6 +1022,10 @@ ALTER TABLE "Note" ADD COLUMN "viewCount" INT NOT NULL DEFAULT 0;
 
 ### 12.3 Context-Aware Resurfacing
 
+Shipped now:
+- On note detail, older semantically related notes surface under a dedicated "You've thought about this before" cue
+- In semantic search, older relevant notes can be injected as resurfaced matches when the active date filter would otherwise hide them
+
 When user opens a note or types in search, check for semantically related past notes.
 
 Logic:
@@ -1041,6 +1049,10 @@ Implementation path: in-app widget first, optional email digest later.
 ---
 
 ### 12.5 Duplicate and Overlap Detection
+
+Shipped now:
+- Enrichment persists a near-duplicate suggestion in `aiMeta` when overlap exceeds the duplicate threshold
+- Note detail surfaces that overlap as "You may have captured this before" with a comparison workflow
 
 Detect when a new note covers ground already in the corpus.
 

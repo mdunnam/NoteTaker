@@ -15,6 +15,7 @@ import {
   scoreKeywordCandidate,
   selectTopSemanticCandidates,
 } from "@/lib/searchRanking";
+import { buildContextAwareResurfacing, type SimilarityCandidate } from "@/lib/overlapSignals";
 import { z } from "zod";
 
 const SearchFiltersSchema = z.object({
@@ -46,6 +47,10 @@ interface SearchNote {
   suggestedProject?: string | null;
 }
 
+interface ResurfacedSearchResult extends ReturnType<typeof buildSearchResult> {
+  resurfacingReason: string;
+}
+
 /** Build optional createdAt filter from a date-range token. */
 function getCreatedAtFilter(dateRange?: SemanticSearchRequest["filters"]["dateRange"]) {
   const now = Date.now();
@@ -75,6 +80,19 @@ function buildSearchResult(note: SearchNote, score: number, query: string) {
     snippet,
     matchedTerms,
     score: Math.round(score),
+  };
+}
+
+/** Add resurfacing reason metadata to a normal search result. */
+function buildResurfacedSearchResult(
+  note: SearchNote,
+  score: number,
+  query: string,
+  resurfacingReason: string
+): ResurfacedSearchResult {
+  return {
+    ...buildSearchResult(note, score, query),
+    resurfacingReason,
   };
 }
 
@@ -138,8 +156,8 @@ export async function POST(request: NextRequest) {
       take: 200,
     });
 
-    if (notes.length === 0) {
-      return NextResponse.json({ results: [], method: body.mode }, { status: 200 });
+    if (notes.length === 0 && (body.mode === "keyword" || !createdAtFilter || body.typeahead)) {
+      return NextResponse.json({ results: [], resurfacedResults: [], method: body.mode }, { status: 200 });
     }
 
     if (body.mode === "keyword") {
@@ -192,14 +210,101 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (scored.length === 0) {
+    if (scored.length === 0 && !createdAtFilter) {
       return performKeywordSearch(notes, query, limit);
     }
 
-    const semanticResults = selectTopSemanticCandidates(scored, limit, 0.45);
+    const semanticResults = scored.length === 0 ? [] : selectTopSemanticCandidates(scored, limit, 0.45);
+    let resurfacedResults: ResurfacedSearchResult[] = [];
+
+    if (!body.typeahead && createdAtFilter?.gte) {
+      const historicalNotes = await prisma.note.findMany({
+        where: {
+          userId: session.user.id,
+          isArchived: false,
+          status: "PROCESSED",
+          createdAt: { lt: createdAtFilter.gte },
+          ...(body.filters?.category ? { category: body.filters.category } : {}),
+          ...(body.filters?.type ? { type: body.filters.type } : {}),
+          ...(body.filters?.tag ? { tags: { has: body.filters.tag } } : {}),
+        },
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          rawContent: true,
+          createdAt: true,
+          category: true,
+          type: true,
+          tags: true,
+          suggestedProject: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 120,
+      });
+
+      if (historicalNotes.length > 0) {
+        const historicalIds = historicalNotes.map((note) => note.id);
+        const historicalEmbeddings = await prisma.$queryRaw<Array<{ id: string; embeddingText: string | null }>>(
+          Prisma.sql`
+            SELECT "id", "embedding"::text AS "embeddingText"
+            FROM "Note"
+            WHERE "id" IN (${Prisma.join(historicalIds)})
+          `
+        );
+
+        const historicalEmbeddingById = new Map(
+          historicalEmbeddings.map((row) => [row.id, parsePgVectorLiteral(row.embeddingText)])
+        );
+        const mainResultIds = new Set(semanticResults.map((note) => note.id));
+        const historicalScored: Array<(SearchNote & SimilarityCandidate)> = [];
+
+        for (const note of historicalNotes) {
+          const storedEmbedding = historicalEmbeddingById.get(note.id) || [];
+
+          if (storedEmbedding.length === 0 || mainResultIds.has(note.id)) {
+            continue;
+          }
+
+          const semanticScore = cosineSimilarity(queryEmbedding, storedEmbedding);
+          const keywordScore = scoreKeywordCandidate(note, query);
+          const blendedScore = semanticScore * 0.85 + Math.min(keywordScore / 10, 1) * 0.15;
+
+          if (blendedScore > 0.55) {
+            historicalScored.push({
+              ...note,
+              score: blendedScore,
+            });
+          }
+        }
+
+        const resurfacedMatches = buildContextAwareResurfacing(
+          new Date(),
+          {
+            suggestedProject: null,
+            category: body.filters?.category || null,
+          },
+          historicalScored,
+          2
+        );
+        const historicalById = new Map(historicalScored.map((note) => [note.id, note]));
+
+        resurfacedResults = resurfacedMatches
+          .map((match) => {
+            const note = historicalById.get(match.note.id);
+            if (!note) {
+              return null;
+            }
+
+            return buildResurfacedSearchResult(note, note.score * 100, query, match.reason);
+          })
+          .filter((note): note is ResurfacedSearchResult => !!note);
+      }
+    }
 
     return NextResponse.json({
       results: semanticResults.map((note) => buildSearchResult(note, note.score * 100, query)),
+      resurfacedResults,
       method: "semantic",
     });
   } catch (error) {
@@ -220,6 +325,7 @@ function performKeywordSearch(
 
   return NextResponse.json({
     results: scored.map((note) => buildSearchResult(note, note.score, query)),
+    resurfacedResults: [],
     method: "keyword",
   });
 }

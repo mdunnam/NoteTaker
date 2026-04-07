@@ -32,8 +32,13 @@ interface SearchResult {
   score: number;
 }
 
+interface ResurfacedSearchResult extends SearchResult {
+  resurfacingReason: string;
+}
+
 interface SearchResponse {
   results: SearchResult[];
+  resurfacedResults: ResurfacedSearchResult[];
   method: "semantic" | "keyword";
 }
 
@@ -85,6 +90,7 @@ export default function SearchClient({ filterOptions }: SearchClientProps) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [resurfacedResults, setResurfacedResults] = useState<ResurfacedSearchResult[]>([]);
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
@@ -130,11 +136,13 @@ export default function SearchClient({ filterOptions }: SearchClientProps) {
       const payload = (await response.json()) as SearchResponse;
       startTransition(() => {
         setResults(payload.results);
+        setResurfacedResults(payload.resurfacedResults || []);
         setSearchMethod(payload.method);
       });
     } catch (searchError) {
       console.error("Search error:", searchError);
       setResults([]);
+      setResurfacedResults([]);
       setSearchMethod(null);
       setError("Search failed. Please try again.");
     } finally {
@@ -206,6 +214,7 @@ export default function SearchClient({ filterOptions }: SearchClientProps) {
     filters.tag ? { key: "tag", label: `Tag: #${filters.tag}` } : null,
     filters.dateRange !== "all" ? { key: "dateRange", label: `Date: ${filters.dateRange}` } : null,
   ].filter(Boolean) as Array<{ key: keyof SearchFilters; label: string }>;
+  const hasVisibleResults = results.length > 0 || resurfacedResults.length > 0;
 
   return (
     <div className="p-6">
@@ -382,8 +391,10 @@ export default function SearchClient({ filterOptions }: SearchClientProps) {
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm text-gray-500">
-              {results.length === 0
+              {!hasVisibleResults
                 ? `No results for "${query}".`
+                : results.length === 0
+                  ? `No in-range results for "${query}", but older notes were resurfaced.`
                 : `${results.length} result${results.length === 1 ? "" : "s"} using ${searchMethod || searchMode} search`}
             </p>
             {searchMethod && searchMethod !== searchMode && (
@@ -393,55 +404,102 @@ export default function SearchClient({ filterOptions }: SearchClientProps) {
             )}
           </div>
 
-          {results.length === 0 ? (
+          {!hasVisibleResults ? (
             <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-500">
               <p className="text-lg font-medium text-gray-700">Nothing matched yet</p>
               <p className="mt-2 text-sm">Try a broader concept, remove a filter, or switch between semantic and keyword mode.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {results.map((note) => (
-                <Link
-                  key={note.id}
-                  href={`/notes/${note.id}`}
-                  className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40"
-                >
-                  <div className="mb-2 flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <h2 className="truncate text-base font-semibold text-gray-900">{note.title || "Untitled note"}</h2>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                        {note.category && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">{note.category}</span>}
-                        {note.type && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">{note.type}</span>}
-                        <span>
-                          {new Date(note.createdAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })}
-                        </span>
-                        {note.suggestedProject && <span>Project: {note.suggestedProject}</span>}
-                      </div>
+            <div className="space-y-6">
+              {resurfacedResults.length > 0 && (
+                <section>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <h2 className="text-sm font-semibold text-gray-900">From Earlier Notes</h2>
+                      <p className="text-xs text-gray-500">Older matches pulled in despite the active date filter.</p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
-                      {note.score}%
+                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">
+                      {resurfacedResults.length} resurfaced
                     </span>
                   </div>
 
-                  <p className="text-sm leading-6 text-gray-700">
-                    {renderHighlightedSnippet(note.snippet || note.summary || note.rawContent, note.matchedTerms)}
-                  </p>
+                  <div className="space-y-3">
+                    {resurfacedResults.map((note) => (
+                      <Link
+                        key={`resurfaced-${note.id}`}
+                        href={`/notes/${note.id}`}
+                        className="block rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm transition-colors hover:border-indigo-300 hover:bg-indigo-100/50"
+                      >
+                        <div className="mb-2 flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h2 className="truncate text-base font-semibold text-gray-900">{note.title || "Untitled note"}</h2>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                              {note.category && <span className="rounded-full bg-white px-2 py-0.5 text-gray-700">{note.category}</span>}
+                              {note.type && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">{note.type}</span>}
+                              <span>
+                                {new Date(note.createdAt).toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-white px-2 py-1 text-xs font-medium text-indigo-700">
+                            {note.score}%
+                          </span>
+                        </div>
+                        <p className="text-sm leading-6 text-gray-700">{note.resurfacingReason}</p>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-                  {note.tags.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {note.tags.slice(0, 6).map((tag) => (
-                        <span key={`${note.id}-${tag}`} className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
-                          #{tag}
-                        </span>
-                      ))}
+              <div className="space-y-3">
+                {results.map((note) => (
+                  <Link
+                    key={note.id}
+                    href={`/notes/${note.id}`}
+                    className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40"
+                  >
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <h2 className="truncate text-base font-semibold text-gray-900">{note.title || "Untitled note"}</h2>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                          {note.category && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">{note.category}</span>}
+                          {note.type && <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">{note.type}</span>}
+                          <span>
+                            {new Date(note.createdAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
+                          {note.suggestedProject && <span>Project: {note.suggestedProject}</span>}
+                        </div>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
+                        {note.score}%
+                      </span>
                     </div>
-                  )}
-                </Link>
-              ))}
+
+                    <p className="text-sm leading-6 text-gray-700">
+                      {renderHighlightedSnippet(note.snippet || note.summary || note.rawContent, note.matchedTerms)}
+                    </p>
+
+                    {note.tags.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {note.tags.slice(0, 6).map((tag) => (
+                          <span key={`${note.id}-${tag}`} className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
         </section>

@@ -129,4 +129,44 @@ describe("enrichNote", () => {
 
     expect(mockedUpdate).toHaveBeenCalled();
   });
+
+  it("persists a duplicate suggestion when an older note clears the overlap threshold", async () => {
+    mockedEmbedNote
+      .mockResolvedValueOnce([1, 0])
+      .mockResolvedValueOnce([1, 0]);
+    mockedFindMany.mockResolvedValue([
+      {
+        id: "older-1",
+        title: "Previous invoice note",
+        summary: "Same billing follow-up",
+        rawContent: "Call Jim about invoices",
+        createdAt: new Date("2026-04-01T00:00:00.000Z"),
+        suggestedProject: null,
+        category: "Work",
+      },
+    ] as never);
+    mockedCosineSimilarity.mockReturnValue(0.94);
+
+    await enrichNote({
+      noteId: "n1",
+      userId: "u1",
+      rawContent: "Call Jim about invoices",
+      fallbackTags: [],
+    });
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(2);
+    const lastCall = mockedUpdate.mock.calls.at(-1);
+
+    expect(lastCall?.[0]).toEqual({
+      where: { id: "n1" },
+      data: expect.objectContaining({
+        aiMeta: expect.objectContaining({
+          duplicateSuggestion: expect.objectContaining({
+            note: expect.objectContaining({ id: "older-1" }),
+            score: 0.94,
+          }),
+        }),
+      }),
+    });
+  });
 });

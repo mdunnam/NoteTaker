@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
 import { cosineSimilarity, embedNote, organizeNote } from "@/lib/ai";
+import { buildDuplicateSuggestion, type SimilarityCandidate } from "@/lib/overlapSignals";
 import { toPgVectorLiteral } from "@/lib/pgvector";
 import {
   buildThinkingMemoryPrompt,
@@ -63,6 +64,13 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
       clarificationQuestionStats: thinkingMemory.clarificationQuestionStats,
     });
 
+    const baseAiMeta = {
+      ...existingAiMeta,
+      intent: organized.intent || null,
+      nextAction: organized.nextAction || null,
+      clarificationQuestions: organized.clarificationQuestions || [],
+    };
+
     await prisma.note.update({
       where: { id: noteId },
       data: {
@@ -77,12 +85,7 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
         extractedEntities: organized.extractedEntities || null,
         confidenceScore: organized.confidenceScore,
         priority: organized.priority || "medium",
-        aiMeta: {
-          ...existingAiMeta,
-          intent: organized.intent || null,
-          nextAction: organized.nextAction || null,
-          clarificationQuestions: organized.clarificationQuestions || [],
-        } as unknown as Prisma.InputJsonValue,
+        aiMeta: baseAiMeta as unknown as Prisma.InputJsonValue,
         status: "PROCESSED",
       },
     });
@@ -138,12 +141,20 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
             isArchived: false,
             status: "PROCESSED",
           },
-          select: { id: true, title: true, summary: true, rawContent: true },
+          select: {
+            id: true,
+            title: true,
+            summary: true,
+            rawContent: true,
+            createdAt: true,
+            suggestedProject: true,
+            category: true,
+          },
           orderBy: { createdAt: "desc" },
           take: 25,
         });
 
-        const scored: Array<{ id: string; score: number }> = [];
+        const scored: SimilarityCandidate[] = [];
 
         for (const candidate of candidates) {
           const candidateText = `${candidate.title || ""}\n${candidate.summary || candidate.rawContent}`.trim();
@@ -151,10 +162,28 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
           if (candidateEmbedding.length === 0) continue;
 
           const score = cosineSimilarity(sourceEmbedding, candidateEmbedding);
-          if (score >= 0.78) scored.push({ id: candidate.id, score });
+          if (score >= 0.78) {
+            scored.push({
+              id: candidate.id,
+              title: candidate.title,
+              summary: candidate.summary,
+              createdAt: candidate.createdAt,
+              suggestedProject: candidate.suggestedProject,
+              category: candidate.category,
+              score,
+            });
+          }
         }
 
         const topMatches = scored.sort((a, b) => b.score - a.score).slice(0, 5);
+        const duplicateSuggestion = buildDuplicateSuggestion(
+          {
+            suggestedProject: organized.suggestedProject || currentNoteHints?.suggestedProject || null,
+            category: organized.category || currentNoteHints?.category || null,
+          },
+          scored,
+          0.9
+        );
 
         for (const match of topMatches) {
           const [sourceNoteId, targetNoteId] = [noteId, match.id].sort();
@@ -165,6 +194,20 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
             create: { sourceNoteId, targetNoteId, score: match.score, reason: "Embedding similarity" },
           });
         }
+
+        const nextAiMeta = { ...baseAiMeta } as Record<string, unknown>;
+        if (duplicateSuggestion) {
+          nextAiMeta.duplicateSuggestion = duplicateSuggestion as unknown;
+        } else {
+          delete nextAiMeta.duplicateSuggestion;
+        }
+
+        await prisma.note.update({
+          where: { id: noteId },
+          data: {
+            aiMeta: nextAiMeta as Prisma.InputJsonValue,
+          },
+        });
       }
     } catch (relationError) {
       console.error("Error creating related-note links:", relationError);
