@@ -97,9 +97,9 @@ const SplitNotesSchema = z.object({
 const SynthesizedNotesSchema = z.object({
   title: z.string(),
   summary: z.string(),
-  themes: z.array(z.string()).max(6),
-  actions: z.array(z.string()).max(6),
-  openQuestions: z.array(z.string()).max(6),
+  themes: z.array(z.string()).max(6).default([]),
+  actions: z.array(z.string()).max(6).default([]),
+  openQuestions: z.array(z.string()).max(6).default([]),
   dominantProject: z.string().nullable().optional(),
   dominantCategory: z.string().nullable().optional(),
   plan: z.object({
@@ -109,10 +109,10 @@ const SynthesizedNotesSchema = z.object({
       title: z.string(),
       detail: z.string(),
       horizon: z.enum(["now", "next", "later"]),
-    })).min(2).max(6),
-    risks: z.array(z.string()).max(5),
+    })).max(6).default([]),
+    risks: z.array(z.string()).max(5).default([]),
     successSignal: z.string(),
-  }),
+  }).optional(),
 });
 
 /**
@@ -573,7 +573,25 @@ export async function synthesizeNotes(
     });
 
     const raw = completion.choices[0]?.message?.content || "{}";
-    const parsed = SynthesizedNotesSchema.parse(JSON.parse(raw));
+    let parsed: z.infer<typeof SynthesizedNotesSchema>;
+    const parseResult = SynthesizedNotesSchema.safeParse(JSON.parse(raw));
+    if (!parseResult.success) {
+      console.error("SynthesizedNotesSchema parse error:", parseResult.error.issues);
+      return buildSynthesisFallback(notes);
+    }
+    parsed = parseResult.data;
+
+    // Build a default plan if the AI omitted it
+    const plan = parsed.plan ?? {
+      objective: "Review the synthesized notes and define one clear next step.",
+      firstMove: parsed.actions[0] || "Choose the most important action from the synthesis.",
+      steps: [
+        { title: "Clarify the goal", detail: "Decide what outcome matters most from these notes.", horizon: "now" as const },
+        { title: "Take the first action", detail: parsed.actions[0] || "Execute on the top action.", horizon: "next" as const },
+      ],
+      risks: [],
+      successSignal: "One concrete next step identified and underway.",
+    };
 
     return {
       title: parsed.title,
@@ -583,7 +601,7 @@ export async function synthesizeNotes(
       openQuestions: parsed.openQuestions,
       dominantProject: parsed.dominantProject || null,
       dominantCategory: parsed.dominantCategory || null,
-      plan: parsed.plan,
+      plan,
       noteCount: notes.length,
       sourceNoteIds: notes.map((note) => note.id),
     };

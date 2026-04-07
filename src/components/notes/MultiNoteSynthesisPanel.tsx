@@ -85,14 +85,18 @@ export default function MultiNoteSynthesisPanel({
         }),
       });
 
+      const payload = await response.json();
+
       if (!response.ok) {
-        throw new Error("Failed to synthesize selected notes");
+        const serverError = (payload as { error?: string })?.error;
+        throw new Error(serverError || `Server error ${response.status}`);
       }
 
-      setResult((await response.json()) as SynthesisResult);
+      setResult(payload as SynthesisResult);
     } catch (synthesisError) {
       console.error("Error synthesizing notes:", synthesisError);
-      setError("Could not synthesize the selected notes.");
+      const msg = synthesisError instanceof Error ? synthesisError.message : "Could not synthesize the selected notes.";
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
