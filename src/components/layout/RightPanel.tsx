@@ -4,10 +4,12 @@ import { prisma } from "@/lib/db";
 import ReclassificationQueue from "@/components/notes/ReclassificationQueue";
 import RightPanelContextual from "@/components/layout/RightPanelContextual";
 import ResurfacingRail from "@/components/notes/ResurfacingRail";
+import TimeResurfacingWidget from "@/components/notes/TimeResurfacingWidget";
 import { getUserForgottenNoteCandidates, getUserReviewPatterns } from "@/lib/resurfacing";
 import { getThinkingMemory, isReviewItemSuppressed } from "@/lib/userMemory";
 import { getNoteHealthAssessment, summarizeWorkspaceHealth } from "@/lib/noteHealth";
 import { getFirstClarificationQuestion, getPriorityQueueItems } from "@/lib/rightPanelQueues";
+import { buildTimeResurfacingSummary } from "@/lib/timeResurfacing";
 
 /**
  * Right panel showing live note health, active queues, and recent extracted tasks.
@@ -166,6 +168,10 @@ export default async function RightPanel() {
     (pattern) => !isReviewItemSuppressed(thinkingMemory.reviewState, "pattern", pattern.id)
   );
   const priorityQueueItems = getPriorityQueueItems(highPriorityNotes, 3);
+  const timeResurfacingSummary = buildTimeResurfacingSummary(healthNotes, {
+    reviewPatterns: visibleReviewPatterns,
+    reclassificationCount: reclassificationCandidates.length,
+  });
 
   const extractedTasks: Array<{
     noteId: string;
@@ -269,6 +275,8 @@ export default async function RightPanel() {
             />
           </div>
         )}
+
+        <TimeResurfacingWidget summary={timeResurfacingSummary} />
 
         <div className="pt-6 border-t border-gray-200">
           <h3 className="font-semibold text-sm mb-3">Recent Extracted Tasks</h3>

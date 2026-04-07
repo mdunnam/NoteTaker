@@ -1,6 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { buildSynthesisProjectPayload, canCreateProjectFromSynthesis } from "@/lib/synthesisProject";
 
 export interface SynthesisSelectableNote {
   id: string;
@@ -29,6 +32,7 @@ interface SynthesisResult {
     successSignal: string;
   };
   noteCount: number;
+  sourceNoteIds: string[];
 }
 
 interface MultiNoteSynthesisPanelProps {
@@ -47,15 +51,19 @@ export default function MultiNoteSynthesisPanel({
   compact = false,
   planningGoalPlaceholder = "Optional planning lens: ship this week, prep client meeting, unblock launch...",
 }: MultiNoteSynthesisPanelProps) {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SynthesisResult | null>(null);
   const [planningGoal, setPlanningGoal] = useState("");
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [createdCollectionId, setCreatedCollectionId] = useState<string | null>(null);
 
   const effectiveNotes = notes.slice(0, MAX_SYNTHESIS_NOTES);
   const selectedIds = effectiveNotes.map((note) => note.id);
   const canSynthesize = selectedIds.length >= 2;
   const overflowCount = Math.max(0, notes.length - effectiveNotes.length);
+  const canCreateProject = result ? canCreateProjectFromSynthesis(result) : false;
 
   /** Submit the selected note set to the synthesis endpoint. */
   const runSynthesis = async () => {
@@ -65,6 +73,7 @@ export default function MultiNoteSynthesisPanel({
 
     setIsLoading(true);
     setError(null);
+    setCreatedCollectionId(null);
 
     try {
       const response = await fetch("/api/synthesis", {
@@ -86,6 +95,37 @@ export default function MultiNoteSynthesisPanel({
       setError("Could not synthesize the selected notes.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  /** Turn a strong synthesis into a collection-backed project. */
+  const handleCreateProject = async () => {
+    if (!result || !canCreateProject) {
+      return;
+    }
+
+    setIsCreatingProject(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildSynthesisProjectPayload(result)),
+      });
+
+      const payload = await response.json() as { id?: string; error?: string };
+      if (!response.ok || !payload.id) {
+        throw new Error(payload.error || "Failed to create project from synthesis");
+      }
+
+      setCreatedCollectionId(payload.id);
+      router.refresh();
+    } catch (projectError) {
+      console.error("Error creating project from synthesis:", projectError);
+      setError("Could not turn this synthesis into a project.");
+    } finally {
+      setIsCreatingProject(false);
     }
   };
 
@@ -189,6 +229,33 @@ export default function MultiNoteSynthesisPanel({
               {result.dominantProject && result.dominantCategory ? " · " : ""}
               {result.dominantCategory ? `Category: ${result.dominantCategory}` : ""}
             </p>
+          )}
+
+          {canCreateProject && (
+            <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">Auto-Project</p>
+                  <p className={`mt-1 text-emerald-900 ${compact ? "text-[11px]" : "text-xs"}`}>
+                    This looks like a project. Create a collection from the synthesis title and source notes.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleCreateProject()}
+                  disabled={isCreatingProject || Boolean(createdCollectionId)}
+                  className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
+                >
+                  {createdCollectionId ? "Created" : isCreatingProject ? "Creating..." : "Turn into project"}
+                </button>
+              </div>
+
+              {createdCollectionId && (
+                <Link href={`/collections/${createdCollectionId}`} className="mt-3 inline-block text-xs font-medium text-emerald-800 underline underline-offset-2">
+                  Open project collection
+                </Link>
+              )}
+            </div>
           )}
         </div>
       )}

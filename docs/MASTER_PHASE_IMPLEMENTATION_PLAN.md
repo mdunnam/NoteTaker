@@ -64,6 +64,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Shared right-panel priority task queue, low-confidence queue, and reclassification queue on non-detail routes
 - Duplicate-overlap cues persisted at enrichment time and surfaced on note detail
 - Context-aware resurfacing on note detail and semantic search with older-note recall under active date filters
+- In-app time-based resurfacing widget for today's tasks, daily connections, and weekly thread counts
 - Resurfacing signals visible outside Review in Inbox and the shared right panel
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
@@ -98,6 +99,7 @@ Shipped:
 - shared right-panel queues for high-priority tasks, sub-0.5 confidence notes, and reclassification candidates
 - note-detail duplicate-overlap cues persisted from enrichment-time similarity checks
 - context-aware resurfacing cues on note detail and in semantic search when older matches are hidden by date filters
+- in-app time-based resurfacing widget for daily tasks, same-day note connections, and weekly signal counts
 - planning outputs layered onto the synthesis route with objective, first move, steps, risks, and success signal
 - project/topic cluster planning directly from the Projects and Topics surfaces
 - review planning workflows that turn queue slices into synthesis and action plans
@@ -1039,6 +1041,15 @@ UI: RightPanel — "You've thought about this before" section
 
 ### 12.4 Time-Based Resurfacing
 
+Shipped now:
+- Shared RightPanel widget for today's extracted tasks
+- Same-day "ideas might connect" cues based on shared project/category/tag signals
+- Weekly counts for patterns, regrouping signals, and thread candidates
+
+Still missing:
+- Scheduled delivery outside the in-app widget
+- Optional email digest later
+
 Scheduled nudges:
 - Morning: today's extracted tasks from all recent notes
 - Evening: "These ideas from today might connect"
@@ -1052,7 +1063,7 @@ Implementation path: in-app widget first, optional email digest later.
 
 Shipped now:
 - Enrichment persists a near-duplicate suggestion in `aiMeta` when overlap exceeds the duplicate threshold
-- Note detail surfaces that overlap as "You may have captured this before" with a comparison workflow
+- Note detail surfaces that overlap as "You may have captured this before" with a comparison workflow and quick link action
 
 Detect when a new note covers ground already in the corpus.
 
@@ -1091,6 +1102,10 @@ UI:
 ---
 
 ### 13.2 Auto-Project from Synthesis
+
+Shipped now:
+- Strong synthesis outputs can be turned into a collection-backed project directly from the synthesis panel
+- The created collection uses the synthesis title and links the synthesis source notes in one step
 
 When synthesis output meets threshold (3+ distinct tasks, coherent goal):
 - Suggestion: "This looks like a project — create one?"

@@ -403,6 +403,28 @@ export default function RightPanelContextual() {
           {insights.duplicateSuggestion.note.summary && (
             <p className="mt-1 line-clamp-2 text-[11px] text-rose-800">{insights.duplicateSuggestion.note.summary}</p>
           )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleAcceptSuggestedLink({
+                id: insights.duplicateSuggestion.note.id,
+                title: insights.duplicateSuggestion.note.title,
+                summary: insights.duplicateSuggestion.note.summary,
+                score: insights.duplicateSuggestion.score,
+                reason: insights.duplicateSuggestion.reason,
+              })}
+              disabled={acceptingLinkId === insights.duplicateSuggestion.note.id || isApplyingSuggestion}
+              className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-60"
+            >
+              {acceptingLinkId === insights.duplicateSuggestion.note.id ? "Linking..." : "Quick link"}
+            </button>
+            <Link
+              href={`/notes/${insights.duplicateSuggestion.note.id}`}
+              className="rounded-md border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Compare notes
+            </Link>
+          </div>
           <div className="mt-3">
             <MultiNoteSynthesisPanel
               notes={[
