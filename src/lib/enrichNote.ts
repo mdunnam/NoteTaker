@@ -6,7 +6,7 @@
 import { Prisma } from "@prisma/client";
 import { rescoreUserReclassificationQueue } from "@/lib/clusters";
 import { prisma } from "@/lib/db";
-import { cosineSimilarity, embedNote, organizeNote } from "@/lib/ai";
+import { cosineSimilarity, embedNote, embedNotes, organizeNote } from "@/lib/ai";
 import { buildDuplicateSuggestion, type SimilarityCandidate } from "@/lib/overlapSignals";
 import { toPgVectorLiteral } from "@/lib/pgvector";
 import {
@@ -154,15 +154,23 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
           take: 25,
         });
 
+        // Batch all candidate embeddings in a single API call instead of N individual calls
+        const candidateTexts = candidates.map((c) =>
+          `${c.title || ""}\n${c.summary || c.rawContent}`.trim()
+        );
+        const candidateEmbeddings = candidateTexts.length > 0
+          ? await embedNotes(candidateTexts)
+          : [];
+
         const scored: SimilarityCandidate[] = [];
 
-        for (const candidate of candidates) {
-          const candidateText = `${candidate.title || ""}\n${candidate.summary || candidate.rawContent}`.trim();
-          const candidateEmbedding = await embedNote(candidateText);
-          if (candidateEmbedding.length === 0) continue;
+        for (let i = 0; i < candidates.length; i++) {
+          const candidateEmbedding = candidateEmbeddings[i];
+          if (!candidateEmbedding || candidateEmbedding.length === 0) continue;
 
           const score = cosineSimilarity(sourceEmbedding, candidateEmbedding);
           if (score >= 0.78) {
+            const candidate = candidates[i];
             scored.push({
               id: candidate.id,
               title: candidate.title,
