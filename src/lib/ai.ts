@@ -573,13 +573,12 @@ export async function synthesizeNotes(
     });
 
     const raw = completion.choices[0]?.message?.content || "{}";
-    let parsed: z.infer<typeof SynthesizedNotesSchema>; // eslint-disable-line prefer-const
     const parseResult = SynthesizedNotesSchema.safeParse(JSON.parse(raw));
     if (!parseResult.success) {
       console.error("SynthesizedNotesSchema parse error:", parseResult.error.issues);
       return buildSynthesisFallback(notes);
     }
-    parsed = parseResult.data;
+    const parsed = parseResult.data;
 
     // Build a default plan if the AI omitted it
     const plan = parsed.plan ?? {
