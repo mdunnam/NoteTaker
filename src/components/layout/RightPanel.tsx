@@ -7,9 +7,10 @@ import ResurfacingRail from "@/components/notes/ResurfacingRail";
 import { getUserForgottenNoteCandidates, getUserReviewPatterns } from "@/lib/resurfacing";
 import { getThinkingMemory, isReviewItemSuppressed } from "@/lib/userMemory";
 import { getNoteHealthAssessment, summarizeWorkspaceHealth } from "@/lib/noteHealth";
+import { getFirstClarificationQuestion, getPriorityQueueItems } from "@/lib/rightPanelQueues";
 
 /**
- * Right panel showing live note health and recent extracted tasks.
+ * Right panel showing live note health, active queues, and recent extracted tasks.
  */
 export default async function RightPanel() {
   const session = await auth();
@@ -120,14 +121,15 @@ export default async function RightPanel() {
         userId: session.user.id,
         isArchived: false,
         status: "PROCESSED",
-        confidenceScore: { lt: 0.65 },
+        confidenceScore: { lt: 0.5 },
       },
-      orderBy: { updatedAt: "desc" },
-      take: 5,
+      orderBy: [{ confidenceScore: "asc" }, { updatedAt: "desc" }],
+      take: 3,
       select: {
         id: true,
         title: true,
         aiMeta: true,
+        confidenceScore: true,
       },
     }),
     prisma.note.findMany({
@@ -138,11 +140,11 @@ export default async function RightPanel() {
         priority: "high",
       },
       orderBy: { updatedAt: "desc" },
-      take: 5,
+      take: 20,
       select: {
         id: true,
         title: true,
-        aiMeta: true,
+        extractedTasks: true,
       },
     }),
     getUserReclassificationCandidates(session.user.id, 3),
@@ -163,6 +165,7 @@ export default async function RightPanel() {
   const visibleReviewPatterns = reviewPatterns.filter(
     (pattern) => !isReviewItemSuppressed(thinkingMemory.reviewState, "pattern", pattern.id)
   );
+  const priorityQueueItems = getPriorityQueueItems(highPriorityNotes, 3);
 
   const extractedTasks: Array<{
     noteId: string;
@@ -209,7 +212,7 @@ export default async function RightPanel() {
           <ReclassificationQueue
             candidates={reclassificationCandidates}
             compact
-            title="Changed Meaning"
+            title="Reclassification Queue"
           />
         )}
 
@@ -314,20 +317,20 @@ export default async function RightPanel() {
         <div className="pt-6 border-t border-gray-200">
           <h3 className="font-semibold text-sm mb-3">Needs Clarification</h3>
           {lowConfidenceNotes.length === 0 ? (
-            <p className="text-xs text-gray-600">No low-confidence notes right now.</p>
+            <p className="text-xs text-gray-600">No notes below 0.5 confidence right now.</p>
           ) : (
             <ul className="space-y-2">
               {lowConfidenceNotes.map((note) => {
-                const meta = (note.aiMeta || {}) as { clarificationQuestions?: string[] };
-                const question = Array.isArray(meta.clarificationQuestions) && meta.clarificationQuestions.length > 0
-                  ? meta.clarificationQuestions[0]
-                  : null;
+                const question = getFirstClarificationQuestion(note.aiMeta);
 
                 return (
                   <li key={note.id} className="rounded border border-amber-200 bg-amber-50 p-3">
                     <a href={`/notes/${note.id}`} className="text-xs font-medium text-amber-900 hover:underline">
                       {note.title || "Untitled note"}
                     </a>
+                    <p className="mt-1 text-[11px] text-amber-700">
+                      Confidence: {Math.round((note.confidenceScore || 0) * 100)}%
+                    </p>
                     {question && <p className="mt-1 text-[11px] text-amber-800">{question}</p>}
                   </li>
                 );
@@ -338,22 +341,19 @@ export default async function RightPanel() {
 
         <div className="pt-6 border-t border-gray-200">
           <h3 className="font-semibold text-sm mb-3">Priority Queue</h3>
-          {highPriorityNotes.length === 0 ? (
-            <p className="text-xs text-gray-600">No high-priority notes pending.</p>
+          {priorityQueueItems.length === 0 ? (
+            <p className="text-xs text-gray-600">No high-priority uncompleted tasks right now.</p>
           ) : (
             <ul className="space-y-2">
-              {highPriorityNotes.map((note) => {
-                const meta = (note.aiMeta || {}) as { nextAction?: string };
-
-                return (
-                  <li key={note.id} className="rounded border border-red-200 bg-red-50 p-3">
-                    <a href={`/notes/${note.id}`} className="text-xs font-medium text-red-900 hover:underline">
-                      {note.title || "Untitled note"}
-                    </a>
-                    {meta.nextAction && <p className="mt-1 text-[11px] text-red-800">Next: {meta.nextAction}</p>}
-                  </li>
-                );
-              })}
+              {priorityQueueItems.map((task, index) => (
+                <li key={`${task.noteId}-${index}`} className="rounded border border-red-200 bg-red-50 p-3">
+                  <div className="text-xs font-medium text-red-900">{task.text}</div>
+                  <a href={`/notes/${task.noteId}`} className="mt-1 block text-[11px] text-red-800 hover:underline">
+                    {task.noteTitle}
+                  </a>
+                  {task.dueDate && <p className="mt-1 text-[11px] text-red-700">Due: {task.dueDate}</p>}
+                </li>
+              ))}
             </ul>
           )}
         </div>

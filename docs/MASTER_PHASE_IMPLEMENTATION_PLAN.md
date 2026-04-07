@@ -61,6 +61,7 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Suggested semantic note links with one-click acceptance on note detail
 - Real collection detail pages with collection-level synthesis
 - Note-detail right-panel conversion actions for project creation, note splitting, and collection assignment
+- Shared right-panel priority task queue, low-confidence queue, and reclassification queue on non-detail routes
 - Resurfacing signals visible outside Review in Inbox and the shared right panel
 - Inferred project and topic clusters from existing notes, entities, tags, and project signals
 - Note-level reorganization suggestions when new context links an older note into a stronger project cluster
@@ -92,6 +93,7 @@ Shipped:
 - note-detail suggested semantic links with manual accept-link controls
 - collection detail browsing with collection-level synthesis
 - note-detail right-panel conversion actions for create-project, split-note, and collection assignment
+- shared right-panel queues for high-priority tasks, sub-0.5 confidence notes, and reclassification candidates
 - planning outputs layered onto the synthesis route with objective, first move, steps, risks, and success signal
 - project/topic cluster planning directly from the Projects and Topics surfaces
 - review planning workflows that turn queue slices into synthesis and action plans
@@ -914,10 +916,7 @@ Shipped additions:
 
 Still missing:
 
-**Global panel additions (non-detail routes):**
-- Priority queue: top 3 high-priority uncompleted tasks
-- Needs clarification: notes still under 0.5 confidence
-- Reclassification queue: top changed-meaning notes whose grouping likely improved
+- global-panel ranking and prioritization polish across routes
 
 ---
 
