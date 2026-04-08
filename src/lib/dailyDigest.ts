@@ -100,7 +100,9 @@ Return strict JSON matching this schema:
 // ─── Generator ─────────────────────────────────────────────────────────────
 
 export async function generateDailyDigest(userId: string): Promise<DigestContent> {
-  // Pull everything we need in parallel
+  const now = new Date();
+  const todayStr = now.toISOString().split("T")[0];
+
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().split("T")[0];
@@ -150,9 +152,6 @@ export async function generateDailyDigest(userId: string): Promise<DigestContent
       select: { content: true },
     }),
   ]);
-
-  const now = new Date();
-  const todayStr = now.toISOString().split("T")[0];
 
   // Separate today's dumps from older notes
   const todayStart = new Date(todayStr + "T00:00:00Z");
