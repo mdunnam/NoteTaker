@@ -33,9 +33,8 @@ export default async function HomePage() {
 
     prisma.entity.findMany({
       where: { userId },
-      orderBy: { mentionCount: "desc" },
-      take: 6,
-      select: { id: true, name: true, type: true, mentionCount: true },
+      take: 20,
+      select: { id: true, name: true, type: true, _count: { select: { notes: true } } },
     }),
   ]);
 
@@ -43,6 +42,7 @@ export default async function HomePage() {
   const projects = new Set(allNotes.map((n) => n.suggestedProject).filter(Boolean));
   const tags = new Set(allNotes.flatMap((n) => n.tags));
   const lastActivity = allNotes[0]?.updatedAt ?? null;
+  const topEntities = [...entities].sort((a, b) => b._count.notes - a._count.notes).slice(0, 6);
 
   const isEmpty = totalNotes === 0;
 
@@ -161,7 +161,7 @@ export default async function HomePage() {
                   >
                     <span className="text-[10px] font-semibold uppercase text-gray-400">{entity.type}</span>
                     <span className="text-gray-800">{entity.name}</span>
-                    <span className="text-[11px] text-gray-400">{entity.mentionCount}</span>
+                    <span className="text-[11px] text-gray-400">{entity._count.notes}</span>
                   </Link>
                 ))}
                 <Link href="/entities" className="flex items-center rounded-full border border-dashed border-gray-300 px-3 py-1.5 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">

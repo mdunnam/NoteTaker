@@ -34,6 +34,7 @@ export default async function EntityDetailPage({ params }: Props) {
         },
         orderBy: { note: { updatedAt: "desc" } },
       },
+      _count: { select: { notes: true } },
     },
   });
 
@@ -52,7 +53,7 @@ export default async function EntityDetailPage({ params }: Props) {
         <span className={`rounded-full px-3 py-1 text-xs font-semibold ${TYPE_COLORS[type] ?? "bg-gray-100 text-gray-700"}`}>
           {type}
         </span>
-        <span className="text-sm text-gray-500">{entity.mentionCount} mentions</span>
+        <span className="text-sm text-gray-500">{entity._count.notes} mention{entity._count.notes === 1 ? "" : "s"}</span>
       </div>
 
       {activeNotes.length === 0 ? (

@@ -20,9 +20,11 @@ export default async function EntitiesPage() {
 
   const entities = await prisma.entity.findMany({
     where: { userId: session.user.id },
-    orderBy: [{ type: "asc" }, { mentionCount: "desc" }],
-    select: { id: true, name: true, type: true, mentionCount: true },
+    select: { id: true, name: true, type: true, _count: { select: { notes: true } } },
   });
+
+  // Sort: by type order, then by note count desc
+  entities.sort((a, b) => b._count.notes - a._count.notes);
 
   const grouped = TYPE_ORDER.reduce<Record<string, typeof entities>>((acc, type) => {
     acc[type] = entities.filter((e) => e.type === type);
@@ -57,7 +59,7 @@ export default async function EntitiesPage() {
                     className={`flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-sm font-medium hover:opacity-80 transition-opacity ${TYPE_COLORS[type] ?? "bg-gray-100 text-gray-700"}`}
                   >
                     {entity.name}
-                    <span className="text-[11px] opacity-60">{entity.mentionCount}</span>
+                    {entity._count.notes > 0 && <span className="text-[11px] opacity-60">{entity._count.notes}</span>}
                   </Link>
                 ))}
               </div>
