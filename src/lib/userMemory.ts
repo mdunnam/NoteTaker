@@ -58,6 +58,7 @@ interface ThinkingMemory {
   knownContexts: MemoryItem[];
   knownPeople: MemoryItem[];
   knownTopics: MemoryItem[];
+  identityAliases: string[]; // Names/aliases that refer to the user themselves
   hintStats: HintStat[];
   reviewState: ReviewState;
   reviewActionStats: ReviewActionStat[];
@@ -135,6 +136,7 @@ function emptyMemory(): ThinkingMemory {
     knownContexts: [],
     knownPeople: [],
     knownTopics: [],
+    identityAliases: [],
     hintStats: [],
     reviewState: {
       forgottenNotes: [],
@@ -467,6 +469,9 @@ export async function getThinkingMemory(userId: string): Promise<ThinkingMemory>
     knownContexts: parseMemoryBucket(raw.knownContexts),
     knownPeople: parseMemoryBucket(raw.knownPeople),
     knownTopics: parseMemoryBucket(raw.knownTopics),
+    identityAliases: Array.isArray(raw.identityAliases)
+      ? (raw.identityAliases as unknown[]).filter((v): v is string => typeof v === "string" && v.trim().length > 0).slice(0, 10)
+      : [],
     hintStats: parseHintStats(raw.hintStats),
     reviewState: pruneReviewState(parseReviewState(raw.reviewState)),
     reviewActionStats: sortReviewActionStats(parseReviewActionStats(raw.reviewActionStats)),
@@ -523,12 +528,18 @@ export function buildThinkingMemoryPrompt(memory: ThinkingMemory): string {
     return `${label}: ${formatted}`;
   };
 
-  return [
+  const lines = [
     formatBucket("Known projects", memory.knownProjects),
     formatBucket("Known contexts", memory.knownContexts),
     formatBucket("Frequent people", memory.knownPeople),
     formatBucket("Frequent topics", memory.knownTopics),
-  ].join("\n");
+  ];
+
+  if (memory.identityAliases.length > 0) {
+    lines.push(`The user's own name/aliases (never treat as another person): ${memory.identityAliases.join(", ")}`);
+  }
+
+  return lines.join("\n");
 }
 
 /**

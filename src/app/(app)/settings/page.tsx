@@ -14,6 +14,7 @@ import AIPerformancePanel from "@/components/settings/AIPerformancePanel";
 import ReviewStatePanel from "@/components/settings/ReviewStatePanel";
 import ClarificationFeedbackPanel from "@/components/settings/ClarificationFeedbackPanel";
 import CaptureFromAnywherePanel from "@/components/settings/CaptureFromAnywherePanel";
+import IdentityAliasesPanel from "@/components/settings/IdentityAliasesPanel";
 
 /**
  * User settings page.
@@ -46,6 +47,14 @@ export default async function SettingsPage() {
       <h1 className="mb-2 text-3xl font-bold text-gray-900">Settings</h1>
       <p className="mb-6 text-gray-600">Manage your profile and account preferences.</p>
       <SettingsClient name={user.name} email={user.email} />
+
+      <div className="mt-10 max-w-xl">
+        <h2 className="mb-1 text-xl font-bold text-gray-900">Your Identity</h2>
+        <p className="mb-4 text-sm text-gray-600">
+          Tell QNote which names refer to you. The AI will never flag these as other people in your daily digest or briefings.
+        </p>
+        <IdentityAliasesPanel />
+      </div>
 
       <div className="mt-10 max-w-5xl">
         <h2 className="mb-1 text-xl font-bold text-gray-900">AI Performance</h2>

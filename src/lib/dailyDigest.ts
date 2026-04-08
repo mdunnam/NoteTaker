@@ -203,6 +203,11 @@ export async function generateDailyDigest(userId: string): Promise<DigestContent
     contextLines.push(JSON.stringify(memory.knownProjects));
   }
 
+  if (memory?.identityAliases && Array.isArray(memory.identityAliases) && memory.identityAliases.length > 0) {
+    contextLines.push(`\n=== USER'S OWN NAMES (never treat as other people) ===`);
+    contextLines.push((memory.identityAliases as string[]).join(", "));
+  }
+
   contextLines.push(`\n=== CURRENT DATE ===`);
   contextLines.push(now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" }));
 
