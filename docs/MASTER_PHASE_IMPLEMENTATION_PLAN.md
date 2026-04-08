@@ -21,7 +21,7 @@ The product target:
 
 The product wins when users say: *"I forgot I even wrote that, and it brought it back because it connected to what I am working on right now."*
 
-## 2. Current Engineering State (2026-04-04)
+## 2. Current Engineering State (2026-04-08)
 
 ### 2.1 Delivery Status
 
@@ -73,6 +73,9 @@ The product wins when users say: *"I forgot I even wrote that, and it brought it
 - Related note relation links
 - Contextual right panel on note detail routes
 - Durable enrichment queue (`NoteJob`) with worker retry loop
+- **File import pipeline** (`POST /api/import`) — up to 50 files, 50 MB each, text extracted server-side, one note created per file and enqueued for AI enrichment
+- **File parser** (`src/lib/fileParser.ts`) — supports PDF (pdf-parse v1), DOCX/DOC/RTF (mammoth), XLSX/XLS (xlsx), CSV, TXT, MD, JSON, PPTX (metadata stub)
+- **Daily Digest** (`/dashboard`) — AI-generated daily briefing that reads all notes, entities, tasks, and thinking memory and produces a personalised chief-of-staff-style briefing. Sections: open loops (who asked you something and didn't get a reply), upcoming (events with prep suggestions), active projects (status + next step), today's sparks (new ideas from today's dump), clarify (ambiguous notes with direct questions), wins. Generated once per day and cached in DB; user can force-regenerate. Surfaced at `/dashboard`, linked as first item in sidebar.
 
 ### 2.2 Current Product Boundary
 
@@ -110,6 +113,8 @@ Shipped:
 - Tauri desktop helper scaffold with a global shortcut that launches the browser capture flow
 - AI performance visibility and learn-from-hint interactions
 - AI performance visibility for clarification-noise trends and learn-from-hint interactions
+- **File import** — multipart upload of PDF, DOCX, XLSX, CSV, TXT, MD, JSON files; text extracted server-side; each file becomes one enriched note
+- **Daily Digest** — `/dashboard` with AI chief-of-staff briefing generated daily; open loops, upcoming events, active projects, today’s sparks, clarify questions, wins; cached per day in `DailyDigest` table; force-regenerate button
 
 Not yet shipped:
 - Fully packaged offline desktop capture app
