@@ -25,6 +25,7 @@ model User {
   preferences   UserPreferences?
   apiKeys       ApiKey[]
   metricSnapshots UserMetricSnapshot[]
+  dailyDigests  DailyDigest[]
 
   @@index([email])
 }
@@ -225,6 +226,23 @@ model NoteEntity {
   @@unique([noteId, entityId])
   @@index([noteId])
   @@index([entityId])
+}
+
+// Daily AI briefing — generated once per day, cached, regenerated on demand
+model DailyDigest {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  date        String   // "YYYY-MM-DD" in user's local date
+  content     Json     // DigestContent — structured briefing
+  noteCount   Int      @default(0) // notes in scope when generated
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
 }
 
 // API keys for various services

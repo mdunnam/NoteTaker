@@ -22,11 +22,18 @@ import {
   Grid3x3,
   Home,
   Users,
+  LayoutDashboard,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 
 const primaryItems = [
+  {
+    label: "Daily Digest",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    description: "Your daily briefing",
+  },
   {
     label: "Home",
     href: "/home",
