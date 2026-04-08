@@ -82,18 +82,10 @@ export async function parseFile(file: File): Promise<ParsedFile> {
     }
     const pdfParseModule = await import("pdf-parse");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const PDFParse = (pdfParseModule as any).PDFParse ?? pdfParseModule.default ?? pdfParseModule;
-    let text = "";
-    if (typeof PDFParse === "function" && PDFParse.prototype?.getText) {
-      // pdf-parse v2 class API
-      const instance = new PDFParse(new Uint8Array(buffer));
-      const result = await instance.getText();
-      text = typeof result === "string" ? result : (result as { text?: string }).text ?? "";
-    } else {
-      // pdf-parse v1 function API
-      const result = await PDFParse(new Uint8Array(buffer));
-      text = result.text ?? "";
-    }
+    const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
+    // pdf-parse v1: simple function, no worker, works in serverless/Vercel
+    const result = await pdfParse(Buffer.from(buffer));
+    const text = result.text ?? "";
     return { filename: name, text: truncate(clean(text), name), suggestedChunks: 1 };
   }
 
