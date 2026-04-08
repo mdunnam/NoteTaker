@@ -14,12 +14,15 @@ const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
-// ─── Schema ────────────────────────────────────────────────────────────────
+import type { DigestContent, DigestSection, DigestItem } from "@/lib/digestTypes";
+export type { DigestContent, DigestSection, DigestItem };
+
+// ─── Zod schema (server-side validation only) ────────────────────────────────────────────
 
 const DigestItemSchema = z.object({
-  id: z.string(),           // stable key for React
-  text: z.string(),         // the headline line
-  detail: z.string().optional(), // optional expanded context
+  id: z.string(),
+  text: z.string(),
+  detail: z.string().optional(),
   noteIds: z.array(z.string()).default([]),
   urgency: z.enum(["high", "medium", "low"]).default("medium"),
 });
@@ -31,16 +34,12 @@ const DigestSectionSchema = z.object({
   items: z.array(DigestItemSchema),
 });
 
-export const DigestContentSchema = z.object({
-  greeting: z.string(),     // personalised opener
-  summary: z.string(),      // 1-2 sentence "here's what's going on"
+const DigestContentSchema = z.object({
+  greeting: z.string(),
+  summary: z.string(),
   sections: z.array(DigestSectionSchema),
-  generatedAt: z.string(),  // ISO timestamp
+  generatedAt: z.string(),
 });
-
-export type DigestContent = z.infer<typeof DigestContentSchema>;
-export type DigestSection = z.infer<typeof DigestSectionSchema>;
-export type DigestItem = z.infer<typeof DigestItemSchema>;
 
 // ─── Prompt ────────────────────────────────────────────────────────────────
 

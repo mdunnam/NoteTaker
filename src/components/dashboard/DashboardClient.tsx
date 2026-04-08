@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { DigestContent, DigestSection, DigestItem } from "@/lib/dailyDigest";
+import type { DigestContent, DigestSection, DigestItem } from "@/lib/digestTypes";
 
 interface Props {
   digest: DigestContent;
