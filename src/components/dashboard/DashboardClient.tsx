@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import type { DigestContent, DigestSection, DigestItem } from "@/lib/dailyDigest";
 
 interface Props {
@@ -83,9 +82,8 @@ function SectionBlock({ section }: { section: DigestSection }) {
   );
 }
 
-export default function DashboardClient({ digest, dateStr }: Props) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+export default function DashboardClient({ digest: initialDigest, dateStr }: Props) {
+  const [digest, setDigest] = useState<DigestContent>(initialDigest);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   const generatedAt = digest.generatedAt
@@ -95,8 +93,11 @@ export default function DashboardClient({ digest, dateStr }: Props) {
   async function handleRegenerate() {
     setIsRegenerating(true);
     try {
-      await fetch("/api/digest", { method: "POST" });
-      startTransition(() => router.refresh());
+      const res = await fetch("/api/digest", { method: "POST" });
+      if (res.ok) {
+        const fresh: DigestContent = await res.json();
+        setDigest(fresh);
+      }
     } finally {
       setIsRegenerating(false);
     }
@@ -125,11 +126,11 @@ export default function DashboardClient({ digest, dateStr }: Props) {
           </div>
           <button
             onClick={handleRegenerate}
-            disabled={isRegenerating || isPending}
+            disabled={isRegenerating}
             className="shrink-0 flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50 disabled:opacity-50 transition-colors"
           >
-            <span className={isRegenerating || isPending ? "animate-spin" : ""}>⟳</span>
-            {isRegenerating || isPending ? "Thinking…" : "Refresh"}
+            <span className={isRegenerating ? "animate-spin inline-block" : ""}>⟳</span>
+            {isRegenerating ? "Thinking…" : "Refresh"}
           </button>
         </div>
 
