@@ -32,7 +32,6 @@ export default async function EntityDetailPage({ params }: Props) {
             select: { id: true, title: true, summary: true, tags: true, category: true, updatedAt: true, isArchived: true },
           },
         },
-        orderBy: { note: { updatedAt: "desc" } },
       },
       _count: { select: { notes: true } },
     },
@@ -40,7 +39,9 @@ export default async function EntityDetailPage({ params }: Props) {
 
   if (!entity) notFound();
 
-  const activeNotes = entity.notes.filter((ne) => !ne.note.isArchived);
+  const activeNotes = entity.notes
+    .filter((ne) => !ne.note.isArchived)
+    .sort((a, b) => new Date(b.note.updatedAt).getTime() - new Date(a.note.updatedAt).getTime());
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
