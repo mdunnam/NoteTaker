@@ -57,8 +57,8 @@ export default async function NoteDetailPage({ params }: NoteDetailPageProps) {
   return (
     <div className="mx-auto max-w-4xl p-6">
       <div className="mb-4">
-        <Link href="/inbox" className="text-sm text-blue-600 hover:underline">
-          ← Back to Inbox
+        <Link href="/home" className="text-sm text-blue-600 hover:underline">
+          ← Home
         </Link>
       </div>
 

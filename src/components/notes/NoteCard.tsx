@@ -4,15 +4,13 @@
 
 "use client";
 
-import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
+import { Archive, Check, MoreHorizontal, Pencil, Pin, Trash2, X } from "lucide-react";
 import { parseNoteAiMeta } from "@/lib/clarification";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ClarificationLoop from "@/components/notes/ClarificationLoop";
 import SplitNoteModal from "@/components/notes/SplitNoteModal";
 import { getConfidenceBadgeConfig } from "@/lib/confidence";
-import NoteHealthBadge from "@/components/notes/NoteHealthBadge";
-import { getNoteHealthAssessment } from "@/lib/noteHealth";
 
 export interface NoteData {
   id: string;
@@ -58,12 +56,12 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
   const [editCollectionId, setEditCollectionId] = useState(note.collection?.id || "");
   const [isSaving, setIsSaving] = useState(false);
   const [collections, setCollections] = useState<CollectionOption[]>([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
   const [splitMessage, setSplitMessage] = useState<string | null>(null);
   const [summaryMessage, setSummaryMessage] = useState<string | null>(null);
   const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
   const confidenceBadge = getConfidenceBadgeConfig(note.confidenceScore);
-  const noteHealth = getNoteHealthAssessment(note);
   const aiMeta = parseNoteAiMeta(note.aiMeta);
   const hasClarifications = (aiMeta.clarificationQuestions?.length ?? 0) > 0 && (note.confidenceScore ?? 1) < 0.65;
 
@@ -209,9 +207,7 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
   };
 
   return (
-    <div className={`border rounded-lg p-4 transition-all ${
-      note.isPinned ? "border-blue-500 bg-blue-50" : "border-gray-200 bg-white"
-    }`}>
+    <div className={`relative border rounded-xl p-4 transition-all ${note.isPinned ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-white"}`}>
       {splitMessage && (
         <div className="mb-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">
           {splitMessage}
@@ -229,97 +225,67 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             {note.priority === "high" && (
-              <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                High
-              </span>
+              <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700">High</span>
             )}
             {note.priority === "medium" && (
-              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                Medium
-              </span>
+              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Medium</span>
             )}
             {note.title && (
-              <h3 className="font-semibold text-base text-gray-900 truncate">{note.title}</h3>
+              <a href={`/notes/${note.id}`} className="font-semibold text-base text-gray-900 hover:text-blue-600 hover:underline truncate">
+                {note.title}
+              </a>
             )}
-            <NoteHealthBadge assessment={noteHealth} />
           </div>
           <p className="text-xs text-gray-400">
-            {new Date(note.createdAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            })}
+            {new Date(note.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
           </p>
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-2 ml-4">
+        <div className="flex gap-1 ml-4 relative">
           {isEditing ? (
             <>
-              <button
-                onClick={handleSaveEdit}
-                disabled={isSaving}
-                className="p-2 rounded-lg hover:bg-green-100 hover:text-green-700 transition-colors disabled:opacity-50"
-                title="Save"
-              >
+              <button onClick={handleSaveEdit} disabled={isSaving} className="p-2 rounded-lg hover:bg-green-100 hover:text-green-700 transition-colors disabled:opacity-50" title="Save">
                 <Check className="w-4 h-4" />
               </button>
-              <button
-                onClick={handleCancelEdit}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Cancel"
-              >
+              <button onClick={handleCancelEdit} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Cancel">
                 <X className="w-4 h-4" />
               </button>
             </>
           ) : (
             <>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Edit"
-              >
+              <button onClick={() => setIsEditing(true)} className="p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Edit">
                 <Pencil className="w-4 h-4" />
               </button>
-              <button
-                onClick={handlePin}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title={note.isPinned ? "Unpin" : "Pin"}
-              >
-                <Pin className={`w-4 h-4 ${note.isPinned ? "fill-current" : ""}`} />
-              </button>
-              <button
-                onClick={() => setIsSplitModalOpen(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Split"
-              >
-                <span className="text-[11px] font-semibold text-gray-700">Split</span>
-              </button>
-              <button
-                onClick={handleRegenerateSummary}
-                disabled={isRegeneratingSummary}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-                title="Regenerate summary"
-              >
-                <span className="text-[11px] font-semibold text-gray-700">
-                  {isRegeneratingSummary ? "..." : "Regen"}
-                </span>
-              </button>
-              <button
-                onClick={handleArchive}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title={note.isArchived ? "Restore" : "Archive"}
-              >
-                <Archive className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="p-2 rounded-lg hover:bg-red-100 hover:text-red-700 transition-colors disabled:opacity-50"
-                title="Delete"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setDropdownOpen((prev) => !prev)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="More actions"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 top-9 z-20 w-44 rounded-xl border border-gray-200 bg-white shadow-lg py-1">
+                    <button onClick={() => { handlePin(); setDropdownOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+                      <Pin className={`w-4 h-4 ${note.isPinned ? "fill-current text-blue-600" : ""}`} />
+                      {note.isPinned ? "Unpin" : "Pin"}
+                    </button>
+                    <button onClick={() => { setIsSplitModalOpen(true); setDropdownOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+                      <span className="w-4 h-4 text-center text-[11px] font-bold">✂</span> Split
+                    </button>
+                    <button onClick={() => { handleRegenerateSummary(); setDropdownOpen(false); }} disabled={isRegeneratingSummary} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50">
+                      <span className="w-4 h-4 text-center text-[11px]">↻</span> Regen summary
+                    </button>
+                    <button onClick={() => { handleArchive(); setDropdownOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50">
+                      <Archive className="w-4 h-4" /> {note.isArchived ? "Restore" : "Archive"}
+                    </button>
+                    <button onClick={() => { setDropdownOpen(false); handleDelete(); }} disabled={isDeleting} className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50">
+                      <Trash2 className="w-4 h-4" /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -351,9 +317,9 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
       )}
 
       {!isEditing && note.summary && (
-        <p className="mb-3 rounded-md border border-blue-100 bg-blue-50 px-2.5 py-2 text-xs text-blue-900">
+        <div className="mb-3 rounded-md border-l-4 border-blue-400 bg-blue-50 pl-3 pr-2.5 py-2 text-xs text-blue-900">
           {note.summary}
-        </p>
+        </div>
       )}
 
       {/* AI Intent callout */}
@@ -438,11 +404,8 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
       </div>
 
       <div className="mt-3 pt-3 border-t border-gray-100">
-        <a
-          href={`/notes/${note.id}`}
-          className="text-xs text-blue-600 hover:underline"
-        >
-          View full note →
+        <a href={`/notes/${note.id}`} className="text-xs text-blue-600 hover:underline font-medium">
+          Open note →
         </a>
       </div>
 

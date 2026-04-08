@@ -20,11 +20,19 @@ import {
   Upload,
   Calendar,
   Grid3x3,
+  Home,
+  Users,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
 
 const primaryItems = [
+  {
+    label: "Home",
+    href: "/home",
+    icon: Home,
+    description: "Your knowledge base",
+  },
   {
     label: "Inbox",
     href: "/inbox",
@@ -52,6 +60,7 @@ const primaryItems = [
 ];
 
 const moreItems = [
+  { label: "People & Projects", href: "/entities", icon: Users },
   { label: "Cards", href: "/cards", icon: Grid3x3 },
   { label: "Timeline", href: "/timeline", icon: Calendar },
   { label: "Favorites", href: "/favorites", icon: Heart },
@@ -86,7 +95,7 @@ export default function Sidebar() {
             const Icon = item.icon;
             const isActive = pathname === item.href ||
               // Treat /topics and /collections as also active under Organize
-              (item.href === "/projects" && ["/topics", "/collections"].includes(pathname));
+              (item.href === "/projects" && ["/topics", "/collections", "/entities"].includes(pathname));
             return (
               <Link
                 key={item.href}

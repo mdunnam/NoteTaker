@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
+import NoteContentRenderer from "@/components/notes/NoteContentRenderer";
 import ClarificationLoop from "@/components/notes/ClarificationLoop";
 import MultiNoteSynthesisPanel from "@/components/notes/MultiNoteSynthesisPanel";
 import NoteHealthPanel from "@/components/notes/NoteHealthPanel";
@@ -270,7 +271,7 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
               className="w-full resize-y rounded border border-blue-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           ) : (
-            <p className="whitespace-pre-wrap text-gray-900">{note.rawContent}</p>
+            <NoteContentRenderer content={note.rawContent} />
           )}
 
           {/* Metadata chips */}
@@ -431,11 +432,33 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
         {note.entities.length > 0 && (
           <div className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="mb-3 text-sm font-semibold text-gray-900">Entities</h2>
-            <ul className="space-y-1">
+            <div className="flex flex-wrap gap-2">
               {note.entities.map(({ entity }) => (
-                <li key={entity.id} className="flex items-center gap-2 text-xs">
-                  <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600 uppercase">{entity.type}</span>
+                <a
+                  key={entity.id}
+                  href={`/entities/${entity.type}/${encodeURIComponent(entity.name)}`}
+                  className="flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                >
+                  <span className="text-[10px] font-semibold uppercase text-gray-400">{entity.type}</span>
                   <span className="text-gray-800">{entity.name}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Backlinks */}
+        {(note.relatedNotesFrom.length > 0 || note.relatedNotesTo.length > 0) && (
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <h2 className="mb-3 text-sm font-semibold text-gray-900">
+              Referenced by {note.relatedNotesFrom.length + note.relatedNotesTo.length} notes
+            </h2>
+            <ul className="space-y-1">
+              {[...note.relatedNotesFrom.map((r) => r.targetNote), ...note.relatedNotesTo.map((r) => r.sourceNote)].map((rel) => (
+                <li key={rel.id}>
+                  <a href={`/notes/${rel.id}`} className="text-sm text-blue-600 hover:underline line-clamp-1">
+                    {rel.title || "Untitled note"}
+                  </a>
                 </li>
               ))}
             </ul>

@@ -102,48 +102,25 @@ export default async function CollectionDetailPage({ params }: CollectionDetailP
           This collection has no active notes yet.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-3">
           {collection.notes.map((note) => (
             <Link
               key={note.id}
               href={`/notes/${note.id}`}
-              className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/30"
+              className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300 hover:bg-blue-50/30 transition-colors"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-semibold text-gray-900">{note.title || "Untitled note"}</p>
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-semibold text-gray-900 hover:text-blue-700">{note.title || "Untitled note"}</p>
                 {note.isPinned && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
-                    pinned
-                  </span>
-                )}
-                {note.priority && (
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-700">
-                    {note.priority}
-                  </span>
+                  <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">pinned</span>
                 )}
               </div>
-
-              <p className="mt-2 line-clamp-3 text-sm text-gray-600">{note.summary || "No summary yet."}</p>
-
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-gray-500">
-                {note.category && (
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">{note.category}</span>
-                )}
-                {note.type && (
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-gray-700">{note.type}</span>
-                )}
-                {note.suggestedProject && (
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">{note.suggestedProject}</span>
-                )}
+              {note.summary && <p className="mt-1 text-sm text-gray-600 line-clamp-2">{note.summary}</p>}
+              <div className="mt-2 flex flex-wrap gap-2 items-center text-[11px] text-gray-500">
+                {note.category && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-purple-700">{note.category}</span>}
+                {note.suggestedProject && <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-indigo-700">{note.suggestedProject}</span>}
+                <span className="ml-auto">{new Date(note.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
               </div>
-
-              <p className="mt-3 text-[11px] text-gray-500">
-                {new Date(note.createdAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
             </Link>
           ))}
         </div>
