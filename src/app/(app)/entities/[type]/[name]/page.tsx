@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
+import { EntityType } from "@prisma/client";
 
 interface Props {
   params: { type: string; name: string };
@@ -21,7 +22,12 @@ export default async function EntityDetailPage({ params }: Props) {
   if (!session?.user?.id) redirect("/login");
 
   const name = decodeURIComponent(params.name);
-  const type = params.type.toUpperCase();
+  const typeUpper = params.type.toUpperCase();
+
+  // Validate type is a valid EntityType enum value
+  const validTypes = Object.values(EntityType) as string[];
+  if (!validTypes.includes(typeUpper)) notFound();
+  const type = typeUpper as EntityType;
 
   const entity = await prisma.entity.findFirst({
     where: { userId: session.user.id, name, type },
@@ -29,11 +35,18 @@ export default async function EntityDetailPage({ params }: Props) {
       notes: {
         include: {
           note: {
-            select: { id: true, title: true, summary: true, tags: true, category: true, updatedAt: true, isArchived: true },
+            select: {
+              id: true,
+              title: true,
+              summary: true,
+              tags: true,
+              category: true,
+              updatedAt: true,
+              isArchived: true,
+            },
           },
         },
       },
-      _count: { select: { notes: true } },
     },
   });
 
@@ -43,18 +56,24 @@ export default async function EntityDetailPage({ params }: Props) {
     .filter((ne) => !ne.note.isArchived)
     .sort((a, b) => new Date(b.note.updatedAt).getTime() - new Date(a.note.updatedAt).getTime());
 
+  const mentionCount = entity.notes.length;
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <Link href="/entities" className="text-sm text-blue-600 hover:underline">← People &amp; Projects</Link>
+        <Link href="/entities" className="text-sm text-blue-600 hover:underline">
+          ← People &amp; Projects
+        </Link>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <h1 className="text-3xl font-bold text-gray-900">{entity.name}</h1>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${TYPE_COLORS[type] ?? "bg-gray-100 text-gray-700"}`}>
-          {type}
+        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${TYPE_COLORS[typeUpper] ?? "bg-gray-100 text-gray-700"}`}>
+          {typeUpper}
         </span>
-        <span className="text-sm text-gray-500">{entity._count.notes} mention{entity._count.notes === 1 ? "" : "s"}</span>
+        <span className="text-sm text-gray-500">
+          {mentionCount} mention{mentionCount === 1 ? "" : "s"}
+        </span>
       </div>
 
       {activeNotes.length === 0 ? (
@@ -69,17 +88,29 @@ export default async function EntityDetailPage({ params }: Props) {
               href={`/notes/${note.id}`}
               className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-300 hover:bg-blue-50/30 transition-colors"
             >
-              <p className="font-semibold text-gray-900 hover:text-blue-700">{note.title || "Untitled note"}</p>
-              {note.summary && <p className="mt-1 text-sm text-gray-600 line-clamp-2">{note.summary}</p>}
+              <p className="font-semibold text-gray-900 hover:text-blue-700">
+                {note.title || "Untitled note"}
+              </p>
+              {note.summary && (
+                <p className="mt-1 text-sm text-gray-600 line-clamp-2">{note.summary}</p>
+              )}
               <div className="mt-2 flex flex-wrap gap-1.5 items-center">
                 {note.category && (
-                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] text-purple-700">{note.category}</span>
+                  <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] text-purple-700">
+                    {note.category}
+                  </span>
                 )}
                 {note.tags.map((tag) => (
-                  <span key={tag} className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">#{tag}</span>
+                  <span key={tag} className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
+                    #{tag}
+                  </span>
                 ))}
                 <span className="text-[11px] text-gray-400 ml-auto">
-                  {new Date(note.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  {new Date(note.updatedAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
                 </span>
               </div>
             </Link>

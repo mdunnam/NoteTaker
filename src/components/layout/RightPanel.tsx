@@ -93,6 +93,7 @@ export default async function RightPanel() {
         suggestedProject: true,
         aiMeta: true,
         extractedTasks: true,
+        tags: true,
         createdAt: true,
         updatedAt: true,
       },

@@ -9,7 +9,7 @@ export default async function HomePage() {
 
   const userId = session.user.id;
 
-  const [totalNotes, pinnedNotes, recentNotes, allNotes, topEntities] = await Promise.all([
+  const [totalNotes, pinnedNotes, recentNotes, allNotes, entities] = await Promise.all([
     prisma.note.count({ where: { userId, isArchived: false } }),
 
     prisma.note.findMany({
