@@ -237,6 +237,12 @@ export async function POST(request: NextRequest) {
 
     await enqueueEnrichment(note.id, session.user.id, request.nextUrl.origin);
 
+    // Invalidate today's digest so it picks up the new note
+    const todayStr = new Date().toISOString().split("T")[0];
+    await prisma.dailyDigest.deleteMany({
+      where: { userId: session.user.id, date: todayStr },
+    }).catch(() => {});
+
     const freshNote = await prisma.note.findUnique({
       where: { id: note.id },
       include: {

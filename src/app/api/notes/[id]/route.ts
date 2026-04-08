@@ -130,6 +130,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       }
     }
 
+    // Invalidate today's digest if content-affecting fields changed
+    if (shouldRescoreQueue || body.isArchived !== undefined) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      await prisma.dailyDigest.deleteMany({
+        where: { userId: session.user.id, date: todayStr },
+      }).catch(() => {});
+    }
+
     return NextResponse.json(updatedNote);
   } catch (error) {
     console.error("Error updating note:", error);
@@ -165,6 +173,12 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     await prisma.note.delete({
       where: { id },
     });
+
+    // Invalidate today's digest cache so it regenerates without the deleted note
+    const todayStr = new Date().toISOString().split("T")[0];
+    await prisma.dailyDigest.deleteMany({
+      where: { userId: session.user.id, date: todayStr },
+    }).catch(() => {}); // non-fatal
 
     return NextResponse.json({ success: true });
   } catch (error) {
