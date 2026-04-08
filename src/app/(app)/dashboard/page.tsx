@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getOrCreateDigest } from "@/lib/dailyDigest";
 import DashboardClient from "@/components/dashboard/DashboardClient";
-import type { DigestContent } from "@/lib/dailyDigest";
+import type { DigestContent } from "@/lib/digestTypes";
 
 export const dynamic = "force-dynamic";
 
