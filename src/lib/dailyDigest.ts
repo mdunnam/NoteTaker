@@ -9,13 +9,14 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import type { DigestContent } from "@/lib/digestTypes";
+
+export type { DigestContent };
+export type { DigestSection, DigestItem } from "@/lib/digestTypes";
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
-
-import type { DigestContent, DigestSection, DigestItem } from "@/lib/digestTypes";
-export type { DigestContent, DigestSection, DigestItem };
 
 // ─── Zod schema (server-side validation only) ────────────────────────────────────────────
 
