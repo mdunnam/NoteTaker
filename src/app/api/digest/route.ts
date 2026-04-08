@@ -21,8 +21,9 @@ export async function GET() {
     const digest = await getOrCreateDigest(session.user.id, todayStr());
     return NextResponse.json(digest);
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("GET /api/digest error:", err);
-    return NextResponse.json({ error: "Failed to generate digest" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to generate digest", detail: message }, { status: 500 });
   }
 }
 
