@@ -26,15 +26,48 @@ export interface EnrichNoteOptions {
  * Persist an embedding into the pgvector-backed Note.embedding column.
  */
 async function persistNoteEmbedding(noteId: string, embedding: number[]): Promise<void> {
-  if (embedding.length === 0) {
-    return;
-  }
-
+  if (embedding.length === 0) return;
   const literal = toPgVectorLiteral(embedding);
-
   await prisma.$executeRaw(
     Prisma.sql`UPDATE "Note" SET "embedding" = ${literal}::vector WHERE "id" = ${noteId}`
   );
+}
+
+/**
+ * Build a compact corpus context string from recent notes so the AI can
+ * reason about this new note in the context of everything the user has written.
+ */
+function buildCorpusContext(
+  recentNotes: Array<{
+    id: string;
+    title: string | null;
+    summary: string | null;
+    category: string | null;
+    suggestedProject: string | null;
+    createdAt: Date;
+    extractedTasks: Prisma.JsonValue;
+  }>
+): string {
+  if (recentNotes.length === 0) return "";
+
+  const now = Date.now();
+  const lines: string[] = ["Recent notes (use for context, cross-referencing, and deduplication):"];
+
+  for (const note of recentNotes.slice(0, 20)) {
+    const daysAgo = Math.round((now - new Date(note.createdAt).getTime()) / 86400000);
+    const tasks = Array.isArray(note.extractedTasks)
+      ? (note.extractedTasks as Array<{ text: string; completed?: boolean }>)
+          .filter((t) => !t.completed)
+          .map((t) => t.text)
+          .slice(0, 2)
+      : [];
+    const taskStr = tasks.length > 0 ? ` | open tasks: ${tasks.join("; ")}` : "";
+    lines.push(
+      `- [${daysAgo}d ago] "${note.title || "Untitled"}" (${note.category || "?"} / ${note.suggestedProject || "no project"})${taskStr}`
+    );
+  }
+
+  return lines.join("\n");
 }
 
 /**
@@ -45,24 +78,45 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
   const { noteId, userId, rawContent, fallbackTags } = options;
 
   try {
-    const [currentNoteHints, thinkingMemory] = await Promise.all([
+    const [currentNoteHints, thinkingMemory, recentNotes] = await Promise.all([
       prisma.note.findUnique({
         where: { id: noteId },
         select: { suggestedProject: true, category: true, aiMeta: true },
       }),
       getThinkingMemory(userId),
+      // Fetch recent notes for corpus context — exclude the note being enriched
+      prisma.note.findMany({
+        where: { userId, isArchived: false, status: "PROCESSED", id: { not: noteId } },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          category: true,
+          suggestedProject: true,
+          createdAt: true,
+          extractedTasks: true,
+        },
+      }),
     ]);
 
     const existingAiMeta = currentNoteHints?.aiMeta && typeof currentNoteHints.aiMeta === "object" && !Array.isArray(currentNoteHints.aiMeta)
       ? currentNoteHints.aiMeta as Record<string, unknown>
       : {};
 
+    // Build corpus context for cross-note reasoning
+    const corpusContext = buildCorpusContext(recentNotes);
+
     const organized = await organizeNote(rawContent, {
       explicitProject: currentNoteHints?.suggestedProject || undefined,
       explicitContext: currentNoteHints?.category || undefined,
       userContext: buildThinkingMemoryPrompt(thinkingMemory),
+      corpusContext: corpusContext || undefined,
+      identityAliases: thinkingMemory.identityAliases,
       clarificationQuestionStats: thinkingMemory.clarificationQuestionStats,
     });
+
 
     const baseAiMeta = {
       ...existingAiMeta,

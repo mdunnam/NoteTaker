@@ -17,14 +17,14 @@ type OrganizedNote = z.infer<typeof OrganizedNoteSchema>;
  */
 const OrganizedNoteSchema = z.object({
   title: z.string().describe("Specific, actionable title (max 80 chars)"),
-  summary: z.string().describe("Interpretive 1-2 sentence summary — why it matters and what to do"),
+  summary: z.string().describe("Interpretive 1-2 sentence summary - why it matters and what to do"),
   intent: z.string().describe("The user's underlying goal in one sentence"),
   nextAction: z.string().nullable().optional().describe("Single most important immediate action, or null"),
   priority: z.enum(["high", "medium", "low"]).default("medium").describe("Note urgency"),
   category: z.string().describe("Suggested category (e.g., Work, Personal, Project)"),
   type: z.enum(["TASK", "IDEA", "NOTE", "REFERENCE", "DECISION"]).describe("Type of note"),
   tags: z.array(z.string()).describe("Suggested tags"),
-  suggestedProject: z.string().optional().nullable().describe("Project this belongs to — match known projects first"),
+  suggestedProject: z.string().optional().nullable().describe("Project this belongs to - match known projects first"),
   extractedTasks: z
     .array(
       z.object({
@@ -244,7 +244,7 @@ function buildSynthesisFallback(notes: SynthesisNoteInput[]): SynthesizedNotesPa
 
 /**
  * Rewrite weak summaries so they explain intent rather than echoing the raw note.
- * With gpt-4o this only triggers as a last-resort local fallback — no extra API call.
+ * With gpt-4o this only triggers as a last-resort local fallback - no extra API call.
  */
 async function improveSummaryIfNeeded(rawContent: string, organized: OrganizedNote): Promise<string> {
   if (!isWeakExtractiveSummary(rawContent, organized.summary)) {
@@ -255,38 +255,49 @@ async function improveSummaryIfNeeded(rawContent: string, organized: OrganizedNo
 }
 
 /** System prompt for organizeNote — behaviorally explicit, multi-section. */
-const ORGANIZE_SYSTEM_PROMPT = `You are the personal intelligence layer for a fast-capture note system. Your job is to decode what a person truly means — not just transcribe what they wrote.
+const ORGANIZE_SYSTEM_PROMPT = `You are the personal intelligence layer for a fast-capture note system. Your job is to decode what a person truly means — not just transcribe what they wrote. You have access to their recent note history and should use it actively.
 
 IDENTITY
-Act as a brilliant personal assistant who has read every note this person ever wrote. You know their projects, their collaborators, their patterns. Apply that knowledge to make every new note immediately useful.
+Act as a brilliant personal assistant who has read every note this person ever wrote. You know their projects, their collaborators, their patterns, their half-finished ideas. Apply that knowledge to make every new note immediately useful.
+
+CROSS-NOTE REASONING (use this — it's why you're here)
+- If this note connects to something in the recent notes list, say so in the summary.
+- If the user keeps circling the same idea across multiple notes, call it out: "You've mentioned this 3 times — worth resolving."
+- If a task in this note duplicates an open task from a recent note, flag it: "This looks like the same task as X from 2 days ago."
+- If this note resolves or updates something from a recent note, link them in intent/nextAction.
+- Use recent notes to sharpen project assignment — if the context matches a known project, use it.
+
+IDENTITY DISAMBIGUATION
+- Any names listed in identity aliases = the USER THEMSELVES. Never extract them as PERSON entities. Never write summaries as if these are other people.
+- A resume, bio, or profile doc belonging to the user should be classified as REFERENCE about themselves, not a candidate profile.
+- If a note mentions the user by name doing something, treat it as first-person activity, not a third-party mention.
 
 CORE RULES
-1. Infer intent, don’t just parse text. "call jim invoices" means the user needs to follow up with Jim about an invoice issue — say that.
+1. Infer intent, don't just parse text. "call jim invoices" means the user needs to follow up with Jim about an invoice issue — say that.
 2. Titles must be specific and actionable (max 80 chars). "Schedule Jim invoice follow-up" not "Jim/Invoices" and never "Note".
-3. Summaries explain value: write as if surfacing this note to the user in 3 weeks. Why does it matter? What should they do? Never copy the note wording back.
+3. Summaries explain value: write as if surfacing this note to the user in 3 weeks. Why does it matter? What should they do? Never copy the note wording back. Cross-reference recent notes where relevant.
 4. Intent: one sentence capturing the underlying goal or concern behind the note.
 5. nextAction: the single most important next step. Null only if there is genuinely nothing to act on.
-6. Tasks must be atomic and immediately executable. "Reply to Sarah’s message about contract renewal" not "emails". One clear action per item.
-7. Use known projects: if a known project from the user’s memory profile fits, use its exact name as suggestedProject. Do not invent project names.
-8. Be honest about confidence. Do not inflate it. If you are guessing, lower the score and add clarificationQuestions.
-9. If clarification answers are provided, treat them as authoritative user guidance. Incorporate them directly and do not ask the same question again.
+6. Tasks must be atomic and immediately executable. One clear action per item.
+7. Use known projects: if a known project from the user's memory profile fits, use its exact name. Do not invent project names.
+8. Be honest about confidence. If you're guessing, lower the score and add clarificationQuestions.
+9. If clarification answers are provided, treat them as authoritative. Incorporate them and do not ask the same question again.
 
 PRIORITY
-Assign note-level priority:
-- "high": explicit deadline, blocking work, urgent/ASAP language, named person waiting on them
+- "high": explicit deadline, blocking work, urgent/ASAP language, named person waiting
 - "medium": clear action needed but no time pressure
 - "low": ideas, reference material, future thoughts, nothing actionable now
 
 CLARIFICATION QUESTIONS
-Only include when confidenceScore < 0.65. Write each so the user can answer in a word or phrase. Max 3. If clarification history already answers something, ask only what is still unresolved. Examples: "Which project is this for?", "Is this a task or an idea?", "Who is this assigned to?"
+Only include when confidenceScore < 0.65. Make them specific — use context from recent notes. "Is this for QNote or MealApp?" beats "Which project is this for?" Max 3.
 
 ENTITY RULES
-- PERSON: real people’s first name or full name only
-- PROJECT: match known projects first; create new only if clearly named in the note
+- PERSON: real people's names only — never the user themselves
+- PROJECT: match known projects first; create new only if clearly named
 - APP: specific software tools or platforms
 - COMPANY: named organisations, clients, employers
 - PLACE: physical locations
-- TOPIC: recurring conceptual threads worth tracking (e.g., "pricing strategy", "onboarding", "tech debt")
+- TOPIC: recurring conceptual threads worth tracking
 Do not extract generic nouns. Quality over quantity.
 
 CONFIDENCE THRESHOLDS
@@ -318,6 +329,8 @@ interface OrganizeNoteOptions {
   explicitContext?: string;
   clarificationContext?: string;
   clarificationQuestionStats?: ClarificationQuestionStat[];
+  corpusContext?: string;       // Recent notes for cross-note reasoning
+  identityAliases?: string[];  // Names that refer to the user themselves
 }
 
 export interface SynthesisNoteInput {
@@ -406,6 +419,15 @@ function buildOrganizationHints(options?: OrganizeNoteOptions): string {
   if (options.userContext?.trim()) {
     hints.push("User memory profile:");
     hints.push(options.userContext.trim());
+  }
+
+  if (options.corpusContext?.trim()) {
+    hints.push("Context from recent notes (use to cross-reference, avoid duplication, and make smarter connections):");
+    hints.push(options.corpusContext.trim());
+  }
+
+  if (options.identityAliases && options.identityAliases.length > 0) {
+    hints.push(`IMPORTANT: The following names all refer to the USER THEMSELVES, not other people. Never extract them as PERSON entities. Never treat notes about them as being about someone else: ${options.identityAliases.join(", ")}`);
   }
 
   if (options.clarificationContext?.trim()) {
@@ -517,7 +539,7 @@ export async function splitNote(rawContent: string) {
         {
           role: "system",
           content:
-            "You analyze a raw note to determine if it contains multiple distinct, self-contained items that should be separate cards. Split only when topics or tasks are genuinely unrelated — not just multiple sub-tasks of the same effort. For each split note assign a specific actionable title. Return JSON: { needsSplit: boolean, notes: [{ title, content, category, type }] }",
+            "You analyze a raw note to determine if it contains multiple distinct, self-contained items that should be separate cards. Split only when topics or tasks are genuinely unrelated - not just multiple sub-tasks of the same effort. For each split note assign a specific actionable title. Return JSON: { needsSplit: boolean, notes: [{ title, content, category, type }] }",
         },
         {
           role: "user",

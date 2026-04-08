@@ -50,17 +50,21 @@ Your job: scan the notes, find the patterns, surface what matters today, and occ
 
 SECTIONS to produce (only include a section if you have real content for it):
 
-1. open_loops — Things someone is waiting on, or you haven't replied to. People mentioned with pending back-and-forth. Example: "David asked you about the redesign scope 2 days ago — have you responded?"
+1. open_loops — Things someone is waiting on, or you haven't replied to. People mentioned with pending back-and-forth. "David asked you about the redesign scope 2 days ago — have you responded?" If yesterday's digest flagged the same loop and it's still open, escalate the urgency.
 
-2. upcoming — Events, dates, deadlines extracted from notes. For interviews/meetings: suggest prep actions. If you see a resume mentioned with a meeting, offer to review it. Keep it concrete.
+2. upcoming — Events, dates, deadlines extracted from notes. For interviews/meetings: suggest prep actions. If you see a resume + a meeting, offer to review it together. Keep it concrete.
 
-3. active_projects — For each project with recent note activity: one-line status + what the notes suggest should happen next.
+3. active_projects — For each project with recent note activity: one-line status + what the notes suggest should happen next. Flag if a project had no activity in 5+ days.
 
-4. today_sparks — Ideas or threads from the most recent note dumps that feel novel or worth developing. "Based on what you dumped today, I think there might be an app idea here: ..."
+4. today_sparks — Ideas or threads from the most recent dumps that feel novel or worth developing. "You've mentioned a subscription model 4 times across 3 different projects this week — have you thought about making that its own thing?"
 
-5. clarify — Genuinely ambiguous notes where you need to ask the human a specific question. Be direct and a little funny if the note warrants it. Max 3 items.
+5. stale_tasks — Open tasks extracted from notes that are older than 3 days and haven't been marked complete. "You wrote 'follow up with the contractor' 6 days ago. Still open?"
 
-6. wins — If you see something completed or shipping, call it out. Optional section.
+6. clarify — Genuinely ambiguous notes where you need to ask the human a specific question. Be direct and a little funny if the note warrants it. Max 3 items.
+
+7. synthesis_spark — If you see 3+ notes circling the same theme without a project attached, propose connecting them. "You have 5 notes about pricing strategy scattered across different projects. Want me to synthesize these into one?"
+
+8. wins — If you see something completed or shipping, call it out.
 
 TONE RULES:
 - Skip corporate filler. No "As your AI assistant..."
@@ -96,7 +100,11 @@ Return strict JSON matching this schema:
 
 export async function generateDailyDigest(userId: string): Promise<DigestContent> {
   // Pull everything we need in parallel
-  const [recentNotes, allEntities, thinkingMemoryRow] = await Promise.all([
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  const [recentNotes, allEntities, thinkingMemoryRow, yesterdayDigest] = await Promise.all([
     prisma.note.findMany({
       where: { userId, isArchived: false, status: "PROCESSED" },
       orderBy: { createdAt: "desc" },
@@ -134,6 +142,11 @@ export async function generateDailyDigest(userId: string): Promise<DigestContent
     prisma.userPreferences.findUnique({
       where: { userId },
       select: { thinkingMemory: true },
+    }),
+    // Load yesterday's digest for continuity
+    prisma.dailyDigest.findUnique({
+      where: { userId_date: { userId, date: yesterdayStr } },
+      select: { content: true },
     }),
   ]);
 
@@ -203,9 +216,45 @@ export async function generateDailyDigest(userId: string): Promise<DigestContent
     contextLines.push(JSON.stringify(memory.knownProjects));
   }
 
-  if (memory?.identityAliases && Array.isArray(memory.identityAliases) && memory.identityAliases.length > 0) {
-    contextLines.push(`\n=== USER'S OWN NAMES (never treat as other people) ===`);
+  // Identity aliases
+  if (memory?.identityAliases && Array.isArray(memory.identityAliases) && (memory.identityAliases as string[]).length > 0) {
+    contextLines.push(`\n=== USER'S OWN NAMES (never flag as other people) ===`);
     contextLines.push((memory.identityAliases as string[]).join(", "));
+  }
+
+  // Stale open tasks (older than 3 days, not completed)
+  const staleTasks: Array<{ noteId: string; noteTitle: string | null; task: string; daysAgo: number }> = [];
+  for (const note of recentNotes) {
+    const tasks = Array.isArray(note.extractedTasks) ? note.extractedTasks : [];
+    const daysAgo = Math.round((now.getTime() - new Date(note.createdAt).getTime()) / 86400000);
+    if (daysAgo >= 3) {
+      for (const task of tasks as Array<{ text: string; completed?: boolean }>) {
+        if (!task.completed && task.text) {
+          staleTasks.push({ noteId: note.id, noteTitle: note.title, task: task.text, daysAgo });
+        }
+      }
+    }
+  }
+  if (staleTasks.length > 0) {
+    contextLines.push(`\n=== STALE OPEN TASKS (3+ days old, not marked complete) ===`);
+    for (const st of staleTasks.slice(0, 15)) {
+      contextLines.push(`[${st.noteId}] "${st.task}" (from "${st.noteTitle || 'Untitled'}" — ${st.daysAgo}d ago)`);
+    }
+  }
+
+  // Yesterday's digest for continuity
+  if (yesterdayDigest?.content) {
+    try {
+      const yContent = yesterdayDigest.content as Record<string, unknown>;
+      const ySections = Array.isArray(yContent.sections) ? yContent.sections as Array<{ key: string; items: Array<{ text: string }> }> : [];
+      const yOpenLoops = ySections.find((s) => s.key === "open_loops");
+      if (yOpenLoops && yOpenLoops.items.length > 0) {
+        contextLines.push(`\n=== YESTERDAY'S OPEN LOOPS (still unresolved?) ===`);
+        for (const item of yOpenLoops.items.slice(0, 5)) {
+          contextLines.push(`- ${item.text}`);
+        }
+      }
+    } catch { /* ignore parse errors */ }
   }
 
   contextLines.push(`\n=== CURRENT DATE ===`);
