@@ -9,13 +9,12 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-import type { DigestContent } from "@/lib/digestTypes";
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
-// ─── Zod schema (server-side validation only) ────────────────────────────────────────────
+// ─── Schema ────────────────────────────────────────────────────────────────
 
 const DigestItemSchema = z.object({
   id: z.string(),
@@ -38,6 +37,11 @@ const DigestContentSchema = z.object({
   sections: z.array(DigestSectionSchema),
   generatedAt: z.string(),
 });
+
+// Types derived from zod — these are the canonical types for this module
+export type DigestItem = z.infer<typeof DigestItemSchema>;
+export type DigestSection = z.infer<typeof DigestSectionSchema>;
+export type DigestContent = z.infer<typeof DigestContentSchema>;
 
 // ─── Prompt ────────────────────────────────────────────────────────────────
 
