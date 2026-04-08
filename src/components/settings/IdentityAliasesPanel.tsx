@@ -29,12 +29,17 @@ export default function IdentityAliasesPanel() {
     setSaving(true);
     setStatus("");
     try {
-      await fetch("/api/user/identity", {
+      const res = await fetch("/api/user/identity", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identityAliases: aliases }),
       });
-      setStatus("Saved.");
+      const data = await res.json();
+      if (data.requeuedNotes > 0) {
+        setStatus(`Saved. Re-enriching ${data.requeuedNotes} note${data.requeuedNotes === 1 ? "" : "s"} that mentioned your name…`);
+      } else {
+        setStatus("Saved.");
+      }
     } catch {
       setStatus("Failed to save.");
     } finally {
