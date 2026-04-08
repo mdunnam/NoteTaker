@@ -86,12 +86,12 @@ export async function parseFile(file: File): Promise<ParsedFile> {
     let text = "";
     if (typeof PDFParse === "function" && PDFParse.prototype?.getText) {
       // pdf-parse v2 class API
-      const instance = new PDFParse(Buffer.from(buffer));
+      const instance = new PDFParse(new Uint8Array(buffer));
       const result = await instance.getText();
       text = typeof result === "string" ? result : (result as { text?: string }).text ?? "";
     } else {
       // pdf-parse v1 function API
-      const result = await PDFParse(Buffer.from(buffer));
+      const result = await PDFParse(new Uint8Array(buffer));
       text = result.text ?? "";
     }
     return { filename: name, text: truncate(clean(text), name), suggestedChunks: 1 };
