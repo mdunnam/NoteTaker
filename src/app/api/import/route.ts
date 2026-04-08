@@ -2,8 +2,8 @@
  * POST /api/import
  *
  * Accepts multipart/form-data with one or more files.
- * Extracts text from each file server-side, creates one note per file,
- * and enqueues AI enrichment for each via the existing NoteJob pipeline.
+ * Extracts text from each file, runs AI split analysis, creates one note
+ * per logical section, and enqueues enrichment for each.
  *
  * Form fields:
  *   files[]      — one or more File objects (required)
@@ -14,6 +14,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { parseFile } from "@/lib/fileParser";
+import { splitNote } from "@/lib/ai";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_FILES = 50;
@@ -21,7 +22,6 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB per file
 
 async function enqueueEnrichment(noteId: string, userId: string, origin: string) {
   await prisma.noteJob.create({ data: { noteId, userId } });
-
   const workerSecret = process.env.WORKER_SECRET;
   if (workerSecret) {
     void fetch(`${origin}/api/worker/enrich`, {
@@ -31,6 +31,24 @@ async function enqueueEnrichment(noteId: string, userId: string, origin: string)
       console.warn("Worker trigger failed (job is queued):", err);
     });
   }
+}
+
+/**
+ * Derive a smart provisional title from raw text — used before AI enrichment
+ * completes so notes never appear as "Untitled".
+ */
+function provisionalTitle(filename: string, content: string, splitTitle?: string): string {
+  // If the AI gave us a title from split, use it
+  if (splitTitle && splitTitle.trim() && splitTitle.trim().toLowerCase() !== "untitled") {
+    return splitTitle.trim().slice(0, 80);
+  }
+  // Otherwise use the first non-empty line of content (trimmed)
+  const firstLine = content.split("\n").map((l) => l.trim()).find((l) => l.length > 3);
+  if (firstLine && firstLine.length <= 120) {
+    return firstLine.slice(0, 80);
+  }
+  // Fall back to filename without extension
+  return filename.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ").slice(0, 80);
 }
 
 export async function POST(request: NextRequest) {
@@ -55,7 +73,7 @@ export async function POST(request: NextRequest) {
   }
 
   const limited = files.slice(0, MAX_FILES);
-  const results: Array<{ filename: string; noteId?: string; error?: string }> = [];
+  const results: Array<{ filename: string; noteIds?: string[]; error?: string }> = [];
 
   for (const file of limited) {
     if (!(file instanceof File)) {
@@ -76,29 +94,55 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Prepend filename as context header so the AI knows what it's reading
-      const rawContent = `[Imported from: ${parsed.filename}]\n\n${parsed.text}`;
+      // Run AI split analysis — breaks multi-topic content into distinct cards
+      let splits: Array<{ title: string; content: string; category: string; type: string }>;
+      try {
+        const splitResult = await splitNote(parsed.text);
+        splits = splitResult.needsSplit && splitResult.notes.length > 1
+          ? splitResult.notes
+          : [{ title: "", content: parsed.text, category: contextHint || "General", type: "NOTE" }];
+      } catch {
+        // If split fails, fall back to single note
+        splits = [{ title: "", content: parsed.text, category: contextHint || "General", type: "NOTE" }];
+      }
 
-      const note = await prisma.note.create({
-        data: {
-          userId: session.user.id,
-          rawContent,
-          status: "PROCESSING",
-          suggestedProject: projectHint ?? null,
-          category: contextHint ?? null,
-          aiMeta: {
-            captureMode: "import",
-            importedFile: {
-              name: file.name,
-              type: file.type || "unknown",
-              size: file.size,
+      const noteIds: string[] = [];
+
+      for (const split of splits) {
+        const rawContent = `[Imported from: ${parsed.filename}]\n\n${split.content}`;
+        const title = provisionalTitle(file.name, split.content, split.title);
+
+        const note = await prisma.note.create({
+          data: {
+            userId: session.user.id,
+            rawContent,
+            title,  // Set immediately — no more "Untitled" while enrichment runs
+            status: "PROCESSING",
+            category: split.category || contextHint || null,
+            type: split.type || "NOTE",
+            suggestedProject: projectHint ?? null,
+            aiMeta: {
+              captureMode: "import",
+              importedFile: {
+                name: file.name,
+                type: file.type || "unknown",
+                size: file.size,
+              },
             },
           },
-        },
-      });
+        });
 
-      await enqueueEnrichment(note.id, session.user.id, request.nextUrl.origin);
-      results.push({ filename: file.name, noteId: note.id });
+        await enqueueEnrichment(note.id, session.user.id, request.nextUrl.origin);
+        noteIds.push(note.id);
+      }
+
+      // Bust today's digest cache
+      const todayStr = new Date().toISOString().split("T")[0];
+      await prisma.dailyDigest.deleteMany({
+        where: { userId: session.user.id, date: todayStr },
+      }).catch(() => {});
+
+      results.push({ filename: file.name, noteIds });
     } catch (err) {
       console.error(`Error importing file ${file.name}:`, err);
       results.push({
@@ -108,12 +152,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const succeeded = results.filter((r) => r.noteId);
+  const succeeded = results.filter((r) => r.noteIds && r.noteIds.length > 0);
   const failed = results.filter((r) => r.error);
+  const totalNotes = succeeded.reduce((sum, r) => sum + (r.noteIds?.length ?? 0), 0);
 
   return NextResponse.json(
     {
       imported: succeeded.length,
+      totalNotes,
       failed: failed.length,
       results,
     },
