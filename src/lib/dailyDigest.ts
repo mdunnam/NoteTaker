@@ -6,13 +6,9 @@
  * active projects, sparks from today, and "what did you mean?" items.
  */
 
-import OpenAI from "openai";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
-
-const openaiClient = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+import { invokeClaudeJson } from "@/lib/bedrock";
 
 // ─── Schema ────────────────────────────────────────────────────────────────
 
@@ -262,23 +258,12 @@ export async function generateDailyDigest(userId: string): Promise<DigestContent
 
   const contextDoc = contextLines.join("\n");
 
-  if (!openaiClient) {
-    return buildFallbackDigest(recentNotes, todayNotes, now);
-  }
-
   try {
-    const completion = await openaiClient.chat.completions.create({
-      model: "gpt-4o",
+    const parsed = await invokeClaudeJson({
+      system: DIGEST_SYSTEM,
+      messages: [{ role: "user", content: contextDoc }],
       temperature: 0.3,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: DIGEST_SYSTEM },
-        { role: "user", content: contextDoc },
-      ],
-    });
-
-    const raw = completion.choices[0]?.message?.content || "{}";
-    const parsed = DigestContentSchema.parse(JSON.parse(raw));
+    }).then((r) => DigestContentSchema.parse(r));
     return parsed;
   } catch (err) {
     console.error("Digest generation failed:", err);

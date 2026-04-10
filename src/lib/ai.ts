@@ -5,6 +5,7 @@ import {
   getClarificationQuestionNoiseAssessment,
   type ClarificationQuestionStat,
 } from "@/lib/clarification";
+import { invokeClaudeJson } from "@/lib/bedrock";
 
 const openaiClient = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -477,24 +478,11 @@ export async function organizeNote(rawContent: string, options?: OrganizeNoteOpt
       };
     }
 
-    const completion = await openaiClient.chat.completions.create({
-      model: "gpt-4o",
+    const parsed = await invokeClaudeJson({
+      system: ORGANIZE_SYSTEM_PROMPT,
+      messages: [{ role: "user", content: `Organize this note:\n\n${rawContent}${buildOrganizationHints(options)}` }],
       temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: ORGANIZE_SYSTEM_PROMPT,
-        },
-        {
-          role: "user",
-          content: `Organize this note:\n\n${rawContent}${buildOrganizationHints(options)}`,
-        },
-      ],
-    });
-
-    const raw = completion.choices[0]?.message?.content || "{}";
-    const parsed = OrganizedNoteSchema.parse(JSON.parse(raw));
+    }).then((r) => OrganizedNoteSchema.parse(r));
     const improvedSummary = await improveSummaryIfNeeded(rawContent, parsed);
     const filteredClarificationQuestions = filterClarificationQuestionsByFeedback(
       parsed.clarificationQuestions,
@@ -531,25 +519,11 @@ export async function splitNote(rawContent: string) {
       };
     }
 
-    const completion = await openaiClient.chat.completions.create({
-      model: "gpt-4o",
+    const parsed = await invokeClaudeJson({
+      system: "You analyze a raw note to determine if it contains multiple distinct, self-contained items that should be separate cards. Split only when topics or tasks are genuinely unrelated - not just multiple sub-tasks of the same effort. For each split note assign a specific actionable title. Return JSON: { needsSplit: boolean, notes: [{ title, content, category, type }] }",
+      messages: [{ role: "user", content: `Analyze and split if needed:\n\n${rawContent}` }],
       temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You analyze a raw note to determine if it contains multiple distinct, self-contained items that should be separate cards. Split only when topics or tasks are genuinely unrelated - not just multiple sub-tasks of the same effort. For each split note assign a specific actionable title. Return JSON: { needsSplit: boolean, notes: [{ title, content, category, type }] }",
-        },
-        {
-          role: "user",
-          content: `Analyze and split if needed:\n\n${rawContent}`,
-        },
-      ],
-    });
-
-    const raw = completion.choices[0]?.message?.content || "{}";
-    const parsed = SplitNotesSchema.parse(JSON.parse(raw));
+    }).then((r) => SplitNotesSchema.parse(r));
     return parsed;
   } catch (error) {
     console.error("Error splitting note:", error);
@@ -573,28 +547,22 @@ export async function synthesizeNotes(
   }
 
   try {
-    const completion = await openaiClient.chat.completions.create({
-      model: "gpt-4o",
+    const completion = await invokeClaudeJson({
+      system: "You synthesize multiple notes into one actionable overview and plan. Find the shared thread, collapse repeated work, and highlight the most important actions and unresolved questions. Also produce a concrete plan with objective, firstMove, ordered steps, risks, and a successSignal. If a planning lens is provided, treat it as authoritative. Return strict JSON with keys: title, summary, themes, actions, openQuestions, dominantProject, dominantCategory, plan.",
+      messages: [{
+        role: "user",
+        content: `Planning lens: ${options?.planningGoal?.trim() || "(none)"}\n\n${notes
+          .map((note, index) => {
+            return `${index + 1}. ${note.title || "Untitled note"}\nProject: ${note.suggestedProject || "(none)"}\nCategory: ${note.category || "(none)"}\nSummary: ${note.summary || "(none)"}\nBody: ${note.rawContent.slice(0, 500)}`;
+          })
+          .join("\n\n")}`,
+      }],
       temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You synthesize multiple notes into one actionable overview and plan. Find the shared thread, collapse repeated work, and highlight the most important actions and unresolved questions. Also produce a concrete plan with objective, firstMove, ordered steps, risks, and a successSignal. If a planning lens is provided, treat it as authoritative. Return strict JSON with keys: title, summary, themes, actions, openQuestions, dominantProject, dominantCategory, plan.",
-        },
-        {
-          role: "user",
-          content: `Planning lens: ${options?.planningGoal?.trim() || "(none)"}\n\n${notes
-            .map((note, index) => {
-              return `${index + 1}. ${note.title || "Untitled note"}\nProject: ${note.suggestedProject || "(none)"}\nCategory: ${note.category || "(none)"}\nSummary: ${note.summary || "(none)"}\nBody: ${note.rawContent.slice(0, 500)}`;
-            })
-            .join("\n\n")}`,
-        },
-      ],
     });
+    // align shape with previous openai response
+    const fakeCompletion = { choices: [{ message: { content: JSON.stringify(completion) } }] };
 
-    const raw = completion.choices[0]?.message?.content || "{}";
+    const raw = fakeCompletion.choices[0]?.message?.content || "{}";
     const parseResult = SynthesizedNotesSchema.safeParse(JSON.parse(raw));
     if (!parseResult.success) {
       console.error("SynthesizedNotesSchema parse error:", parseResult.error.issues);
