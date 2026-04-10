@@ -290,7 +290,17 @@ PRIORITY
 - "low": ideas, reference material, future thoughts, nothing actionable now
 
 CLARIFICATION QUESTIONS
-Only include when confidenceScore < 0.65. Make them specific — use context from recent notes. "Is this for QNote or MealApp?" beats "Which project is this for?" Max 3.
+Only include when confidenceScore < 0.65 AND the note itself is genuinely ambiguous.
+Rules:
+- Questions must be answerable by the user with a short reply
+- Questions must be about THIS note only — never reference other notes or patterns noticed in history
+- Never ask about things not mentioned in this note
+- Never speculate about intent across unrelated notes
+- Bad: "The tree poem — do you want it updated?" (references another note entirely)
+- Bad: "Everything at zero mentions — intentional pause?" (observational, unanswerable)
+- Good: "Is this for QNote or MealApp?" (about this note, answerable)
+- Good: "Who is the meeting with — client or internal?" (about this note, answerable)
+- Max 2 questions. If you cannot form a useful answerable question about THIS note, return [].
 
 ENTITY RULES
 - PERSON: real people's names only — never the user themselves
