@@ -55,11 +55,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No speech detected in audio" }, { status: 422 });
     }
 
+    // Derive a provisional title from the first ~60 chars of transcript
+    const words = transcript.trim().split(/\s+/);
+    let provisionalTitle = words.slice(0, 10).join(" ");
+    if (words.length > 10) provisionalTitle += "…";
+    provisionalTitle = provisionalTitle.slice(0, 80);
+
     // Create note from transcript
     const note = await prisma.note.create({
       data: {
         userId: session.user.id,
-        rawContent: `[Voice note transcribed by AWS Transcribe]\n\n${transcript}`,
+        rawContent: transcript,
+        title: provisionalTitle,
         status: "PROCESSING",
         suggestedProject: projectHint ?? null,
         aiMeta: {
