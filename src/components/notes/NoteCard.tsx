@@ -5,6 +5,7 @@
 "use client";
 
 import { Archive, Check, MoreHorizontal, Pencil, Pin, Trash2, X } from "lucide-react";
+import Link from "next/link";
 import { parseNoteAiMeta } from "@/lib/clarification";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -397,9 +398,15 @@ export default function NoteCard({ note, quickHints }: NoteCardProps) {
         )}
 
         {note.status === "PROCESSED" && (
-          <span className={`px-2 py-1 rounded-full ${confidenceBadge.className}`}>
-            {confidenceBadge.label}
-          </span>
+          confidenceBadge.label === "Needs review" ? (
+            <Link href="/review" className={`px-2 py-1 rounded-full text-[11px] font-medium ${confidenceBadge.className} hover:opacity-80 hover:underline underline-offset-2`}>
+              {confidenceBadge.label} →
+            </Link>
+          ) : (
+            <span className={`px-2 py-1 rounded-full ${confidenceBadge.className}`}>
+              {confidenceBadge.label}
+            </span>
+          )
         )}
       </div>
 

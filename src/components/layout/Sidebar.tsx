@@ -76,7 +76,7 @@ const moreItems = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ reviewCount = 0 }: { reviewCount?: number }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -114,12 +114,19 @@ export default function Sidebar() {
                 }`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium leading-tight">{item.label}</div>
                   <div className={`text-[10px] leading-tight truncate ${
                     isActive ? "text-blue-100" : "text-gray-400"
                   }`}>{item.description}</div>
                 </div>
+                {item.href === "/review" && reviewCount > 0 && (
+                  <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                    isActive ? "bg-white text-blue-600" : "bg-red-500 text-white"
+                  }`}>
+                    {reviewCount}
+                  </span>
+                )}
               </Link>
             );
           })}

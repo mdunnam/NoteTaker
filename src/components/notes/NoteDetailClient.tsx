@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Archive, Check, Pencil, Pin, Trash2, Volume2, X } from "lucide-react";
 import NoteContentRenderer from "@/components/notes/NoteContentRenderer";
 import ClarificationLoop from "@/components/notes/ClarificationLoop";
@@ -298,9 +299,15 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
           <div className="mb-2 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-blue-900">AI Summary</h2>
             <div className="flex items-center gap-2">
-              <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${confidenceBadge.className}`}>
-                {confidenceBadge.label}
-              </span>
+              {confidenceBadge.label === "Needs review" ? (
+                <Link href="/review" className={`rounded-full px-2 py-1 text-[11px] font-medium ${confidenceBadge.className} hover:opacity-80 underline-offset-2 hover:underline`}>
+                  {confidenceBadge.label} →
+                </Link>
+              ) : (
+                <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${confidenceBadge.className}`}>
+                  {confidenceBadge.label}
+                </span>
+              )}
               <button
                 onClick={handleRegenerateSummary}
                 disabled={isRegeneratingSummary}
