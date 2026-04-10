@@ -478,7 +478,7 @@ export async function organizeNote(rawContent: string, options?: OrganizeNoteOpt
     }
 
     const completion = await openaiClient.chat.completions.create({
-      model: "gpt-5.4",
+      model: "gpt-4o",
       temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
@@ -532,7 +532,7 @@ export async function splitNote(rawContent: string) {
     }
 
     const completion = await openaiClient.chat.completions.create({
-      model: "gpt-5.4",
+      model: "gpt-4o",
       temperature: 0.1,
       response_format: { type: "json_object" },
       messages: [
@@ -574,7 +574,7 @@ export async function synthesizeNotes(
 
   try {
     const completion = await openaiClient.chat.completions.create({
-      model: "gpt-5.4",
+      model: "gpt-4o",
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
