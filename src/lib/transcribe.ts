@@ -9,6 +9,7 @@ import {
   GetTranscriptionJobCommand,
   TranscriptionJobStatus,
 } from "@aws-sdk/client-transcribe";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { uploadToS3 } from "./s3";
 
 // Lazy client factory — reads env vars at request time, not module init
@@ -72,12 +73,19 @@ export async function transcribeAudio(params: {
     );
 
     if (job?.TranscriptionJobStatus === TranscriptionJobStatus.COMPLETED) {
-      // Fetch the transcript JSON from S3
-      const transcriptUrl = job.Transcript?.TranscriptFileUri;
-      if (!transcriptUrl) throw new Error("No transcript URL returned");
-
-      const res = await fetch(transcriptUrl);
-      const json = await res.json();
+      // Fetch transcript JSON from S3 using SDK (bucket may block public access)
+      const transcriptKey = `transcripts/${jobName}.json`;
+      const s3 = new S3Client({
+        region: (process.env.AWS_REGION ?? "us-east-1").trim(),
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        },
+      });
+      const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: transcriptKey }));
+      const body = await obj.Body?.transformToString();
+      if (!body) throw new Error("Empty transcript response from S3");
+      const json = JSON.parse(body);
       const transcript = json?.results?.transcripts?.[0]?.transcript ?? "";
       return transcript;
     }
