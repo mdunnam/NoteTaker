@@ -21,15 +21,38 @@ const URGENCY_DOT: Record<string, string> = {
   low: "bg-gray-300",
 };
 
-function DigestItemCard({ item }: { item: DigestItem }) {
+function DigestItemCard({ item, isQuestion }: { item: DigestItem; isQuestion?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+  const [answering, setAnswering] = useState(false);
+  const [answer, setAnswer] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const colorClass = URGENCY_COLORS[item.urgency] ?? URGENCY_COLORS.low;
   const dotClass = URGENCY_DOT[item.urgency] ?? URGENCY_DOT.low;
 
+  async function handleSubmitAnswer() {
+    if (!answer.trim() || !item.noteIds[0]) return;
+    setSubmitting(true);
+    try {
+      await fetch(`/api/notes/${item.noteIds[0]}/clarify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answer: answer.trim(), question: item.text }),
+      });
+      setSubmitted(true);
+      setAnswering(false);
+    } catch {
+      // silent
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div
-      className={`border-l-4 rounded-lg px-4 py-3 shadow-sm ${colorClass} cursor-pointer transition-all`}
-      onClick={() => item.detail && setExpanded((v) => !v)}
+      className={`border-l-4 rounded-lg px-4 py-3 shadow-sm ${colorClass} transition-all`}
+      onClick={() => !isQuestion && item.detail && setExpanded((v) => !v)}
+      style={{ cursor: isQuestion ? "default" : item.detail ? "pointer" : "default" }}
     >
       <div className="flex items-start gap-3">
         <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
@@ -38,7 +61,62 @@ function DigestItemCard({ item }: { item: DigestItem }) {
           {expanded && item.detail && (
             <p className="mt-2 text-sm text-gray-600 leading-relaxed">{item.detail}</p>
           )}
-          {item.noteIds.length > 0 && (
+
+          {/* Answer UI for questions */}
+          {isQuestion && item.noteIds.length > 0 && (
+            <div className="mt-2">
+              {submitted ? (
+                <p className="text-xs text-green-700 font-medium">✓ Answer saved — note will re-enrich shortly</p>
+              ) : answering ? (
+                <div className="flex gap-2 mt-1">
+                  <input
+                    type="text"
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && void handleSubmitAnswer()}
+                    placeholder="Type your answer..."
+                    autoFocus
+                    className="flex-1 rounded border border-amber-300 px-2 py-1 text-xs text-gray-900 outline-none focus:border-amber-500"
+                  />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); void handleSubmitAnswer(); }}
+                    disabled={submitting || !answer.trim()}
+                    className="rounded bg-amber-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    {submitting ? "..." : "Send"}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setAnswering(false); }}
+                    className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setAnswering(true); }}
+                    className="rounded bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200"
+                  >
+                    Answer →
+                  </button>
+                  {item.noteIds.map((id) => (
+                    <Link
+                      key={id}
+                      href={`/notes/${id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[11px] text-blue-600 hover:underline self-center"
+                    >
+                      Open note →
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Normal note links for non-question items */}
+          {!isQuestion && item.noteIds.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {item.noteIds.map((id) => (
                 <Link
@@ -53,7 +131,7 @@ function DigestItemCard({ item }: { item: DigestItem }) {
             </div>
           )}
         </div>
-        {item.detail && (
+        {!isQuestion && item.detail && (
           <span className="text-xs text-gray-400 shrink-0 mt-0.5">{expanded ? "▲" : "▼"}</span>
         )}
       </div>
@@ -63,6 +141,7 @@ function DigestItemCard({ item }: { item: DigestItem }) {
 
 function SectionBlock({ section }: { section: DigestSection }) {
   if (!section.items.length) return null;
+  const isQuestion = section.key === "clarify";
 
   return (
     <section>
@@ -75,7 +154,7 @@ function SectionBlock({ section }: { section: DigestSection }) {
       </h2>
       <div className="space-y-2">
         {section.items.map((item) => (
-          <DigestItemCard key={item.id} item={item} />
+          <DigestItemCard key={item.id} item={item} isQuestion={isQuestion} />
         ))}
       </div>
     </section>
