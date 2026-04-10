@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, Check, Pencil, Pin, Trash2, X } from "lucide-react";
+import { Archive, Check, Pencil, Pin, Trash2, Volume2, X } from "lucide-react";
 import NoteContentRenderer from "@/components/notes/NoteContentRenderer";
 import ClarificationLoop from "@/components/notes/ClarificationLoop";
 import MultiNoteSynthesisPanel from "@/components/notes/MultiNoteSynthesisPanel";
 import NoteHealthPanel from "@/components/notes/NoteHealthPanel";
+import ReadAloudButton from "@/components/voice/ReadAloudButton";
 import { parseNoteAiMeta } from "@/lib/clarification";
 import SplitNoteModal from "@/components/notes/SplitNoteModal";
 import { getConfidenceBadgeConfig } from "@/lib/confidence";
@@ -254,6 +255,7 @@ export default function NoteDetailClient({ note, quickHints }: NoteDetailClientP
                   <button onClick={() => setIsSplitModalOpen(true)} className="rounded-lg p-2 hover:bg-gray-100" title="Split note">
                     <span className="text-xs font-semibold text-gray-700">Split</span>
                   </button>
+                  <ReadAloudButton noteId={note.id} />
                   <button onClick={handlePin} className="rounded-lg p-2 hover:bg-gray-100" title={note.isPinned ? "Unpin" : "Pin"}><Pin className={`h-4 w-4 ${note.isPinned ? "fill-current text-blue-600" : ""}`} /></button>
                   <button onClick={handleArchive} className="rounded-lg p-2 hover:bg-gray-100" title={note.isArchived ? "Restore" : "Archive"}><Archive className="h-4 w-4" /></button>
                   <button onClick={handleDelete} className="rounded-lg p-2 hover:bg-red-100 hover:text-red-700" title="Delete"><Trash2 className="h-4 w-4" /></button>

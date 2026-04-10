@@ -9,6 +9,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Send } from "lucide-react";
 import DumpModal from "@/components/notes/DumpModal";
+import VoiceRecorder from "@/components/voice/VoiceRecorder";
 
 export default function CaptureBar() {
   const [content, setContent] = useState("");
@@ -141,6 +142,11 @@ export default function CaptureBar() {
             >
               Analyze
             </button>
+
+            <VoiceRecorder
+              projectHint={projectHint}
+              onCreated={() => router.refresh()}
+            />
 
             <button
               type="submit"
