@@ -10,11 +10,15 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
   },
   appleWebApp: {
     capable: true,
     title: "QNote",
     statusBarStyle: "default",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 

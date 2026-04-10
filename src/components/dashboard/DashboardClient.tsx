@@ -191,7 +191,7 @@ export default function DashboardClient({ digest: initialDigest, dateStr }: Prop
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1">
+            <p suppressHydrationWarning className="text-xs font-medium uppercase tracking-widest text-gray-400 mb-1">
               {new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
                 weekday: "long", month: "long", day: "numeric",
               })}
@@ -217,7 +217,7 @@ export default function DashboardClient({ digest: initialDigest, dateStr }: Prop
         {(generatedAt || totalItems > 0) && (
           <div className="flex items-center gap-3 text-[12px] text-gray-400">
             {totalItems > 0 && <span>{totalItems} items across {digest.sections.length} sections</span>}
-            {generatedAt && <span>· Generated at {generatedAt}</span>}
+            {generatedAt && <span suppressHydrationWarning>· Generated at {generatedAt}</span>}
           </div>
         )}
 
