@@ -1,20 +1,94 @@
 /**
- * Server-side file text extraction.
- * Handles PDF, DOCX, RTF, XLSX, CSV, TXT, MD, JSON and plain text types.
- * Returns extracted plain text — NO truncation here.
- * The chunkDocument() pipeline downstream handles splitting large content.
+ * Server-side file text extraction with intelligent formatting.
+ *
+ * - DOCX/DOC: full rich markdown (headings, bold, italic, tables, lists)
+ * - PDF: full text extraction + inferFormatting() to reconstruct structure
+ * - Plain text/log: inferFormatting() to detect and add structure
+ * - Markdown: preserved as-is
+ * - CSV/XLSX: formatted as markdown tables
+ * - JSON: pretty-printed in a code block
+ *
+ * NO truncation — chunkDocument() handles size splitting downstream.
  */
+
+import { inferFormatting } from "./inferFormatting";
 
 export interface ParsedFile {
   filename: string;
   text: string;
-  /** How many notes to split into — 1 for most files, more for spreadsheets with many rows */
   suggestedChunks: number;
 }
 
-/** Strip excessive blank lines and normalize line endings */
+/** Normalize line endings and collapse excess blank lines */
 function clean(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Strip HTML tags from a string */
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, "").trim();
+}
+
+/**
+ * Convert mammoth HTML output to rich markdown.
+ * Handles: headings, bold, italic, underline, lists, tables, links, code, hr.
+ */
+function htmlToMarkdown(html: string): string {
+  return html
+    // Headings
+    .replace(/<h1[^>]*>(.*?)<\/h1>/gi, (_, t) => `\n# ${stripTags(t)}\n`)
+    .replace(/<h2[^>]*>(.*?)<\/h2>/gi, (_, t) => `\n## ${stripTags(t)}\n`)
+    .replace(/<h3[^>]*>(.*?)<\/h3>/gi, (_, t) => `\n### ${stripTags(t)}\n`)
+    .replace(/<h4[^>]*>(.*?)<\/h4>/gi, (_, t) => `\n#### ${stripTags(t)}\n`)
+    .replace(/<h5[^>]*>(.*?)<\/h5>/gi, (_, t) => `\n##### ${stripTags(t)}\n`)
+    .replace(/<h6[^>]*>(.*?)<\/h6>/gi, (_, t) => `\n###### ${stripTags(t)}\n`)
+    // Bold / Strong
+    .replace(/<(strong|b)[^>]*>(.*?)<\/(strong|b)>/gi, (_, _t, content) => `**${stripTags(content)}**`)
+    // Italic / Em
+    .replace(/<(em|i)[^>]*>(.*?)<\/(em|i)>/gi, (_, _t, content) => `_${stripTags(content)}_`)
+    // Underline → bold (markdown has no underline)
+    .replace(/<u[^>]*>(.*?)<\/u>/gi, (_, content) => `**${stripTags(content)}**`)
+    // Strikethrough
+    .replace(/<s[^>]*>(.*?)<\/s>/gi, (_, content) => `~~${stripTags(content)}~~`)
+    // Code
+    .replace(/<code[^>]*>(.*?)<\/code>/gi, (_, content) => `\`${stripTags(content)}\``)
+    .replace(/<pre[^>]*>(.*?)<\/pre>/gis, (_, content) => `\n\`\`\`\n${stripTags(content)}\n\`\`\`\n`)
+    // Links
+    .replace(/<a[^>]+href="([^"]*)"[^>]*>(.*?)<\/a>/gi, (_, href, text) => `[${stripTags(text)}](${href})`)
+    // Tables
+    .replace(/<table[^>]*>(.*?)<\/table>/gis, (_, tableContent) => {
+      const rows: string[][] = [];
+      const rowMatches = tableContent.match(/<tr[^>]*>(.*?)<\/tr>/gis) || [];
+      for (const row of rowMatches) {
+        const cells = row.match(/<t[dh][^>]*>(.*?)<\/t[dh]>/gis) || [];
+        rows.push(cells.map((cell) => stripTags(cell).replace(/\n/g, " ").trim()));
+      }
+      if (rows.length === 0) return "";
+      const header = rows[0];
+      const sep = header.map(() => "---");
+      const mdRows = [
+        `| ${header.join(" | ")} |`,
+        `| ${sep.join(" | ")} |`,
+        ...rows.slice(1).map((r) => `| ${r.join(" | ")} |`),
+      ];
+      return `\n${mdRows.join("\n")}\n`;
+    })
+    // Unordered lists
+    .replace(/<ul[^>]*>(.*?)<\/ul>/gis, (_, content) => `\n${content}\n`)
+    .replace(/<ol[^>]*>(.*?)<\/ol>/gis, (_, content) => `\n${content}\n`)
+    .replace(/<li[^>]*>(.*?)<\/li>/gi, (_, t) => `- ${stripTags(t).trim()}\n`)
+    // Horizontal rule
+    .replace(/<hr[^>]*\/?>/gi, "\n---\n")
+    // Line breaks
+    .replace(/<br\s*\/?>/gi, "\n")
+    // Paragraphs
+    .replace(/<p[^>]*>(.*?)<\/p>/gis, (_, t) => `\n${stripTags(t).trim()}\n`)
+    // Blockquote
+    .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, (_, t) =>
+      t.split("\n").map((l: string) => `> ${l.trim()}`).join("\n")
+    )
+    // Strip remaining tags
+    .replace(/<[^>]+>/g, "");
 }
 
 export async function parseFile(file: File): Promise<ParsedFile> {
@@ -22,28 +96,63 @@ export async function parseFile(file: File): Promise<ParsedFile> {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   const mime = file.type;
 
-  // --- Plain text / markdown / log / JSON ---
-  if (
-    mime.startsWith("text/") ||
-    ["txt", "md", "markdown", "log", "json", "tsv"].includes(ext)
-  ) {
+  // --- Markdown — preserve as-is ---
+  if (ext === "md" || ext === "markdown") {
     const text = clean(await file.text());
     return { filename: name, text, suggestedChunks: 1 };
   }
 
-  // --- CSV ---
-  if (ext === "csv" || mime === "text/csv") {
-    const raw = clean(await file.text());
-    return { filename: name, text: raw, suggestedChunks: 1 };
+  // --- JSON — code block ---
+  if (ext === "json" || mime === "application/json") {
+    try {
+      const raw = await file.text();
+      const parsed = JSON.parse(raw);
+      const pretty = JSON.stringify(parsed, null, 2);
+      return {
+        filename: name,
+        text: `\`\`\`json\n${pretty}\n\`\`\``,
+        suggestedChunks: 1,
+      };
+    } catch {
+      const raw = clean(await file.text());
+      return { filename: name, text: raw, suggestedChunks: 1 };
+    }
   }
 
-  // --- PDF ---
+  // --- Plain text / log / TSV — infer formatting ---
+  if (
+    mime.startsWith("text/") ||
+    ["txt", "log", "tsv"].includes(ext)
+  ) {
+    const raw = clean(await file.text());
+    const formatted = inferFormatting(raw);
+    return { filename: name, text: formatted, suggestedChunks: 1 };
+  }
+
+  // --- CSV — format as markdown table ---
+  if (ext === "csv" || mime === "text/csv") {
+    const raw = await file.text();
+    const lines = raw.split("\n").filter((l) => l.trim());
+    if (lines.length === 0) return { filename: name, text: "", suggestedChunks: 1 };
+
+    const rows = lines.map((line) =>
+      line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, ""))
+    );
+    const header = rows[0];
+    const sep = header.map(() => "---");
+    const mdRows = [
+      `| ${header.join(" | ")} |`,
+      `| ${sep.join(" | ")} |`,
+      ...rows.slice(1).map((r) => `| ${r.join(" | ")} |`),
+    ];
+    return { filename: name, text: mdRows.join("\n"), suggestedChunks: 1 };
+  }
+
+  // --- PDF — extract text + infer formatting ---
   if (ext === "pdf" || mime === "application/pdf") {
     const buffer = await file.arrayBuffer();
-    // pdfjs-dist (used by pdf-parse) requires DOMMatrix which isn't available in Node/serverless.
-    // Polyfill it before importing so the parse doesn't crash.
+
     if (typeof globalThis.DOMMatrix === "undefined") {
-      // Minimal stub — pdfjs only uses it for affine transforms during text extraction
       // @ts-expect-error polyfill
       globalThis.DOMMatrix = class DOMMatrix {
         a = 1; b = 0; c = 0; d = 1; e = 0; f = 0;
@@ -69,16 +178,19 @@ export async function parseFile(file: File): Promise<ParsedFile> {
         toString() { return "matrix(1,0,0,1,0,0)"; }
       };
     }
+
     const pdfParseModule = await import("pdf-parse");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
     const result = await pdfParse(Buffer.from(buffer));
-    const text = clean(result.text ?? "");
-    return { filename: name, text, suggestedChunks: 1 };
+    const rawText = clean(result.text ?? "");
+
+    // Run intelligent formatting inference on flat PDF text
+    const formatted = inferFormatting(rawText);
+    return { filename: name, text: formatted, suggestedChunks: 1 };
   }
 
-  // --- DOCX / DOC / RTF ---
-  // Use convertToHtml so we can preserve heading structure as markdown headers
+  // --- DOCX / DOC / RTF — rich markdown via mammoth ---
   if (
     ext === "docx" ||
     ext === "doc" ||
@@ -91,7 +203,6 @@ export async function parseFile(file: File): Promise<ParsedFile> {
     const buffer = await file.arrayBuffer();
     const mammoth = await import("mammoth");
 
-    // Convert to HTML with heading styles mapped to markdown-style headers
     const htmlResult = await mammoth.convertToHtml(
       { buffer: Buffer.from(buffer) },
       {
@@ -100,28 +211,22 @@ export async function parseFile(file: File): Promise<ParsedFile> {
           "p[style-name='Heading 2'] => h2:fresh",
           "p[style-name='Heading 3'] => h3:fresh",
           "p[style-name='Heading 4'] => h4:fresh",
+          "p[style-name='Heading 5'] => h5:fresh",
+          "p[style-name='Heading 6'] => h6:fresh",
           "p[style-name='Title'] => h1:fresh",
           "p[style-name='Subtitle'] => h2:fresh",
+          "p[style-name='Quote'] => blockquote:fresh",
+          "p[style-name='Intense Quote'] => blockquote:fresh",
+          "p[style-name='Code'] => pre:fresh",
         ],
       }
     );
 
-    // Convert HTML headings to markdown headers for chunkDocument() to detect
-    const markdown = htmlResult.value
-      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, (_, t) => `\n# ${stripTags(t)}\n`)
-      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, (_, t) => `\n## ${stripTags(t)}\n`)
-      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, (_, t) => `\n### ${stripTags(t)}\n`)
-      .replace(/<h4[^>]*>(.*?)<\/h4>/gi, (_, t) => `\n#### ${stripTags(t)}\n`)
-      .replace(/<li[^>]*>(.*?)<\/li>/gi, (_, t) => `- ${stripTags(t)}\n`)
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<p[^>]*>(.*?)<\/p>/gi, (_, t) => `${stripTags(t)}\n\n`)
-      .replace(/<[^>]+>/g, "");
-
+    const markdown = htmlToMarkdown(htmlResult.value);
     return { filename: name, text: clean(markdown), suggestedChunks: 1 };
   }
 
-  // --- XLSX / XLS ---
-  // Each sheet becomes its own H2 section so chunkDocument() can split by sheet
+  // --- XLSX / XLS — one H2 section per sheet, formatted as markdown tables ---
   if (
     ext === "xlsx" ||
     ext === "xls" ||
@@ -132,18 +237,31 @@ export async function parseFile(file: File): Promise<ParsedFile> {
     const XLSX = await import("xlsx");
     const workbook = XLSX.read(Buffer.from(buffer), { type: "buffer" });
 
-    const sheets: string[] = [];
+    const sections: string[] = [];
     for (const sheetName of workbook.SheetNames) {
       const sheet = workbook.Sheets[sheetName];
-      const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
-      if (csv.trim()) {
-        // Use H2 so chunkDocument() will split by sheet automatically
-        sheets.push(`## ${sheetName}\n\n${csv.trim()}`);
-      }
+      // Get as array of arrays for proper table formatting
+      const data = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1, defval: "" });
+      if (data.length === 0) continue;
+
+      const header = (data[0] as string[]).map(String);
+      const sep = header.map(() => "---");
+      const mdRows = [
+        `| ${header.join(" | ")} |`,
+        `| ${sep.join(" | ")} |`,
+        ...data.slice(1).map((row) =>
+          `| ${(row as string[]).map(String).join(" | ")} |`
+        ),
+      ];
+
+      sections.push(`## ${sheetName}\n\n${mdRows.join("\n")}`);
     }
 
-    const text = clean(sheets.join("\n\n"));
-    return { filename: name, text, suggestedChunks: workbook.SheetNames.length };
+    return {
+      filename: name,
+      text: clean(sections.join("\n\n")),
+      suggestedChunks: workbook.SheetNames.length,
+    };
   }
 
   // --- PPTX ---
@@ -153,20 +271,15 @@ export async function parseFile(file: File): Promise<ParsedFile> {
   ) {
     return {
       filename: name,
-      text: `[PPTX file: ${name}]\nPowerPoint files cannot be fully parsed. Please export as PDF first, then re-import.`,
+      text: `> **Note:** PowerPoint files cannot be fully parsed. Please export as PDF first, then re-import.\n\n[PPTX file: ${name}]`,
       suggestedChunks: 1,
     };
   }
 
-  // --- Fallback for unknown types ---
+  // --- Fallback ---
   return {
     filename: name,
-    text: `[Unsupported file: ${name} (${mime || ext})]\nThis file type could not be parsed. Copy and paste the content manually.`,
+    text: `> **Note:** Unsupported file type: \`${ext || mime}\`. Copy and paste the content manually.\n\n[File: ${name}]`,
     suggestedChunks: 1,
   };
-}
-
-/** Strip HTML tags from a string */
-function stripTags(html: string): string {
-  return html.replace(/<[^>]+>/g, "").trim();
 }
