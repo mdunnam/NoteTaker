@@ -14,6 +14,7 @@ import {
   getThinkingMemory,
   updateThinkingMemory,
 } from "@/lib/userMemory";
+import { analyzeText } from "@/lib/comprehend";
 
 export interface EnrichNoteOptions {
   noteId: string;
@@ -78,12 +79,17 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
   const { noteId, userId, rawContent, fallbackTags } = options;
 
   try {
-    const [currentNoteHints, thinkingMemory, recentNotes] = await Promise.all([
+    const [currentNoteHints, thinkingMemory, recentNotes, comprehendInsights] = await Promise.all([
       prisma.note.findUnique({
         where: { id: noteId },
         select: { suggestedProject: true, category: true, aiMeta: true },
       }),
       getThinkingMemory(userId),
+      // Comprehend: parallel sentiment/entity analysis (non-fatal)
+      analyzeText(rawContent.slice(0, 4900)).catch((err) => {
+        console.warn("Comprehend analysis failed (non-fatal):", err);
+        return null;
+      }),
       // Fetch recent notes for corpus context — exclude the note being enriched
       prisma.note.findMany({
         where: { userId, isArchived: false, status: "PROCESSED", id: { not: noteId } },
@@ -123,6 +129,12 @@ export async function enrichNote(options: EnrichNoteOptions): Promise<void> {
       intent: organized.intent || null,
       nextAction: organized.nextAction || null,
       clarificationQuestions: organized.clarificationQuestions || [],
+      // AWS Comprehend insights
+      ...(comprehendInsights ? {
+        sentiment: comprehendInsights.sentiment,
+        comprehendEntities: comprehendInsights.entities,
+        keyPhrases: comprehendInsights.keyPhrases,
+      } : {}),
     };
 
     await prisma.note.update({
