@@ -6,16 +6,20 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const region = process.env.AWS_REGION ?? "us-east-1";
-const bucket = process.env.AWS_S3_BUCKET ?? "qnote-blinq";
+// Lazy client factory — reads env vars at request time, not module init
+function getS3Client(): S3Client {
+  const region = (process.env.AWS_REGION ?? "us-east-1").trim();
+  if (!region) throw new Error("AWS_REGION env var is not set");
+  return new S3Client({
+    region,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    },
+  });
+}
 
-export const s3Client = new S3Client({
-  region,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-});
+const bucket = () => (process.env.AWS_S3_BUCKET ?? "qnote-blinq").trim();
 
 /**
  * Upload a file buffer to S3.
@@ -27,9 +31,9 @@ export async function uploadToS3(params: {
   contentType: string;
   metadata?: Record<string, string>;
 }): Promise<string> {
-  await s3Client.send(
+  await getS3Client().send(
     new PutObjectCommand({
-      Bucket: bucket,
+      Bucket: bucket(),
       Key: params.key,
       Body: params.body,
       ContentType: params.contentType,
@@ -44,15 +48,15 @@ export async function uploadToS3(params: {
  * Default expiry: 1 hour.
  */
 export async function getPresignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-  return getSignedUrl(s3Client, command, { expiresIn: expiresInSeconds });
+  const command = new GetObjectCommand({ Bucket: bucket(), Key: key });
+  return getSignedUrl(getS3Client(), command, { expiresIn: expiresInSeconds });
 }
 
 /**
  * Delete an object from S3.
  */
 export async function deleteFromS3(key: string): Promise<void> {
-  await s3Client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  await getS3Client().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
 }
 
 /**

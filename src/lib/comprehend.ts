@@ -11,15 +11,18 @@ import {
   LanguageCode,
 } from "@aws-sdk/client-comprehend";
 
-const region = process.env.AWS_REGION ?? "us-east-1";
-
-export const comprehendClient = new ComprehendClient({
-  region,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-});
+// Lazy client factory — reads env vars at request time, not module init
+function getComprehendClient(): ComprehendClient {
+  const region = (process.env.AWS_REGION ?? "us-east-1").trim();
+  if (!region) throw new Error("AWS_REGION env var is not set");
+  return new ComprehendClient({
+    region,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    },
+  });
+}
 
 export interface ComprehendInsights {
   sentiment: {
@@ -42,6 +45,7 @@ export async function analyzeText(text: string): Promise<ComprehendInsights> {
   // Comprehend max is 5000 UTF-8 bytes
   const truncated = Buffer.from(text).slice(0, 4900).toString("utf-8");
   const lang = LanguageCode.EN;
+  const comprehendClient = getComprehendClient();
 
   const [sentimentResult, entitiesResult, keyPhrasesResult] = await Promise.all([
     comprehendClient.send(new DetectSentimentCommand({ Text: truncated, LanguageCode: lang })),
