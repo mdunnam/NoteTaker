@@ -1,7 +1,8 @@
 /**
  * Server-side file text extraction.
  * Handles PDF, DOCX, RTF, XLSX, CSV, TXT, MD, JSON and plain text types.
- * Returns extracted plain text ready for AI enrichment.
+ * Returns extracted plain text — NO truncation here.
+ * The chunkDocument() pipeline downstream handles splitting large content.
  */
 
 export interface ParsedFile {
@@ -11,19 +12,7 @@ export interface ParsedFile {
   suggestedChunks: number;
 }
 
-/** Max characters to send to AI per note — avoid token overflow */
-const MAX_CHARS_PER_NOTE = 12_000;
-
-/** Truncate with a notice if content is too long */
-function truncate(text: string, filename: string): string {
-  if (text.length <= MAX_CHARS_PER_NOTE) return text;
-  return (
-    text.slice(0, MAX_CHARS_PER_NOTE) +
-    `\n\n[Truncated: ${filename} exceeded ${MAX_CHARS_PER_NOTE} chars. Import remaining content separately.]`
-  );
-}
-
-/** Strip excessive blank lines */
+/** Strip excessive blank lines and normalize line endings */
 function clean(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
@@ -39,13 +28,13 @@ export async function parseFile(file: File): Promise<ParsedFile> {
     ["txt", "md", "markdown", "log", "json", "tsv"].includes(ext)
   ) {
     const text = clean(await file.text());
-    return { filename: name, text: truncate(text, name), suggestedChunks: 1 };
+    return { filename: name, text, suggestedChunks: 1 };
   }
 
   // --- CSV ---
   if (ext === "csv" || mime === "text/csv") {
     const raw = clean(await file.text());
-    return { filename: name, text: truncate(raw, name), suggestedChunks: 1 };
+    return { filename: name, text: raw, suggestedChunks: 1 };
   }
 
   // --- PDF ---
@@ -83,13 +72,13 @@ export async function parseFile(file: File): Promise<ParsedFile> {
     const pdfParseModule = await import("pdf-parse");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfParse = (pdfParseModule as any).default ?? pdfParseModule;
-    // pdf-parse v1: simple function, no worker, works in serverless/Vercel
     const result = await pdfParse(Buffer.from(buffer));
-    const text = result.text ?? "";
-    return { filename: name, text: truncate(clean(text), name), suggestedChunks: 1 };
+    const text = clean(result.text ?? "");
+    return { filename: name, text, suggestedChunks: 1 };
   }
 
   // --- DOCX / DOC / RTF ---
+  // Use convertToHtml so we can preserve heading structure as markdown headers
   if (
     ext === "docx" ||
     ext === "doc" ||
@@ -101,12 +90,38 @@ export async function parseFile(file: File): Promise<ParsedFile> {
   ) {
     const buffer = await file.arrayBuffer();
     const mammoth = await import("mammoth");
-    const result = await mammoth.extractRawText({ buffer: Buffer.from(buffer) });
-    const text = clean(result.value);
-    return { filename: name, text: truncate(text, name), suggestedChunks: 1 };
+
+    // Convert to HTML with heading styles mapped to markdown-style headers
+    const htmlResult = await mammoth.convertToHtml(
+      { buffer: Buffer.from(buffer) },
+      {
+        styleMap: [
+          "p[style-name='Heading 1'] => h1:fresh",
+          "p[style-name='Heading 2'] => h2:fresh",
+          "p[style-name='Heading 3'] => h3:fresh",
+          "p[style-name='Heading 4'] => h4:fresh",
+          "p[style-name='Title'] => h1:fresh",
+          "p[style-name='Subtitle'] => h2:fresh",
+        ],
+      }
+    );
+
+    // Convert HTML headings to markdown headers for chunkDocument() to detect
+    const markdown = htmlResult.value
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, (_, t) => `\n# ${stripTags(t)}\n`)
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, (_, t) => `\n## ${stripTags(t)}\n`)
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, (_, t) => `\n### ${stripTags(t)}\n`)
+      .replace(/<h4[^>]*>(.*?)<\/h4>/gi, (_, t) => `\n#### ${stripTags(t)}\n`)
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, (_, t) => `- ${stripTags(t)}\n`)
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<p[^>]*>(.*?)<\/p>/gi, (_, t) => `${stripTags(t)}\n\n`)
+      .replace(/<[^>]+>/g, "");
+
+    return { filename: name, text: clean(markdown), suggestedChunks: 1 };
   }
 
   // --- XLSX / XLS ---
+  // Each sheet becomes its own H2 section so chunkDocument() can split by sheet
   if (
     ext === "xlsx" ||
     ext === "xls" ||
@@ -122,12 +137,13 @@ export async function parseFile(file: File): Promise<ParsedFile> {
       const sheet = workbook.Sheets[sheetName];
       const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
       if (csv.trim()) {
-        sheets.push(`## Sheet: ${sheetName}\n${csv.trim()}`);
+        // Use H2 so chunkDocument() will split by sheet automatically
+        sheets.push(`## ${sheetName}\n\n${csv.trim()}`);
       }
     }
 
     const text = clean(sheets.join("\n\n"));
-    return { filename: name, text: truncate(text, name), suggestedChunks: 1 };
+    return { filename: name, text, suggestedChunks: workbook.SheetNames.length };
   }
 
   // --- PPTX ---
@@ -137,7 +153,7 @@ export async function parseFile(file: File): Promise<ParsedFile> {
   ) {
     return {
       filename: name,
-      text: `[PPTX file: ${name}]\nPowerPoint files cannot be fully parsed. Please copy and paste the slide text manually, or export as PDF first.`,
+      text: `[PPTX file: ${name}]\nPowerPoint files cannot be fully parsed. Please export as PDF first, then re-import.`,
       suggestedChunks: 1,
     };
   }
@@ -148,4 +164,9 @@ export async function parseFile(file: File): Promise<ParsedFile> {
     text: `[Unsupported file: ${name} (${mime || ext})]\nThis file type could not be parsed. Copy and paste the content manually.`,
     suggestedChunks: 1,
   };
+}
+
+/** Strip HTML tags from a string */
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, "").trim();
 }

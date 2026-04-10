@@ -2,8 +2,9 @@
  * POST /api/import
  *
  * Accepts multipart/form-data with one or more files.
- * Extracts text from each file, runs AI split analysis, creates one note
- * per logical section, and enqueues enrichment for each.
+ * Extracts full text from each file, applies header-aware chunking
+ * (H1 → H2 → H3 → paragraphs), creates one note per chunk,
+ * archives the original to S3, and enqueues AI enrichment for each.
  *
  * Form fields:
  *   files[]      — one or more File objects (required)
@@ -14,7 +15,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { parseFile } from "@/lib/fileParser";
-import { splitNote } from "@/lib/ai";
+import { chunkDocument } from "@/lib/chunkDocument";
+import { uploadToS3, buildImportKey } from "@/lib/s3";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_FILES = 50;
@@ -34,20 +36,15 @@ async function enqueueEnrichment(noteId: string, userId: string, origin: string)
 }
 
 /**
- * Derive a smart provisional title from raw text — used before AI enrichment
- * completes so notes never appear as "Untitled".
+ * Derive a smart provisional title — used before AI enrichment completes
+ * so notes never appear as "Untitled".
  */
-function provisionalTitle(filename: string, content: string, splitTitle?: string): string {
-  // If the AI gave us a title from split, use it
-  if (splitTitle && splitTitle.trim() && splitTitle.trim().toLowerCase() !== "untitled") {
-    return splitTitle.trim().slice(0, 80);
+function provisionalTitle(filename: string, content: string, chunkTitle?: string): string {
+  if (chunkTitle && chunkTitle.trim() && chunkTitle.trim().toLowerCase() !== "untitled") {
+    return chunkTitle.trim().slice(0, 80);
   }
-  // Otherwise use the first non-empty line of content (trimmed)
   const firstLine = content.split("\n").map((l) => l.trim()).find((l) => l.length > 3);
-  if (firstLine && firstLine.length <= 120) {
-    return firstLine.slice(0, 80);
-  }
-  // Fall back to filename without extension
+  if (firstLine && firstLine.length <= 120) return firstLine.slice(0, 80);
   return filename.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ").slice(0, 80);
 }
 
@@ -73,7 +70,7 @@ export async function POST(request: NextRequest) {
   }
 
   const limited = files.slice(0, MAX_FILES);
-  const results: Array<{ filename: string; noteIds?: string[]; error?: string }> = [];
+  const results: Array<{ filename: string; noteIds?: string[]; chunks?: number; error?: string }> = [];
 
   for (const file of limited) {
     if (!(file instanceof File)) {
@@ -94,32 +91,38 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Run AI split analysis — breaks multi-topic content into distinct cards
-      let splits: Array<{ title: string; content: string; category: string; type: string }>;
+      // Archive original file to S3 (non-fatal)
+      let s3Key: string | undefined;
       try {
-        const splitResult = await splitNote(parsed.text);
-        splits = splitResult.needsSplit && splitResult.notes.length > 1
-          ? splitResult.notes
-          : [{ title: "", content: parsed.text, category: contextHint || "General", type: "NOTE" }];
-      } catch {
-        // If split fails, fall back to single note
-        splits = [{ title: "", content: parsed.text, category: contextHint || "General", type: "NOTE" }];
+        const buffer = Buffer.from(await file.arrayBuffer());
+        s3Key = buildImportKey(session.user.id, file.name);
+        await uploadToS3({
+          key: s3Key,
+          body: buffer,
+          contentType: file.type || "application/octet-stream",
+          metadata: { userId: session.user.id, originalName: file.name },
+        });
+      } catch (s3Err) {
+        console.warn(`S3 upload failed for ${file.name}:`, s3Err);
+        s3Key = undefined;
       }
 
+      // Header-aware chunking: H1 → H2 → H3 → paragraphs
+      const chunks = chunkDocument(parsed.text, parsed.filename);
       const noteIds: string[] = [];
 
-      for (const split of splits) {
-        const rawContent = `[Imported from: ${parsed.filename}]\n\n${split.content}`;
-        const title = provisionalTitle(file.name, split.content, split.title);
+      for (const chunk of chunks) {
+        const rawContent = `[Imported from: ${parsed.filename}]\n\n${chunk.content}`;
+        const title = provisionalTitle(file.name, chunk.content, chunk.title);
 
         const note = await prisma.note.create({
           data: {
             userId: session.user.id,
             rawContent,
-            title,  // Set immediately — no more "Untitled" while enrichment runs
+            title,
             status: "PROCESSING",
-            category: split.category || contextHint || null,
-            type: split.type || "NOTE",
+            category: contextHint || null,
+            type: "NOTE",
             suggestedProject: projectHint ?? null,
             aiMeta: {
               captureMode: "import",
@@ -127,6 +130,9 @@ export async function POST(request: NextRequest) {
                 name: file.name,
                 type: file.type || "unknown",
                 size: file.size,
+                s3Key: s3Key ?? null,
+                totalChunks: chunks.length,
+                chunkIndex: noteIds.length,
               },
             },
           },
@@ -142,7 +148,7 @@ export async function POST(request: NextRequest) {
         where: { userId: session.user.id, date: todayStr },
       }).catch(() => {});
 
-      results.push({ filename: file.name, noteIds });
+      results.push({ filename: file.name, noteIds, chunks: chunks.length });
     } catch (err) {
       console.error(`Error importing file ${file.name}:`, err);
       results.push({
@@ -157,12 +163,7 @@ export async function POST(request: NextRequest) {
   const totalNotes = succeeded.reduce((sum, r) => sum + (r.noteIds?.length ?? 0), 0);
 
   return NextResponse.json(
-    {
-      imported: succeeded.length,
-      totalNotes,
-      failed: failed.length,
-      results,
-    },
+    { imported: succeeded.length, totalNotes, failed: failed.length, results },
     { status: 201 }
   );
 }
