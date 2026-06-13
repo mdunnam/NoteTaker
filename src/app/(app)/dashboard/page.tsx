@@ -1,39 +1,69 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import { getOrCreateDigest } from "@/lib/dailyDigest";
-import DashboardClient from "@/components/dashboard/DashboardClient";
-import type { DigestContent } from "@/lib/digestTypes";
-
-export const dynamic = "force-dynamic";
+import { prisma } from "@/lib/db";
+import { getUserId } from "@/lib/user";
+import DashboardClient from "./DashboardClient";
+import { getTodayEventsSafe } from "@/lib/calendar";
+import { getSlackAttentionSafe } from "@/lib/slack";
 
 export default async function DashboardPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  const userId = await getUserId();
+  const today = new Date().toISOString().split("T")[0];
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
 
-  const dateStr = new Date().toISOString().split("T")[0];
+  const [tasks, habits, projects, recentNotes, events, slackItems] = await Promise.all([
+    prisma.task.findMany({
+      where: { userId, status: { not: "DONE" } },
+      orderBy: [{ dueDate: "asc" }, { priority: "desc" }],
+      take: 20,
+    }),
+    prisma.habit.findMany({ where: { userId, isActive: true } }),
+    prisma.project.findMany({ where: { userId, status: "ACTIVE" }, take: 5 }),
+    prisma.note.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 5 }),
+    getTodayEventsSafe(),
+    getSlackAttentionSafe(),
+  ]);
 
-  let digest: DigestContent | null = null;
-  let errorMsg: string | null = null;
+  const todayLogs = await prisma.habitLog.findMany({
+    where: { habitId: { in: habits.map((h) => h.id) }, date: today },
+  });
 
-  try {
-    digest = await getOrCreateDigest(session.user.id, dateStr);
-  } catch (err) {
-    console.error("[Dashboard] failed to load digest:", err);
-    errorMsg = err instanceof Error ? err.message : String(err);
-  }
+  const habitCompletions = new Map(todayLogs.map((l) => [l.habitId, l.completed]));
+  const dueToday = tasks.filter((t) => !t.dueDate || t.dueDate <= todayEnd);
+  const habitsCompleted = habits.filter((h) => habitCompletions.get(h.id)).length;
 
-  if (errorMsg || !digest) {
-    return (
-      <div className="p-8 max-w-xl mx-auto mt-16 text-center">
-        <p className="text-4xl mb-4">⚠️</p>
-        <h1 className="text-xl font-semibold text-gray-800">Digest failed to load</h1>
-        <p className="mt-2 text-sm text-gray-500 font-mono bg-gray-100 rounded p-3 text-left break-all">
-          {errorMsg ?? "Unknown error"}
-        </p>
-        <p className="mt-4 text-sm text-gray-400">Check Vercel function logs for the full stack trace.</p>
-      </div>
-    );
-  }
-
-  return <DashboardClient digest={digest} dateStr={dateStr} />;
+  return (
+    <DashboardClient
+      tasks={tasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        priority: t.priority,
+        status: t.status,
+        dueDate: t.dueDate?.toISOString() ?? null,
+        notes: t.notes,
+        projectId: t.projectId,
+      }))}
+      habits={habits.map((h) => ({
+        id: h.id,
+        name: h.name,
+        icon: h.icon,
+        color: h.color,
+        completedToday: !!habitCompletions.get(h.id),
+      }))}
+      projects={projects.map((p) => ({
+        id: p.id,
+        name: p.name,
+        color: p.color,
+        taskCount: 0,
+      }))}
+      recentNotes={recentNotes.map((n) => ({
+        id: n.id,
+        title: n.title,
+        content: n.content.slice(0, 120),
+        createdAt: n.createdAt.toISOString(),
+      }))}
+      events={events}
+      slackItems={slackItems}
+      stats={{ dueTodayCount: dueToday.length, habitsCompleted, habitsTotal: habits.length }}
+    />
+  );
 }

@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,252 +7,189 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model for NextAuth.js
+// Single system user — bootstrapped at startup, no login ever
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String    // hashed
-  name          String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  name      String   @default("You")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  notes         Note[]
-  collections   Collection[]
-  entities      Entity[]
-  preferences   UserPreferences?
-  apiKeys       ApiKey[]
-  metricSnapshots UserMetricSnapshot[]
-  dailyDigests  DailyDigest[]
-
-  @@index([email])
+  tasks     Task[]
+  habits    Habit[]
+  projects  Project[]
+  notes     Note[]
+  messages  Message[]
+  memories  Memory[]
 }
 
-model UserMetricSnapshot {
-  id                    String   @id @default(cuid())
-  userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+// Tasks
 
-  snapshotDate          DateTime
-  avgConfidence         Float    @default(0)
-  clarificationRate     Float    @default(0)
-  avgTimeToResolutionMs Float    @default(0)
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  @@unique([userId, snapshotDate])
-  @@index([userId, snapshotDate])
-}
-
-model UserPreferences {
-  id            String    @id @default(cuid())
-  userId        String    @unique
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  defaultCollection String?
-  theme         String    @default("system")
-  thinkingMemory Json?
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-}
-
-// Core Note model
-model Note {
-  id                String    @id @default(cuid())
-  userId            String
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  rawContent        String    @db.Text
-  title             String?
-  summary           String?   @db.Text
-  category          String?
-  type              String?   // TASK, IDEA, NOTE, REFERENCE, etc.
-  
-  tags              String[]  @default([])
-  suggestedProject  String?
-  extractedTasks    Json?     // Array of { text, dueDate?, completed? }
-  extractedDates    Json?     // Array of dates mentioned
-  extractedEntities Json?     // Array of { type, name } for people, projects, etc.
-  
-  status            NoteStatus @default(UNPROCESSED) // UNPROCESSED, PROCESSING, PROCESSED
-  confidenceScore   Float?    @default(0.5)
-  priority          String?   // "high" | "medium" | "low" — AI-assigned urgency
-  aiMeta            Json?     // { intent, nextAction, clarificationQuestions }
-  
-  embedding         Unsupported("vector(1536)")?  // OpenAI text-embedding-3-large w/ dimensions:1536
-  
-  isArchived        Boolean   @default(false)
-  isPinned          Boolean   @default(false)
-  isSplitFrom       String?   // If this note was split from another
-  
-  collectionId      String?
-  collection        Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
-  
-  relatedNotesFrom  NoteRelation[] @relation("source")
-  relatedNotesTo    NoteRelation[] @relation("target")
-  
-  entities          NoteEntity[]
-  jobs              NoteJob[]
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  @@index([userId])
-  @@index([status])
-  @@index([collectionId])
-  @@index([isArchived])
-  @@index([createdAt])
-}
-
-enum NoteStatus {
-  UNPROCESSED
-  PROCESSING
-  PROCESSED
-}
-
-enum JobStatus {
-  PENDING
-  PROCESSING
-  DONE
-  FAILED
-}
-
-// Durable enrichment job queue — survives serverless cold-starts and retries on failure
-model NoteJob {
-  id          String    @id @default(cuid())
-  noteId      String
-  note        Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+model Task {
+  id          String     @id @default(cuid())
   userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  status      JobStatus @default(PENDING)
-  attempts    Int       @default(0)
-  maxAttempts Int       @default(3)
-  lastError   String?   @db.Text
+  title       String
+  notes       String?    @db.Text
+  priority    Priority   @default(MEDIUM)
+  status      TaskStatus @default(TODO)
 
-  scheduledAt DateTime  @default(now())
-  processedAt DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  source       String?
+  sourceId     String?  @unique
+  recurrence   String?
+  parentTaskId String?
+  parentTask   Task?    @relation("recurring", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  childTasks   Task[]   @relation("recurring")
 
-  @@index([status, scheduledAt])
-  @@index([noteId])
-}
-
-// Related notes (many-to-many with score)
-model NoteRelation {
-  id            String    @id @default(cuid())
-  sourceNoteId  String
-  targetNoteId  String
-  
-  sourceNote    Note      @relation("source", fields: [sourceNoteId], references: [id], onDelete: Cascade)
-  targetNote    Note      @relation("target", fields: [targetNoteId], references: [id], onDelete: Cascade)
-  
-  score         Float     @default(0.5) // Similarity score 0-1
-  reason        String?   // Why they're related
-  
-  createdAt     DateTime  @default(now())
-
-  @@unique([sourceNoteId, targetNoteId])
-  @@index([sourceNoteId])
-  @@index([targetNoteId])
-}
-
-// Collections (user-created containers like Work, Personal, etc.)
-model Collection {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  name          String
-  description   String?   @db.Text
-  color         String?   @default("gray")
-  icon          String?
-  
-  notes         Note[]
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  @@index([userId])
-}
-
-// Entities detected by AI (people, projects, topics, etc.)
-model Entity {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  type          EntityType
-  name          String
-  description   String?   @db.Text
-  permalink     String?   // URL-friendly name
-  
-  notes         NoteEntity[]
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  @@unique([userId, type, name])
-  @@index([userId])
-  @@index([type])
-}
-
-enum EntityType {
-  PERSON
-  PROJECT
-  APP
-  COMPANY
-  PLACE
-  TOPIC
-}
-
-// Junction table for notes and entities (many-to-many)
-model NoteEntity {
-  id            String    @id @default(cuid())
-  noteId        String
-  entityId      String
-  
-  note          Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  entity        Entity    @relation(fields: [entityId], references: [id], onDelete: Cascade)
-  
-  mentionCount  Int       @default(1)
-  lastMentioned DateTime  @updatedAt
-
-  @@unique([noteId, entityId])
-  @@index([noteId])
-  @@index([entityId])
-}
-
-// Daily AI briefing — generated once per day, cached, regenerated on demand
-model DailyDigest {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  date        String   // "YYYY-MM-DD" in user's local date
-  content     Json     // DigestContent — structured briefing
-  noteCount   Int      @default(0) // notes in scope when generated
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@unique([userId, date])
+  @@index([userId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([projectId])
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// Habits
+
+model Habit {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?    @db.Text
+  icon        String?
+  color       String?    @default("#6366f1")
+  frequency   String     @default("daily")
+  isActive    Boolean    @default(true)
+  logs        HabitLog[]
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
   @@index([userId])
 }
 
-// API keys for various services
-model ApiKey {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  name          String    // e.g., "OpenAI", "Neon"
-  key           String    @db.Text
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+model HabitLog {
+  id        String   @id @default(cuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  date      String
+  completed Boolean  @default(true)
+  note      String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+  @@index([habitId])
+  @@index([date])
+}
+
+// Projects
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?       @db.Text
+  status      ProjectStatus @default(ACTIVE)
+  color       String?       @default("#6366f1")
+  icon        String?
+
+  tasks       Task[]
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@index([userId])
+  @@index([status])
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+// Notes
+
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String?
+  content   String   @db.Text
+  tags      String[] @default([])
+  isPinned  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// Nero chat history
+
+model Message {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role      MessageRole
+  content   String      @db.Text
+  metadata  Json?
+
+  createdAt DateTime    @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+// Long-term memory — distilled facts Nero learns about Mike
+model Memory {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  content    String   @db.Text
+  category   String   @default("general") // preference | fact | project | person | routine | general
+  importance Int      @default(3)         // 1-5; higher = always surface
+  source     String?                       // "chat" | "distill" | "manual"
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([importance])
 }

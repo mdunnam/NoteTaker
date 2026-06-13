@@ -1,0 +1,1 @@
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -STA -File ""G:\APPS\NoteTaker\scripts\nero-tray.ps1""", 0, False

@@ -1,0 +1,55 @@
+{
+  "display_information": {
+    "name": "Nero",
+    "description": "Mike's personal daily assistant",
+    "background_color": "#7c3aed"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "nero",
+      "always_online": true
+    },
+    "app_home": {
+      "home_tab_enabled": false,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "user": [
+        "search:read",
+        "channels:history",
+        "channels:read",
+        "groups:history",
+        "groups:read",
+        "im:history",
+        "im:read",
+        "mpim:history",
+        "mpim:read",
+        "users:read"
+      ],
+      "bot": [
+        "channels:history",
+        "channels:read",
+        "groups:history",
+        "groups:read",
+        "im:history",
+        "im:read",
+        "im:write",
+        "users:read",
+        "chat:write"
+      ]
+    }
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false,
+    "event_subscriptions": {
+      "bot_events": [
+        "message.im"
+      ]
+    }
+  }
+}
