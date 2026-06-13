@@ -182,11 +182,11 @@ const TOOLS: NeroTool[] = [
   },
   {
     name: "update_directives",
-    description: "Rewrite your own standing directives — the editable part of your system prompt that persists across all future conversations. Use this whenever Mike tells you how he wants you to work, what to prioritize, what rules to follow, or how to behave. Pass the FULL new directives text (it replaces the old block, so include everything you want to keep).",
+    description: "Rewrite your standing directives -- a SHORT additional list of rules/preferences Mike has given you (tone tweaks, priorities, routines, formatting habits, etc.) that persists across all future conversations. This is a SUPPLEMENT to your core instructions, not a copy of them -- never restate your identity, tools, or core behavior here. Pass the FULL new directives list as short bullet points (it replaces the old list, so carry forward any prior directives Mike still wants plus the new one).",
     input_schema: {
       type: "object",
       properties: {
-        directives: { type: "string", description: "The complete new directives text to save. Replaces the previous directives entirely." },
+        directives: { type: "string", description: "The complete new directives list as short bullet points. Replaces the previous list entirely -- do not include core identity/instructions, only additional standing rules." },
       },
       required: ["directives"],
     },
