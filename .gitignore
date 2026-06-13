@@ -48,3 +48,6 @@ prisma/*.db-journal
 .env*.local
 
 service-account.json
+
+# Nero self-maintained directives (runtime state)
+nero-directives.md
